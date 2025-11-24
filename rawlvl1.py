@@ -6,7 +6,6 @@ import numpy as np
 from scipy.optimize import curve_fit
 import sympy as sp
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch
 import networkx as nx
 
 FUNCTION_LIBRARY = {
@@ -186,17 +185,9 @@ class KANLayer(nn.Module):
         formula = self.c * self.sym_fun(v) + self.d
         return sp.simplify(formula)
 
-# Advanced GraphKAN: Integrates KAN layers as edge functions in a GCN-like structure.
-# Connectivity rules:
-# - Inputs: may connect to inputs and hidden nodes; also to output y.
-# - Hidden: may connect to hidden nodes and to output y; NOT to inputs (no h->x edges).
-# - Output y: receives from inputs/hidden only (no outgoing edges).
-# Node states (including inputs) are updated via message passing to learn dependencies (e.g., x3 = f(x1, x2)).
-# Reconstruction loss on inputs forces the model to learn how to reconstruct each input from others, discovering dependencies.
-# Hidden nodes are free to learn intermediate representations for more complex relationships.
-# Multiple layers allow deeper propagation of information.
+
 class GraphKAN(nn.Module):
-    def __init__(self, num_inputs=3, num_hidden=2, num_outputs=1, num_intervals=15, spline_order=3, grid_range=[-3, 3], num_layers=2,
+    def __init__(self, num_inputs=3, num_hidden=2, num_outputs=1, num_intervals=15, spline_order=3, grid_range=[-2, 2], num_layers=2,
                  use_residual=True, use_layernorm=True):
         super(GraphKAN, self).__init__()
         # Store topology
@@ -295,78 +286,6 @@ class GraphKAN(nn.Module):
                             phi_ij.symbolic_enabled = False
                             phi_ij.mask.data = torch.zeros_like(phi_ij.mask)
 
-    def get_full_symbolic_formula(self):
-        """Compose y purely in terms of original inputs by back-substituting hidden nodes.
-
-        Returns a LaTeX string like 'y = ...' with all hidden variables eliminated.
-        If some contributing edges are non-symbolic, it will still compose using the
-        available symbolic edges (effectively ignoring the non-symbolic ones).
-        """
-        expr, _partial = self.compose_symbolic_y(decimals=2)
-        if expr is None:
-            return "y = (no symbolic edges found)"
-        return f"y = {sp.latex(expr)}"
-
-    def compose_symbolic_y(self, decimals=2):
-        """Returns (expr, partial) where expr is SymPy expression for y in terms of inputs only.
-
-        - Uses only edges with identified symbolic functions (phi.symbolic_enabled and mask>0).
-        - Propagates symbols across self.num_layers to back-substitute hidden nodes.
-        - Rounds floating constants inside the final expression to the given decimals.
-        - partial=True if some encountered edges into a node were non-symbolic (and thus ignored).
-        """
-        # Create SymPy symbols for inputs
-        input_syms = sp.symbols(' '.join([f'x{i+1}' for i in range(self.num_inputs)]))
-        if self.num_inputs == 1:
-            input_syms = (input_syms,)  # ensure tuple-like access
-        # Initialize state: inputs are symbols; hidden and y start at 0
-        current = list(input_syms) + [0] * self.num_hidden + [0] * self.num_outputs
-        partial = False
-        for _ in range(self.num_layers):
-            new_state = [0] * self.num_nodes
-            for j in range(self.num_nodes):
-                msgs = 0
-                has_non_sym = False
-                for i in range(self.num_nodes):
-                    if i == j:
-                        continue
-                    key = f'{i}_{j}'
-                    if key not in self.phis:
-                        continue
-                    phi = self.phis[key]
-                    if phi.mask.item() == 0:
-                        continue
-                    if phi.symbolic_enabled:
-                        f_expr = phi.symbolic_formula(var='tmp')
-                        msgs += f_expr.subs('tmp', current[i])
-                    else:
-                        has_non_sym = True
-                if has_non_sym:
-                    partial = True
-                new_state[j] = sp.simplify(msgs)
-            current = new_state
-
-        # Helper to round all Float constants inside a SymPy expression
-        def _round_expr(e, n):
-            if e is None:
-                return None
-            floats = list(e.atoms(sp.Float))
-            if not floats:
-                return e
-            repl = {}
-            for a in floats:
-                try:
-                    repl[a] = sp.Float(f"{float(a):.{n}f}")
-                except Exception:
-                    repl[a] = a
-            return e.xreplace(repl)
-
-        y_expr = sp.simplify(current[self.y_index])
-        if y_expr == 0:
-            # No symbolic path reached y
-            return None, partial
-        y_expr = _round_expr(y_expr, decimals)
-        return y_expr, partial
 
     def plot_with_formula(self):
         G = nx.DiGraph()
@@ -402,9 +321,9 @@ class GraphKAN(nn.Module):
         nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=3, alpha=0.9)
         nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=11, font_color='darkblue')
 
-        formula = self.get_full_symbolic_formula()
-        plt.text(0.02, 0.02, formula, transform=plt.gca().transAxes,
-                 fontsize=15, verticalalignment='bottom', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.9))
+
+        # plt.text(0.02, 0.02, formula, transform=plt.gca().transAxes,
+        #          fontsize=15, verticalalignment='bottom', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.9))
 
         plt.title("GraphKAN: Full Symbolic Discovery (including hidden nodes)", fontsize=18, pad=20)
         plt.axis('off')
@@ -451,7 +370,7 @@ def train():
         loss_y = F.mse_loss(pred_y, train_y)
         # Reconstruction loss for input nodes only (match rawlvl0 weight)
         loss_rec = sum(F.mse_loss(out[:, i], train_features[:, i]) for i in range(model.num_inputs))
-        loss = loss_y + loss_rec
+        loss = loss_y + loss_rec/3
         loss.backward()
         optimizer.step()
 
@@ -471,7 +390,7 @@ def train():
 train()
 model.prune(threshold=5e-3)
 model.auto_symbolic()
-model.resolve_bidirectional()
+# model.resolve_bidirectional()
 
 # --- Print identified formulas similar to rawlvl0 ---
 
@@ -501,9 +420,5 @@ for name, phi in model.phis.items():
     expr = phi.symbolic_formula(var=node_names[i])
     expr = _round_sympy_expr(expr, decimals=2)
     print(f"{node_names[i]} → {node_names[j]} : {expr}")
-
-print("\nComposed symbolic y:")
-formula_str = model.get_full_symbolic_formula()
-print(formula_str)
 
 model.plot_with_formula()
