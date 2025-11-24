@@ -285,9 +285,9 @@ class GraphKAN(nn.Module):
                         else:
                             phi_ij.symbolic_enabled = False
                             phi_ij.mask.data = torch.zeros_like(phi_ij.mask)
+        
 
-
-    def plot_with_formula(self):
+    def plot(self):
         G = nx.DiGraph()
         pos = {}
         edge_labels = {}
@@ -313,7 +313,7 @@ class GraphKAN(nn.Module):
                 edge_labels[(i, j)] = label
                 edge_colors.append('red')
 
-        plt.figure(figsize=(11, 8))
+        plt.figure(figsize=(10, 8))
         nx.draw(G, pos, with_labels=True, labels=node_labels, node_color='lightcyan',
                 node_size=3000, font_size=16, font_weight='bold', arrows=True,
                 arrowstyle='->', arrowsize=25, edge_color=edge_colors, width=2.5)
@@ -321,14 +321,67 @@ class GraphKAN(nn.Module):
         nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=3, alpha=0.9)
         nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=11, font_color='darkblue')
 
-
-        # plt.text(0.02, 0.02, formula, transform=plt.gca().transAxes,
-        #          fontsize=15, verticalalignment='bottom', bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.9))
-
         plt.title("GraphKAN: Full Symbolic Discovery (including hidden nodes)", fontsize=18, pad=20)
         plt.axis('off')
         plt.tight_layout()
         plt.show()
+
+    def compose_symbolic_expressions(self, decimals=2):
+        """
+        Compose symbolic expressions for all nodes using only discovered symbolic edges.
+        Returns a dict: node_index -> sympy expression.
+        Inputs are returned as symbols x1..xN.
+        The expression for y (self.y_index) is in terms of inputs only when possible.
+        """
+        # Initialize expressions with input symbols
+        exprs = {i: sp.symbols(f'x{i+1}') for i in range(self.num_inputs)}
+
+        # Iteratively propagate expressions along enabled symbolic edges
+        # We allow partial sums so we don't need strict topological order
+        max_iters = self.num_nodes * 2
+        for _ in range(max_iters):
+            updated = False
+            for name, phi in self.phis.items():
+                if phi.mask.item() == 0 or not getattr(phi, 'symbolic_enabled', False):
+                    continue
+                i, j = map(int, name.split('_'))
+                # Only propagate from nodes we already have an expression for
+                if i in exprs:
+                    try:
+                        contrib = sp.simplify(phi.c * phi.sym_fun(exprs[i]) + phi.d)
+                    except Exception:
+                        # Fallback: skip this edge if sympy composition fails
+                        continue
+                    if j in exprs:
+                        new_expr = sp.simplify(exprs[j] + contrib)
+                    else:
+                        new_expr = contrib
+                    if new_expr != exprs.get(j):
+                        exprs[j] = new_expr
+                        updated = True
+            if not updated:
+                break
+
+        # Optionally round floating constants for readability
+        def _round_sympy_expr_local(expr, decimals_local=2):
+            if expr is None:
+                return None
+            floats = list(expr.atoms(sp.Float))
+            if not floats:
+                return expr
+            repl = {}
+            for a in floats:
+                try:
+                    repl[a] = sp.Float(f"{float(a):.{decimals_local}f}")
+                except Exception:
+                    repl[a] = a
+            return expr.xreplace(repl)
+
+        if decimals is not None:
+            for k in list(exprs.keys()):
+                exprs[k] = _round_sympy_expr_local(exprs[k], decimals)
+
+        return exprs
 
 # Toy data
 num_samples = 1000
@@ -421,4 +474,12 @@ for name, phi in model.phis.items():
     expr = _round_sympy_expr(expr, decimals=2)
     print(f"{node_names[i]} → {node_names[j]} : {expr}")
 
-model.plot_with_formula()
+model.plot()
+
+# Compose y symbolically in terms of input variables only
+exprs = model.compose_symbolic_expressions(decimals=2)
+if model.y_index in exprs:
+    print("\nComposed y in terms of inputs:")
+    print(f"y = {exprs[model.y_index]}")
+else:
+    print("\nComposed y in terms of inputs: unavailable (no symbolic path found)")
