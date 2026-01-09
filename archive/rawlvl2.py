@@ -6,21 +6,37 @@ import numpy as np
 from scipy.optimize import curve_fit
 import sympy as sp
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch
 import networkx as nx
+
+def _safe_log_torch(x):
+    return torch.log(torch.clamp(x, min=1e-6))
+
+def _safe_inv_torch(x):
+    eps = 1e-6
+    x_clamped = torch.where(x >= 0, torch.clamp(x, min=eps), torch.clamp(x, max=-eps))
+    return 1.0 / x_clamped
+
+def _safe_sqrt_torch(x):
+    return torch.sqrt(torch.clamp(x, min=0.0))
+
+def _safe_exp_torch(x):
+    return torch.exp(torch.clamp(x, min=-50.0, max=50.0))
 
 FUNCTION_LIBRARY = {
     'sin': {'np': np.sin, 'torch': torch.sin, 'sympy': sp.sin},
     'cos': {'np': np.cos, 'torch': torch.cos, 'sympy': sp.cos},
-    'exp': {'np': np.exp, 'torch': torch.exp, 'sympy': sp.exp},
-    'log': {'np': np.log, 'torch': torch.log, 'sympy': sp.log},
-    'sqrt': {'np': np.sqrt, 'torch': torch.sqrt, 'sympy': sp.sqrt},
+    'tan': {'np': np.tan, 'torch': torch.tan, 'sympy': sp.tan},
+    'exp': {'np': np.exp, 'torch': _safe_exp_torch, 'sympy': sp.exp},
+    'log': {'np': np.log, 'torch': _safe_log_torch, 'sympy': sp.log},
+    'sqrt': {'np': np.sqrt, 'torch': _safe_sqrt_torch, 'sympy': sp.sqrt},
     'tanh': {'np': np.tanh, 'torch': torch.tanh, 'sympy': sp.tanh},
     'sigmoid': {'np': lambda x: 1/(1+np.exp(-x)), 'torch': torch.sigmoid, 'sympy': lambda v: 1/(1 + sp.exp(-v))},
     'identity': {'np': lambda x: x, 'torch': lambda x: x, 'sympy': lambda v: v},
     'square': {'np': lambda x: x**2, 'torch': lambda x: x**2, 'sympy': lambda v: v**2},
     'cube': {'np': lambda x: x**3, 'torch': lambda x: x**3, 'sympy': lambda v: v**3},
-    'inv': {'np': lambda x: 1/x, 'torch': lambda x: 1/x, 'sympy': lambda v: 1/v},
-    'gauss': {'np': lambda x: np.exp(-x**2), 'torch': lambda x: torch.exp(-x**2), 'sympy': lambda v: sp.exp(-v**2)},
+    'inv': {'np': lambda x: 1/x, 'torch': _safe_inv_torch, 'sympy': lambda v: 1/v},
+    'gauss': {'np': lambda x: np.exp(-x**2), 'torch': lambda x: torch.exp(-(x**2)), 'sympy': lambda v: sp.exp(-(v**2))},
     # Add more functions if needed for more complex symbolic fitting
 }
 
@@ -63,7 +79,7 @@ def extend_grid(grid, k_extend=0):
     return grid
 
 class KANLayer(nn.Module):
-    def __init__(self, in_dim=1, out_dim=1, num=15, k=3, noise_scale=0.1, scale_base=1.0, scale_sp=1.0, base_fun=nn.SiLU(), grid_eps=0.02, grid_range=[-3, 3], sp_trainable=True, sb_trainable=True):
+    def __init__(self, in_dim=1, out_dim=1, num=15, k=3, noise_scale=0.1, scale_base=1.0, scale_sp=0.1, base_fun=nn.Identity(), grid_eps=0.02, grid_range=[-3, 3], sp_trainable=True, sb_trainable=True):
         super(KANLayer, self).__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -91,6 +107,7 @@ class KANLayer(nn.Module):
         batch = x.shape[0]
         if self.symbolic_enabled:
             y_base = torch.tensor(self.c, device=x.device) * self.fun(x) + torch.tensor(self.d, device=x.device)
+            y_base = torch.nan_to_num(y_base, nan=0.0, posinf=1e6, neginf=-1e6)
             y = y_base[:, :, None]
             y = self.mask[None, :, :] * y
             y = y.sum(dim=1)
@@ -125,9 +142,15 @@ class KANLayer(nn.Module):
             self.mask.data = torch.zeros_like(self.mask)
 
     def auto_symbolic(self, lib=None, threshold=0.95):
+        """
+        Fit c * f(x) without per-edge bias. In GraphKAN, node j aggregates
+        sums over incoming edges. An intercept per edge would accumulate and
+        distort the node value. To align with MultiKAN-style auto symbolic,
+        we estimate only a scale c and fix d = 0.
+        """
         if self.mask.item() == 0:
             return
-        print("Fitting symbolic for this layer")
+        print("Fitting symbolic for this layer (no per-edge bias)")
         x_np = np.linspace(self.grid_range[0], self.grid_range[1], 1000)
         x_t = torch.from_numpy(x_np).float().unsqueeze(1)
         with torch.no_grad():
@@ -135,46 +158,43 @@ class KANLayer(nn.Module):
         y_np = y_t.squeeze().numpy()
         candidate_names = list(FUNCTION_LIBRARY.keys()) if lib is None else [n for n in lib if n in FUNCTION_LIBRARY]
         candidate_names = [n for n in candidate_names if callable(FUNCTION_LIBRARY[n].get('np', None))]
-        fun_dict_np = {n: (lambda fn: (lambda x, c, d: c * fn(x) + d))(FUNCTION_LIBRARY[n]['np']) for n in candidate_names}
         fun_dict_torch = {n: FUNCTION_LIBRARY[n]['torch'] for n in candidate_names if 'torch' in FUNCTION_LIBRARY[n]}
         sym_dict = {n: FUNCTION_LIBRARY[n]['sympy'] for n in candidate_names if 'sympy' in FUNCTION_LIBRARY[n]}
         best_r2 = -1
         best_name = None
-        best_popt = None
+        best_c = None
         for name in candidate_names:
-            if name not in fun_dict_np:
-                continue
-            fit_fun = fun_dict_np[name]
             base_np_fun = FUNCTION_LIBRARY[name]['np']
             with np.errstate(all='ignore'):
                 fvals = base_np_fun(x_np)
                 valid_mask = np.isfinite(fvals) & np.isfinite(y_np)
                 if valid_mask.sum() < 50:
                     continue
-                x_fit = x_np[valid_mask]
+                f_fit = fvals[valid_mask]
                 y_fit = y_np[valid_mask]
-                try:
-                    popt, _ = curve_fit(fit_fun, x_fit, y_fit, p0=[1.0, 0.0], maxfev=10000)
-                    pred = fit_fun(x_fit, *popt)
-                    if not np.all(np.isfinite(pred)):
-                        continue
-                    ss_res = np.sum((y_fit - pred)**2)
-                    ss_tot = np.sum((y_fit - y_fit.mean())**2)
-                    r2 = 1 - ss_res / (ss_tot + 1e-6)
-                    if r2 > best_r2:
-                        best_r2 = r2
-                        best_name = name
-                        best_popt = popt
-                except:
+                denom = np.sum(f_fit * f_fit)
+                if denom <= 1e-12:
                     continue
-        if best_r2 > threshold:
+                c_hat = np.sum(f_fit * y_fit) / denom
+                pred = c_hat * f_fit
+                if not np.all(np.isfinite(pred)):
+                    continue
+                ss_res = np.sum((y_fit - pred)**2)
+                ss_tot = np.sum((y_fit - y_fit.mean())**2)
+                r2 = 1 - ss_res / (ss_tot + 1e-12)
+                if r2 > best_r2:
+                    best_r2 = r2
+                    best_name = name
+                    best_c = float(c_hat)
+        if best_r2 > threshold and best_name is not None:
             self.sym_name = best_name
-            self.c, self.d = best_popt
+            self.c = best_c
+            self.d = 0.0
             self.fun = fun_dict_torch.get(best_name, lambda x: x)
             self.sym_fun = sym_dict.get(best_name, lambda v: v)
             self.symbolic_enabled = True
             self.best_r2 = best_r2
-            print(f"Best fit: {best_name} with R2 {best_r2:.4f}")
+            print(f"Best fit: {best_name} with R2 {best_r2:.4f}, c={self.c:.4f}, d fixed to 0")
         else:
             print("No good symbolic fit found")
 
@@ -185,21 +205,25 @@ class KANLayer(nn.Module):
         formula = self.c * self.sym_fun(v) + self.d
         return sp.simplify(formula)
 
-
+# Advanced GraphKAN: Integrates KAN layers as edge functions in a GCN-like structure.
+# Connectivity rules:
+# - Inputs: may connect to inputs and hidden nodes; also to output y.
+# - Hidden: may connect to hidden nodes and to output y; NOT to inputs (no h->x edges).
+# - Output y: receives from inputs/hidden only (no outgoing edges).
+# Node states (including inputs) are updated via message passing to learn dependencies (e.g., x3 = f(x1, x2)).
+# Reconstruction loss on inputs forces the model to learn how to reconstruct each input from others, discovering dependencies.
+# Hidden nodes are free to learn intermediate representations for more complex relationships.
+# Multiple layers allow deeper propagation of information.
 class GraphKAN(nn.Module):
-    def __init__(self, num_inputs=3, num_hidden=2, num_outputs=1, num_intervals=15, spline_order=3, grid_range=[-2, 2], num_layers=2,
-                 use_residual=True, use_layernorm=True):
+    def __init__(self, num_inputs=3, num_hidden=2, num_intervals=15, spline_order=3, grid_range=[-3, 3], num_layers=2,
+                 use_layernorm=True):
         super(GraphKAN, self).__init__()
         # Store topology
         self.num_inputs = num_inputs
         self.num_hidden = num_hidden
-        self.num_outputs = num_outputs
-        self.num_nodes = num_inputs + num_hidden + num_outputs
+        self.num_nodes = num_inputs + num_hidden
         self.num_layers = num_layers
-        self.use_residual = use_residual
         self.use_layernorm = use_layernorm
-        # Index of the single output node (assumes num_outputs == 1)
-        self.y_index = self.num_nodes - 1
         self.input_indices = list(range(num_inputs))
         self.hidden_indices = list(range(num_inputs, num_inputs + num_hidden))
         self.phis = nn.ModuleDict()
@@ -208,29 +232,10 @@ class GraphKAN(nn.Module):
             for j in range(self.num_nodes):
                 if i == j:
                     continue
-                # Any input or hidden can point to y (output receiver only)
-                if j == self.y_index and i < num_inputs + num_hidden:
+                else:
                     self.phis[f'{i}_{j}'] = KANLayer(
                         num=num_intervals, k=spline_order, grid_range=grid_range, base_fun=nn.SiLU()
                     )
-                # Input source: allow to inputs and hidden
-                elif i in self.input_indices:
-                    if j in self.input_indices or j in self.hidden_indices:
-                        self.phis[f'{i}_{j}'] = KANLayer(
-                            num=num_intervals, k=spline_order, grid_range=grid_range, base_fun=nn.SiLU()
-                        )
-                # Hidden source: allow only to hidden (no hidden -> input)
-                elif i in self.hidden_indices:
-                    if j in self.hidden_indices or j == self.y_index:
-                        self.phis[f'{i}_{j}'] = KANLayer(
-                            num=num_intervals, k=spline_order, grid_range=grid_range, base_fun=nn.SiLU()
-                        )
-
-        # Residual + LayerNorm for stable message passing (configurable)
-        if self.use_residual:
-            self.res_weight = nn.Parameter(torch.ones(1) * 0.5)
-        else:
-            self.res_weight = None
         if self.use_layernorm:
             self.ln = nn.LayerNorm(self.num_nodes)
         else:
@@ -242,14 +247,15 @@ class GraphKAN(nn.Module):
         for j in range(self.num_nodes):
             msgs = 0.0
             for i in range(self.num_nodes):
-                if i != j and f'{i}_{j}' in self.phis:
+                if f'{i}_{j}' in self.phis:
                     phi = self.phis[f'{i}_{j}']
                     msg, _, _, _ = phi(x[:, i:i+1])
                     msgs = msgs + msg.squeeze(1)
-            new_x[:, j] = msgs
-        # Optional residual connection
-        if self.use_residual and self.res_weight is not None:
-            new_x = x + self.res_weight * new_x
+            if j < self.num_inputs:           # input nodes: predict from others
+                new_x[:, j] = msgs            # no residual path
+            else:                             # hidden nodes: allow residual
+                new_x[:, j] = x[:, j] + msgs
+
         # Optional layer normalization
         if self.use_layernorm and self.ln is not None:
             new_x = self.ln(new_x)
@@ -268,7 +274,8 @@ class GraphKAN(nn.Module):
     def auto_symbolic(self):
         for name, phi in self.phis.items():
             if phi.mask.item() > 0:
-                phi.auto_symbolic(threshold=0.95)
+                print(name)
+                phi.auto_symbolic(threshold=0.85)
 
     def resolve_bidirectional(self):
         for i in range(self.num_nodes):
@@ -285,165 +292,205 @@ class GraphKAN(nn.Module):
                         else:
                             phi_ij.symbolic_enabled = False
                             phi_ij.mask.data = torch.zeros_like(phi_ij.mask)
-        
 
-    def plot(self):
-        G = nx.DiGraph()
-        pos = {}
+
+
+    def plot_with_formula(self, layout='spring', seed=42, k=None, scale=2.0, jitter=0.0,
+                           show_nonsymbolic=False,
+                           r2_influence=True, r2_power=1.0,
+                           spring_weight_scale=5.0,
+                           kamada_min_dist=0.3, kamada_max_dist=3.0):
+        """
+        Plot the discovered graph.
+
+        Args:
+            layout: 'spring' (scatter), 'kamada', or 'layered'. Default 'spring'.
+            seed: random seed for spring layout.
+            k: optimal distance between nodes for spring layout (passed to networkx.spring_layout).
+            scale: scale factor for spring layout.
+            jitter: add small random jitter to positions in layered layout to avoid exact alignment.
+            show_nonsymbolic: if True, also draw faint gray edges for active but non-symbolic connections.
+        """
+        G_sym = nx.DiGraph()
+        G_all = nx.DiGraph()
         edge_labels = {}
-        edge_colors = []
+        edge_r2 = {}
 
-        # Layout
-        for i in range(self.num_inputs):
-            pos[i] = (i - (self.num_inputs - 1) / 2, 0)
-        for i in range(self.num_hidden):
-            pos[self.num_inputs + i] = (i * 1.5 - (self.num_hidden - 1) * 0.75, 1.5)
-        pos[self.y_index] = (0.5, 3)
+        # Add all nodes first so layouts place isolated nodes too
+        for n in range(self.num_nodes):
+            G_sym.add_node(n)
+            G_all.add_node(n)
 
+        # Collect edges
+        sym_edges = []
+        nonsym_edges = []
+        for name, phi in self.phis.items():
+            i, j = map(int, name.split('_'))
+            if phi.mask.item() != 0:
+                G_all.add_edge(i, j)
+                if phi.symbolic_enabled:
+                    G_sym.add_edge(i, j)
+                    sym_edges.append((i, j))
+                    edge_labels[(i, j)] = f"{phi.c:+.2f}*{phi.sym_name}"
+                    # Cache R2 for layout/width scaling
+                    try:
+                        edge_r2[(i, j)] = float(getattr(phi, 'best_r2', 0.0))
+                    except Exception:
+                        edge_r2[(i, j)] = 0.0
+                elif show_nonsymbolic:
+                    nonsym_edges.append((i, j))
+
+        # Node labels
         node_labels = {i: f'x{i+1}' for i in range(self.num_inputs)}
         node_labels.update({self.num_inputs + i: f'h{i+1}' for i in range(self.num_hidden)})
-        node_labels[self.y_index] = 'y'
 
-        for name, phi in self.phis.items():
-            if phi.mask.item() != 0 and phi.symbolic_enabled:
-                i, j = map(int, name.split('_'))
-                G.add_edge(i, j)
-                # Annotate symbolic edges with a red arrow and a label
-                label = f"{phi.c:+.2f}*{phi.sym_name}"
-                edge_labels[(i, j)] = label
-                edge_colors.append('red')
+        # Choose layout
+        if layout == 'spring':
+            base_graph = G_sym if len(G_sym.edges) > 0 else G_all
+            # Apply R² as spring weights: higher R² -> stronger attraction (closer)
+            if r2_influence and len(base_graph.edges) > 0:
+                for (u, v) in base_graph.edges:
+                    r2 = edge_r2.get((u, v), 0.0)
+                    w = 1.0 + spring_weight_scale * max(0.0, r2) ** r2_power
+                    base_graph[u][v]['weight'] = w
+            pos = nx.spring_layout(base_graph, seed=seed, k=k, scale=scale, weight='weight')
+            # Ensure positions for any nodes missing due to isolated in base_graph
+            for n in range(self.num_nodes):
+                if n not in pos:
+                    pos[n] = np.random.default_rng(seed + n).random(2) * scale
+        elif layout == 'kamada':
+            base_graph = G_sym if len(G_sym.edges) > 0 else G_all
+            # Kamada-Kawai uses edge 'weight' as distances in shortest paths.
+            # Map higher R² to shorter desired distances.
+            if r2_influence and len(base_graph.edges) > 0:
+                dmin, dmax = kamada_min_dist, kamada_max_dist
+                for (u, v) in base_graph.edges:
+                    r2 = edge_r2.get((u, v), 0.0)
+                    # distance decreases with r2
+                    dist = dmax - (dmax - dmin) * max(0.0, r2) ** r2_power
+                    base_graph[u][v]['weight'] = max(1e-6, float(dist))
+            pos = nx.kamada_kawai_layout(base_graph, scale=scale, weight='weight')
+            for n in range(self.num_nodes):
+                if n not in pos:
+                    pos[n] = np.random.default_rng(seed + n).random(2) * scale
+        else:  # layered
+            pos = {}
+            for i in range(self.num_inputs):
+                y = 0.0 + (np.random.rand() - 0.5) * jitter if jitter > 0 else 0.0
+                pos[i] = (i - (self.num_inputs - 1) / 2, y)
+            for i in range(self.num_hidden):
+                y = 1.5 + (np.random.rand() - 0.5) * jitter if jitter > 0 else 1.5
+                pos[self.num_inputs + i] = (i * 1.5 - (self.num_hidden - 1) * 0.75, y)
 
-        plt.figure(figsize=(10, 8))
-        nx.draw(G, pos, with_labels=True, labels=node_labels, node_color='lightcyan',
-                node_size=3000, font_size=16, font_weight='bold', arrows=True,
-                arrowstyle='->', arrowsize=25, edge_color=edge_colors, width=2.5)
+        # Draw
+        plt.figure(figsize=(11, 8))
 
-        nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=3, alpha=0.9)
-        nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=11, font_color='darkblue')
+        # Color-code inputs vs hidden
+        node_colors = []
+        for n in range(self.num_nodes):
+            node_colors.append('lightblue' if n < self.num_inputs else 'lightgreen')
 
-        plt.title("GraphKAN: Full Symbolic Discovery (including hidden nodes)", fontsize=18, pad=20)
+        nx.draw_networkx_nodes(G_all, pos, node_color=node_colors, node_size=1800, edgecolors='k')
+        nx.draw_networkx_labels(G_all, pos, labels=node_labels, font_size=14, font_weight='bold')
+
+        # Optional non-symbolic edges (faint gray)
+        if show_nonsymbolic and len(nonsym_edges) > 0:
+            nx.draw_networkx_edges(
+                G_all, pos, edgelist=nonsym_edges, edge_color='lightgray', width=1.5, alpha=0.6,
+                arrows=True, arrowstyle='-|>', arrowsize=18, connectionstyle='arc3,rad=0.1'
+            )
+
+        # Symbolic edges (highlighted red); width scaled by R² if available
+        if len(sym_edges) > 0:
+            if r2_influence:
+                widths = [2.0 + 4.0 * max(0.0, edge_r2.get(e, 0.0)) ** r2_power for e in sym_edges]
+            else:
+                widths = 3.0
+            nx.draw_networkx_edges(
+                G_sym, pos, edgelist=sym_edges, edge_color='red', width=widths, alpha=0.95,
+                arrows=True, arrowstyle='-|>', arrowsize=22, connectionstyle='arc3,rad=0.15'
+            )
+            nx.draw_networkx_edge_labels(G_sym, pos, edge_labels=edge_labels, font_size=11, font_color='darkred')
+
+        plt.title("GraphKAN: Discovered symbolic links", fontsize=18, pad=20)
         plt.axis('off')
         plt.tight_layout()
         plt.show()
 
-    def compose_symbolic_expressions(self, decimals=2):
-        """
-        Compose symbolic expressions for all nodes using only discovered symbolic edges.
-        Returns a dict: node_index -> sympy expression.
-        Inputs are returned as symbols x1..xN.
-        The expression for y (self.y_index) is in terms of inputs only when possible.
-        """
-        # Initialize expressions with input symbols
-        exprs = {i: sp.symbols(f'x{i+1}') for i in range(self.num_inputs)}
-
-        # Iteratively propagate expressions along enabled symbolic edges
-        # We allow partial sums so we don't need strict topological order
-        max_iters = self.num_nodes * 2
-        for _ in range(max_iters):
-            updated = False
-            for name, phi in self.phis.items():
-                if phi.mask.item() == 0 or not getattr(phi, 'symbolic_enabled', False):
-                    continue
-                i, j = map(int, name.split('_'))
-                # Only propagate from nodes we already have an expression for
-                if i in exprs:
-                    try:
-                        contrib = sp.simplify(phi.c * phi.sym_fun(exprs[i]) + phi.d)
-                    except Exception:
-                        # Fallback: skip this edge if sympy composition fails
-                        continue
-                    if j in exprs:
-                        new_expr = sp.simplify(exprs[j] + contrib)
-                    else:
-                        new_expr = contrib
-                    if new_expr != exprs.get(j):
-                        exprs[j] = new_expr
-                        updated = True
-            if not updated:
-                break
-
-        # Optionally round floating constants for readability
-        def _round_sympy_expr_local(expr, decimals_local=2):
-            if expr is None:
-                return None
-            floats = list(expr.atoms(sp.Float))
-            if not floats:
-                return expr
-            repl = {}
-            for a in floats:
-                try:
-                    repl[a] = sp.Float(f"{float(a):.{decimals_local}f}")
-                except Exception:
-                    repl[a] = a
-            return expr.xreplace(repl)
-
-        if decimals is not None:
-            for k in list(exprs.keys()):
-                exprs[k] = _round_sympy_expr_local(exprs[k], decimals)
-
-        return exprs
-
 # Toy data
-num_samples = 1000
+num_samples = 5000
 x1 = torch.rand(num_samples) * 2 - 1
 x2 = torch.rand(num_samples) * 2 - 1
-x3 = x1 + torch.sin(x2)
-y_real = torch.sin(x3 + torch.exp(x1))
+x3 = x1+torch.cos(x2)
+x4 = x2+torch.sin(x1)
 
-num_hidden = 1
+num_hidden = 0
 # Assemble features dynamically: [inputs | hidden placeholders | output placeholder]
-num_inputs = 3
-num_outputs = 1
+num_inputs = 4
 features = torch.cat([
     x1.unsqueeze(1),
     x2.unsqueeze(1),
     x3.unsqueeze(1),
+    x4.unsqueeze(1),
     torch.zeros(num_samples, num_hidden),
-    torch.zeros(num_samples, num_outputs)
+
 ], dim=1)
 
 train_features = features[:800]
-train_y = y_real[:800]
+
 test_features = features[800:]
-test_y = y_real[800:]
+
 
 # Model (aligned with rawlvl0 defaults for fair comparison)
-model = GraphKAN(num_inputs=num_inputs, num_hidden=num_hidden, num_outputs=num_outputs,
-                 num_intervals=15, spline_order=3, grid_range=[-1, 1], num_layers=8,
-                 use_residual=False, use_layernorm=False)
-optimizer = optim.Adam(model.parameters(), lr=5e-3)
+model = GraphKAN(num_inputs=num_inputs, num_hidden=num_hidden,
+                 num_intervals=15, spline_order=3, grid_range=[-1, 1], num_layers=1,
+                 use_layernorm=False)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
+def train(epochs=1000, weight=1):
 
-def train():
-    model.train()
-    for epoch in range(600):
+    for epoch in range(epochs):
+        model.train()
         optimizer.zero_grad()
         out = model(train_features)
-        pred_y = out[:, model.y_index]
-        loss_y = F.mse_loss(pred_y, train_y)
-        # Reconstruction loss for input nodes only (match rawlvl0 weight)
-        loss_rec = sum(F.mse_loss(out[:, i], train_features[:, i]) for i in range(model.num_inputs))
-        loss = loss_y + loss_rec/3
+
+        loss = F.mse_loss(out[:, :num_inputs], train_features[:, :num_inputs])
         loss.backward()
         optimizer.step()
 
         if epoch % 100 == 0:
             model.eval()
             with torch.no_grad():
-                test_out = model(test_features)[:, -1]
-                test_mse = F.mse_loss(test_out, test_y).item()
+                test_out = model(test_features)
+                test_mse = F.mse_loss(test_out[:, :num_inputs], test_features[:, :num_inputs])
             print(f"Epoch {epoch} | Test MSE: {test_mse:.6f} | Total Loss: {loss.item():.4f}")
         if epoch % 20 == 0 and epoch > 0:
             for name, phi in model.phis.items():
                 i = int(name.split('_')[0])
-                if i < model.num_inputs:
-                    phi.update_grid_from_samples(train_features[:, i:i+1])
+
+                phi.update_grid_from_samples(train_features[:, i:i+1])
 
 # Prune & symbolic
-train()
-model.prune(threshold=5e-3)
+train(weight=1)
+model.prune(threshold=1e-5)
+model.eval()
+with torch.no_grad():
+    test_out = model(test_features)
+    test_mse = F.mse_loss(test_out[:, :num_inputs], test_features[:, :num_inputs])
+print(f"Pruned MSE: {test_mse:.6f}")
 model.auto_symbolic()
-# model.resolve_bidirectional()
+model.eval()
+with torch.no_grad():
+    test_out = model(test_features)
+    test_mse = F.mse_loss(test_out[:, :num_inputs], test_features[:, :num_inputs])
+print(f"Symbolised MSE: {test_mse:.6f}")
+model.resolve_bidirectional()
+
+model.eval()
+with torch.no_grad():
+    test_out = model(test_features)
+    test_mse = F.mse_loss(test_out[:, :num_inputs], test_features[:, :num_inputs])
+print(f"Directional MSE: {test_mse:.6f}")
 
 # --- Print identified formulas similar to rawlvl0 ---
 
@@ -474,12 +521,5 @@ for name, phi in model.phis.items():
     expr = _round_sympy_expr(expr, decimals=2)
     print(f"{node_names[i]} → {node_names[j]} : {expr}")
 
-model.plot()
 
-# Compose y symbolically in terms of input variables only
-exprs = model.compose_symbolic_expressions(decimals=2)
-if model.y_index in exprs:
-    print("\nComposed y in terms of inputs:")
-    print(f"y = {exprs[model.y_index]}")
-else:
-    print("\nComposed y in terms of inputs: unavailable (no symbolic path found)")
+model.plot_with_formula()

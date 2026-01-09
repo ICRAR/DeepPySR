@@ -277,7 +277,7 @@ class KANLayer(nn.Module):
 
 # Graph KAN with hidden (empty) nodes and multi-layer message passing
 class GraphKAN(nn.Module):
-    def __init__(self, num_inputs=3, num_hidden=3, num_outputs=1, num_intervals=15, spline_order=3, grid_range=[-3, 3], num_layers=2):
+    def __init__(self, num_inputs=3, num_hidden=3, num_outputs=1, num_intervals=15, spline_order=3, grid_range=[-3, 3], num_layers=1):
         super(GraphKAN, self).__init__()
         self.num_nodes = num_inputs + num_hidden + num_outputs
         self.num_layers = num_layers
@@ -315,7 +315,7 @@ class GraphKAN(nn.Module):
                         phi = self.phis[key]
                         msg, _, _, _ = phi(x[:, i].unsqueeze(1))
                         msgs += msg.squeeze(1)
-            new_x[:, j] = msgs
+            new_x[:, j] = x[:,j]+msgs
         return new_x
 
     def forward(self, x):
