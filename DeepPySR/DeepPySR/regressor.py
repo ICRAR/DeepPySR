@@ -42,6 +42,17 @@ class DeepPySRRegressor(PySRRegressor):
         params["random_state"] = seed
         params["progress"] = False # Keep sub-processes quiet
         
+        # Configure PySR to use our output_dir for its files
+        # We use a subfolder for each target to avoid collisions if running in parallel
+        # though currently it's sequential.
+        target_output_dir = os.path.join(self.output_dir, "pysr_outputs", target_name)
+        os.makedirs(target_output_dir, exist_ok=True)
+        
+        params["output_directory"] = target_output_dir
+        # Also use temp_equation_file to avoid leaving files in the root if not requested
+        # but the user wants them in their specified path.
+        # If we set output_directory, PySR should use it.
+        
         # If procs is not set, default to a safe value
         if params.get("procs") is None:
             params["procs"] = max(1, (os.cpu_count() or 2) - 1)
@@ -146,6 +157,7 @@ class DeepPySRRegressor(PySRRegressor):
                 print(f"Error modeling {target_name}: {e}")
 
         self.save_relationships()
+        
         return self
 
     def save_relationships(self, filename="relationships.json"):
