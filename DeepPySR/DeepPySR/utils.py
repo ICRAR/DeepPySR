@@ -4,6 +4,7 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 import networkx as nx
+from pycirclize import Circos
 
 def ensure_output_dir(path: str = "outputs") -> str:
     os.makedirs(path, exist_ok=True)
@@ -31,54 +32,82 @@ def detect_basic_function_for_var(sym_expr: sp.Expr, var_symbol: sp.Symbol) -> s
     return ",".join(tags)
 
 def is_redundant(
-    target_name: str,
-    sym_expr: sp.Expr,
-    all_relationships: list[dict],
-    threshold: float = 1e-3
+        target_name: str,
+        sym_expr: sp.Expr,
+        all_relationships: list[dict],
+        threshold: float = 1e-4
 ) -> bool:
+    """
+    Checks redundancy by evaluating the new expression against existing
+    relationships over a vectorized numerical grid.
+    """
     if not all_relationships:
         return False
 
+    # 1. Expand the expression by substituting previous relationships
+    # We do this numerically to avoid SymPy's symbolic bottleneck
     target_sym = sp.Symbol(target_name)
-    expr_to_check = target_sym - sym_expr
-    
-    sorted_rels = sorted(all_relationships, key=lambda r: r["layer"])
-    sub_map = []
-    for rel in sorted_rels:
-        t_sym = rel.get("target_symbol") or sp.Symbol(rel["target"])
-        sub_map.append((t_sym, rel["sympy"]))
-    
-    expr_to_check = expr_to_check.subs(sub_map)
+    combined_expr = target_sym - sym_expr
+
+    # Sort relationships by layer to ensure we substitute 'deep' vars first
+    sorted_rels = sorted(all_relationships, key=lambda r: r["layer"], reverse=True)
+
+    # 2. Create a substitution map for all intermediate variables
+    sub_map = {rel["target_symbol"]: rel["sympy"] for rel in sorted_rels}
+
+    # 3. Identify truly independent variables (root inputs like x0, x1...)
+    # Instead of full symbolic expansion, we lambdify the expression
+    # with all discovered variables as potential inputs.
+    all_involved = set(str(s) for s in combined_expr.free_symbols)
+    for r in all_relationships:
+        all_involved.update(r["involved"])
+
+    # Remove the target itself and other intermediate symbols
+    root_vars = sorted([v for v in all_involved if v.startswith("x") and v not in sub_map])
+    root_symbols = [sp.Symbol(v) for v in root_vars]
 
     try:
-        free_vars = sorted(list(expr_to_check.free_symbols), key=lambda s: str(s))
-        if not free_vars:
-            return abs(float(expr_to_check)) < threshold
-            
-        f = sp.lambdify(free_vars, expr_to_check, modules=[
-            "numpy", 
-            {
-                "sin": np.sin, "cos": np.cos, "exp": np.exp, "log": np.log, 
-                "sqrt": np.sqrt, "tanh": np.tanh, "square": np.square,
-                "asin": np.arcsin, "acos": np.arccos, "atanh": np.arctanh
-            }
-        ])
-        
-        n_points = 100
-        test_data = [np.random.uniform(0.1, 1.0, n_points) for _ in free_vars]
-        values = f(*test_data)
-        
-        if np.isscalar(values):
-            return abs(float(values)) < threshold
-            
-        if np.allclose(values, 0, atol=threshold, rtol=threshold):
+        # Create a fast NumPy function
+        # We use 'lambdify' on the final expanded form
+        final_expr = combined_expr
+        for _ in range(len(all_relationships)): # Iterative expansion
+            new_expr = final_expr.subs(sub_map)
+            if new_expr == final_expr: break
+            final_expr = new_expr
+
+        f = sp.lambdify(root_symbols, final_expr, modules="numpy")
+
+        # 4. Generate high-volume test data (Vectorized)
+        n_points = 5000
+        test_data = [np.random.uniform(0.1, 1.0, n_points) for _ in root_symbols]
+
+        # Evaluate
+        y_pred = f(*test_data)
+
+        # If the difference is near zero, the new relationship is already implied.
+        if np.allclose(y_pred, 0, atol=threshold):
             return True
-            
-        if np.std(values) < threshold and np.abs(np.mean(values)) < threshold:
+
+        # Also check if the expression itself expands to a constant (original behavior).
+        # We check the standard deviation of its expansion.
+        final_rhs = sym_expr
+        for _ in range(len(all_relationships)):
+            new_expr = final_rhs.subs(sub_map)
+            if new_expr == final_rhs: break
+            final_rhs = new_expr
+        
+        rhs_symbols = sorted([str(s) for s in final_rhs.free_symbols])
+        if not rhs_symbols: # It's a symbolic constant
             return True
-                
+        
+        f_rhs = sp.lambdify([sp.Symbol(s) for s in rhs_symbols], final_rhs, modules="numpy")
+        rhs_test_data = [np.random.uniform(0.1, 1.0, n_points) for _ in rhs_symbols]
+        if np.std(f_rhs(*rhs_test_data)) < threshold:
+            return True
+
     except Exception:
-        pass
+        # Fallback to False if math errors occur (e.g. log of negative)
+        return False
 
     return False
 
@@ -229,8 +258,15 @@ def plot_n_layer_graph(
 
     ax_table.axis("off")
     table_data = []
-    unique_targets = sorted(list(set(d["label"] for d in node_data.values())), 
-                            key=lambda x: (0 if x=="y" else 1, int(x[1:]) if x.startswith("x") and x[1:].isdigit() else x))
+    
+    def sort_key(v):
+        if v == "y":
+            return (0, 0, "")
+        if v.startswith("x") and v[1:].isdigit():
+            return (1, int(v[1:]), v)
+        return (2, 0, v)
+
+    unique_targets = sorted(list(set(d["label"] for d in node_data.values())), key=sort_key)
     
     for t in unique_targets:
         rel = rel_map.get(t)
@@ -254,4 +290,130 @@ def plot_n_layer_graph(
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches='tight')
+    plt.close()
+
+def plot_circlize(
+        relationships: list[dict],
+        save_path: str,
+        total_vars: int = 0
+):
+    # 1. Collect and sort all unique variables
+    all_vars = {"y"}
+    for rel in relationships:
+        all_vars.add(rel["target"])
+        for v in rel["involved"]:
+            all_vars.add(v)
+
+    # Add missing variables if total_vars is provided
+    if total_vars > 0:
+        for i in range(total_vars):
+            all_vars.add(f"x{i}")
+
+    # Sort: 'y' first, then x0, x1, etc.
+    def sort_key(v):
+        if v == "y":
+            return (0, 0, "")
+        if v.startswith("x") and v[1:].isdigit():
+            return (1, int(v[1:]), v)
+        return (2, 0, v)
+
+    sorted_vars = sorted(list(all_vars), key=sort_key)
+
+    # 2. Identify variables directly influencing 'y'
+    y_rel = next((r for r in relationships if r["target"] == "y"), None)
+    direct_to_y = set(y_rel["involved"]) if y_rel else set()
+    
+    # 3. Define layer colors
+    max_layer = max((r["layer"] for r in relationships), default=1)
+    cmap = plt.get_cmap("viridis", max_layer)
+    layer_colors = {i+1: cmap(i) for i in range(max_layer)}
+
+    # 4. Initialize pyCirclize Circos
+    # We assign each variable a sector of equal size (10 units)
+    sectors = {v: 10 for v in sorted_vars}
+    circos = Circos(sectors, space=2) # Reduced space from 3 to 2 for compactness
+
+    for sector in circos.sectors:
+        # Create a track for the variable "dots" and labels
+        # Track from radius 95 to 100
+        node_track = sector.add_track((95, 100))
+
+        v_name = sector.name
+        # Determine styling
+        if v_name == "y":
+            color = "#D32F2F" # Professional Dark Red
+            size = 120 # Reduced from 150
+            zorder = 5
+        elif v_name in direct_to_y:
+            color = "#1976D2" # Professional Dark Blue
+            size = 80 # Reduced from 100
+            zorder = 4
+        else:
+            color = "#CFD8DC" # Subtle Gray-Blue
+            size = 40 # Reduced from 50
+            zorder = 3
+
+        # Place the dot in the middle of the sector
+        node_track.scatter([5], [97.5], color=color, s=size, edgecolors="black", lw=0.5, zorder=zorder)
+
+        # Add labels outside the track
+        # Reduced radius from 115 to 108 and font size from 10 to 9
+        node_track.text(v_name, x=5, r=108, size=9, weight="bold")
+
+    # 5. Draw Relationship Links
+    for rel in relationships:
+        target = rel["target"]
+        score = rel["score"]
+        layer = rel["layer"]
+        color = layer_colors.get(layer, "black")
+
+        # Scale line thickness by score (clamped for visual stability)
+        # Publication standard: usually between 0.5 and 5.0
+        lw = 0.5 + 4.0 * (min(score, 10.0) / 10.0)
+
+        # Color intensity can also reflect score
+        alpha = 0.3 + 0.6 * (min(score, 10.0) / 10.0)
+
+        for source in rel["involved"]:
+            if source == target: continue
+
+            # Draw a curved link between the centers of the two sectors
+            circos.link(
+                (target, 4, 6),   # (SectorName, StartPos, EndPos)
+                (source, 4, 6),
+                color=color,
+                alpha=alpha,
+                lw=lw,
+                direction=1 # Arrow pointing towards the target
+            )
+
+    # 6. Final Rendering and Export
+    # Use GridSpec to place the legend at the bottom of the plot
+    fig = plt.figure(figsize=(6, 8))
+    gs = fig.add_gridspec(2, 1, height_ratios=[5, 1])
+    
+    ax_circos = fig.add_subplot(gs[0], projection="polar")
+    circos.plotfig(ax=ax_circos)
+    ax_circos.set_title("Variable Influence Hierarchy", fontsize=14, fontweight="bold", pad=15)
+
+    ax_legend = fig.add_subplot(gs[1])
+
+    # 7. Legend Logic
+    ax_legend.axis("off")
+    
+    # Thickness legend
+    legend_elements = []
+    for s in [1, 5, 10]:
+        lw = 0.5 + 4.0 * (min(s, 10.0) / 10.0)
+        legend_elements.append(plt.Line2D([0], [0], color='black', lw=lw, label=f'Score: {s}'))
+    
+    # Color legend
+    for layer, col in layer_colors.items():
+        legend_elements.append(plt.Line2D([0], [0], color=col, lw=2, label=f'Layer {layer}'))
+    
+    ax_legend.legend(handles=legend_elements, loc='center', title="Mappings", 
+                     title_fontsize='9', fontsize='8', ncol=3) 
+
+    plt.tight_layout()
+    fig.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close()

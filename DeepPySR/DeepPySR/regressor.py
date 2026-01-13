@@ -1,24 +1,30 @@
 import os
+import csv
 import json
 import numpy as np
 import sympy as sp
-from pysr import PySRRegressor
-from .utils import is_redundant, ensure_output_dir, plot_n_layer_graph
+from pysr import PySRRegressor, jl
+from .utils import is_redundant, ensure_output_dir, plot_n_layer_graph, plot_circlize
+
+# 1. Initialize Julia and add the GPU backend package
+jl.seval('import Pkg; Pkg.add("CUDA")')
+jl.seval('using CUDA')
 
 class DeepPySRRegressor(PySRRegressor):
     def __init__(
         self,
         max_layers=4,
-        score_threshold=5.0,
         output_dir="outputs/deepPySR",
         binary_operators=None,
         unary_operators=None,
+        decimal = 2,
+        stopping_score = 2,
         **pysr_kwargs
     ):
         if binary_operators is None:
             binary_operators = ["+", "-", "*", "/"]
         if unary_operators is None:
-            unary_operators = ["sin", "cos", "exp", "log", "sqrt", "tanh", "square", "asin", "acos", "atanh"]
+            unary_operators = ["sin", "cos", "exp", "log", "sqrt", "tanh", "square", "asin", "acos", "atanh","tan","atan"]
             
         # Initialize the base PySRRegressor with all other kwargs
         super().__init__(
@@ -26,22 +32,24 @@ class DeepPySRRegressor(PySRRegressor):
             unary_operators=unary_operators,
             **pysr_kwargs
         )
+        self.decimal = decimal
         self.max_layers = max_layers
-        self.score_threshold = score_threshold
         self.output_dir = output_dir
+        self.stopping_score = stopping_score
         self.relationships_ = []
 
-    def _fit_single_target(self, X, y, target_name, layer, seed):
+    def _fit_single_target(self, X, y, target_name,seed):
         # Create a new PySRRegressor instance with the same parameters as self
         # but with a specific random_state and potentially other tweaks for sub-fitting
         params = self.get_params()
         # Remove deepPySR specific params before passing to PySRRegressor
-        for p in ["max_layers", "score_threshold", "output_dir"]:
+        for p in ["max_layers", "output_dir", "decimal", "stopping_score"]:
             params.pop(p, None)
             
         params["random_state"] = seed
+        # params["deterministic"] = True
         params["progress"] = False # Keep sub-processes quiet
-        
+        params["turbo"] = True
         # Configure PySR to use our output_dir for its files
         # We use a subfolder for each target to avoid collisions if running in parallel
         # though currently it's sequential.
@@ -77,9 +85,10 @@ class DeepPySRRegressor(PySRRegressor):
         loss = float(best.get("loss", np.nan))
         score = float(best.get("score", np.nan)) if "score" in best else (1.0/loss if loss > 0 else 0)
         
-        return sym_expr, score, int(best.get("complexity", -1))
+        return sym_expr, score, loss, int(best.get("complexity", -1))
 
     def fit(self, X, y):
+        self.n_features_in_ = X.shape[1]
         ensure_output_dir(self.output_dir)
         self.relationships_ = []
         queue = [("y", y, 1, None)]
@@ -89,13 +98,13 @@ class DeepPySRRegressor(PySRRegressor):
             target_name, target_y, layer, parent_name = queue.pop(0)
             if layer > self.max_layers:
                 continue
-            
+
             if target_name in processed_targets and target_name != "y":
                 continue
             processed_targets.add(target_name)
 
             print(f"--- Fitting {target_name} at layer {layer} ---")
-            
+
             if target_name == "y":
                 X_input = X
                 cols = list(range(X.shape[1]))
@@ -107,26 +116,24 @@ class DeepPySRRegressor(PySRRegressor):
                         parent_idx = int(parent_name[1:])
                     except ValueError:
                         pass
-                
+
                 cols = [j for j in range(X.shape[1]) if j != idx and j != parent_idx]
                 X_input = X[:, cols]
 
             try:
-                sym_expr, score, complexity = self._fit_single_target(
-                    X_input, target_y, target_name, layer, self.random_state + layer + len(self.relationships_)
-                )
-                
+                sym_expr, score, loss, complexity = self._fit_single_target(
+                    X_input, target_y, target_name, seed=layer + len(self.relationships_))
+
                 # Round coefficients
-                for a in sp.preorder_traversal(sym_expr):
-                    if isinstance(a, sp.Float):
-                        sym_expr = sym_expr.subs(a, round(a, 2))
+                for n in sym_expr.atoms(sp.Number):
+                    sym_expr = sym_expr.xreplace({n: round(float(n), self.decimal)})
 
                 if target_name != "y":
                     mapping = {sp.Symbol(f"x{k}"): sp.Symbol(f"x{cols[k]}") for k in range(len(cols))}
                     sym_expr = sym_expr.xreplace(mapping)
-                
+
                 involved = sorted({str(s) for s in sym_expr.free_symbols})
-                
+
                 if is_redundant(target_name, sym_expr, self.relationships_):
                     print(f"Relationship for {target_name} is redundant. Skipping.")
                     continue
@@ -139,10 +146,13 @@ class DeepPySRRegressor(PySRRegressor):
                     "formula": str(sym_expr),
                     "involved": involved,
                     "score": score,
+                    "loss": loss,
                     "complexity": complexity
                 }
-                
-                if score > self.score_threshold:
+
+                if score < self.stopping_score:
+                    print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
+                else:
                     self.relationships_.append(relationship)
                     if layer < self.max_layers:
                         for vname in involved:
@@ -151,30 +161,41 @@ class DeepPySRRegressor(PySRRegressor):
                                 queue.append((vname, X[:, v_idx], layer + 1, target_name))
                             except (ValueError, IndexError):
                                 continue
-                else:
-                    print(f"Weak relationship for {target_name} (score={score:.4g}). Leaf node.")
             except Exception as e:
                 print(f"Error modeling {target_name}: {e}")
 
         self.save_relationships()
-        
+
         return self
 
-    def save_relationships(self, filename="relationships.json"):
+    def save_relationships(self, filename="relationships.csv"):
         path = os.path.join(self.output_dir, filename)
-        serializable = []
-        for r in self.relationships_:
-            r_copy = r.copy()
-            r_copy.pop("sympy", None)
-            r_copy.pop("target_symbol", None)
-            serializable.append(r_copy)
-        with open(path, "w") as f:
-            json.dump(serializable, f, indent=4)
+        columns = ["layer", "target", "formula", "involved", "score", "loss", "complexity"]
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=columns)
+            writer.writeheader()
+            for r in self.relationships_:
+                row = {col: r.get(col) for col in columns}
+                # Format involved as a string if it's a list
+                if isinstance(row["involved"], list):
+                    row["involved"] = ", ".join(row["involved"])
+                writer.writerow(row)
 
     def plot(self, filename="hierarchy.png"):
-        if not self.relationships_:
-            print("No relationships to plot.")
+        total_vars = getattr(self, "n_features_in_", 0)
+        if not self.relationships_ and total_vars == 0:
+            print("No relationships or variables to plot.")
             return
         path = os.path.join(self.output_dir, filename)
-        plot_n_layer_graph(self.relationships_, path)
+        plot_n_layer_graph(self.relationships_, path, total_vars=total_vars)
+        print(f"Plot saved to {path}")
+
+    def plot_circle(self, filename="circle.png"):
+        total_vars = getattr(self, "n_features_in_", 0)
+        if not self.relationships_ and total_vars == 0:
+            print("No relationships or variables to plot.")
+            return
+        path = os.path.join(self.output_dir, filename)
+        
+        plot_circlize(self.relationships_, path, total_vars=total_vars)
         print(f"Plot saved to {path}")
