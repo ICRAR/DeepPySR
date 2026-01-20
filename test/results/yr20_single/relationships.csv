@@ -1,0 +1,5 @@
+layer,target,formula,involved,score,loss,complexity
+1,y,1.38*y5_a6,y5_a6,0.1427433958495477,19.093788,3
+2,y5_a6,y5_bmiz + 17.72,y5_bmiz,0.5207913488944835,0.94646376,3
+3,y5_bmiz,tanh(y1_bmifa),y1_bmifa,0.3313692261631958,0.6165155,2
+4,y1_bmifa,atan(y1_a6 - 14.98),y1_a6,0.4262140791846179,0.37862936,4

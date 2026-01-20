@@ -114,8 +114,9 @@ def is_redundant(
 def plot_n_layer_graph(
     relationships: list[dict],
     save_path: str,
-    total_vars: int = 0
+    feature_names: list[str] = None
 ):
+    total_vars = len(feature_names) if feature_names else 0
     G = nx.DiGraph()
     node_data = {} 
     edges = [] 
@@ -295,7 +296,7 @@ def plot_n_layer_graph(
 def plot_circlize(
         relationships: list[dict],
         save_path: str,
-        total_vars: int = 0
+        feature_names: list[str] = None
 ):
     # 1. Collect and sort all unique variables
     all_vars = {"y"}
@@ -304,10 +305,10 @@ def plot_circlize(
         for v in rel["involved"]:
             all_vars.add(v)
 
-    # Add missing variables if total_vars is provided
-    if total_vars > 0:
-        for i in range(total_vars):
-            all_vars.add(f"x{i}")
+    # Add missing variables if feature_names is provided
+    if feature_names:
+        for name in feature_names:
+            all_vars.add(name)
 
     # Sort: 'y' first, then x0, x1, etc.
     def sort_key(v):
