@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-import time,os, torch
+import time, torch
 import kan as KAN
-from pysr import ParametricExpressionSpec, TemplateExpressionSpec
-from DeepPySR.DeepPySR.regressor import DeepPySRRegressor
+from pysr import TemplateExpressionSpec
+from DeepPySR.regressor import DeepPySRRegressor
 from sklearn.metrics import r2_score
 
 # 1. Generate Synthetic Data

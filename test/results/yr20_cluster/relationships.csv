@@ -1,8 +1,0 @@
-layer,target,formula,involved,score,loss,complexity
-1,y,0.4*y5_a7_y5_a9_y5_a8_y5_a10 + 24.64,y5_a7_y5_a9_y5_a8_y5_a10,0.11265698010704862,19.70382,5
-2,y5_a7_y5_a9_y5_a8_y5_a10,y5_a5_y5_a6_y5_bmiz - 1.0*tan(sex),"sex, y5_a5_y5_a6_y5_bmiz",0.07863477559555213,16.150309,4
-3,y5_a5_y5_a6_y5_bmiz,-1.0*SUM_PGS000921_SUM_PGS002313_SUM_PGS002161 + 0.0336700336700337*prepreg_weight_mht_wt_latepreg_weight_m_wt1 + 0.73*y1_a5_y1_a6_y1_bmifa,"SUM_PGS000921_SUM_PGS002313_SUM_PGS002161, prepreg_weight_mht_wt_latepreg_weight_m_wt1, y1_a5_y1_a6_y1_bmifa",0.02081015901680157,11.835963,9
-3,sex,atan(12.6796709708339*exp(-1.0*atan(y1_a5_y1_a6_y1_bmifa))),y1_a5_y1_a6_y1_bmifa,0.03226963229804219,0.23362158,6
-4,y1_a5_y1_a6_y1_bmifa,cos(sex),sex,0.06338253560259724,6.2304835,2
-4,SUM_PGS000921_SUM_PGS002313_SUM_PGS002161,-0.25*SUM_PGS000027_SUM_PGS004150,SUM_PGS000027_SUM_PGS004150,0.3272361637173218,0.17424327,3
-4,prepreg_weight_mht_wt_latepreg_weight_m_wt1,height_m - 164.06,height_m,0.0888616824002609,386.10355,3

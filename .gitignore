@@ -3,3 +3,6 @@
 /archive/
 /**/pysr_outputs/
 /**/*kan*/
+/**/outputs/
+/test_data/
+/test/model/

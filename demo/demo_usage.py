@@ -1,5 +1,5 @@
 import numpy as np
-from DeepPySR.DeepPySR.regressor import DeepPySRRegressor
+from DeepPySR.regressor import DeepPySRRegressor
 import os,torch
 import time
 import kan as KAN
@@ -53,7 +53,7 @@ def run_pysr():
     regressor = DeepPySRRegressor(
         max_layers=4,           # DeepPySR specific: Depth of the symbolic hierarchy
         output_dir="results/l3_v15",
-        stopping_score=0.1,     # DeepPySR specific: Stop recursion if loss is below this
+        stopping_score=1,     # DeepPySR specific: Stop recursion if loss is below this
         
         # PySR parameters (inherited)
         select_k_features = None,
@@ -142,6 +142,6 @@ def run_kan(width=[15,5,1]):
     print(f"KAN R2 score: {r2:.2f}")
 
 if __name__ == "__main__":
-    # run_pysr() # r2 1 for var15, 0.47 for var11
-    run_kan(width=[15,[5,1],1]) # r2 0 formula 0.0166442945192102
+    run_pysr() # r2 1 for var15, 0.47 for var11
+    # run_kan(width=[15,[5,1],1]) # r2 0 formula 0.0166442945192102
     # run_kan(width=[15,5,2,1])
