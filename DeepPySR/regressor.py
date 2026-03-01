@@ -1,10 +1,12 @@
 import os
 import csv
 import json
+import warnings
 import pandas as pd
 import numpy as np
 import sympy as sp
 from pysr import PySRRegressor, jl
+from sklearn.exceptions import ConvergenceWarning
 from .utils import is_redundant, ensure_output_dir, plot_n_layer_graph, plot_circlize
 
 # 1. Initialize Julia and add the GPU backend package
@@ -20,7 +22,7 @@ class DeepPySRRegressor(PySRRegressor):
         unary_operators=None,
         decimal = 2,
         stopping_score = 2,
-        **pysr_kwargs
+        pysr_kwargs =None
     ):
         if binary_operators is None:
             binary_operators = ["+", "-", "*", "/"]
@@ -31,7 +33,6 @@ class DeepPySRRegressor(PySRRegressor):
         super().__init__(
             binary_operators=binary_operators,
             unary_operators=unary_operators,
-            **pysr_kwargs
         )
         self.decimal = decimal
         self.max_layers = max_layers
@@ -39,6 +40,12 @@ class DeepPySRRegressor(PySRRegressor):
         self.stopping_score = stopping_score
         self.relationships_ = []
         self.equations_ = None
+        self.pysr_kwargs = pysr_kwargs or {
+            "model_selection": "best",
+            "binary_operators": ["+", "*"],
+            "unary_operators": ["sin", "cos", "exp", "log", "sqrt", "tanh", "square"],
+            "procs": 4
+        }
 
     def predict(self, X):
         """
@@ -86,18 +93,15 @@ class DeepPySRRegressor(PySRRegressor):
             
         return values['y']
 
-    def _fit_single_target(self, X, y, target_name, category, seed):
+    def _fit_single_target(self, X, y, target_name):
         # Create a new PySRRegressor instance with the same parameters as self
         # but with a specific random_state and potentially other tweaks for sub-fitting
         params = self.get_params()
+
         # Remove deepPySR specific params before passing to PySRRegressor
-        for p in ["max_layers", "output_dir", "decimal", "stopping_score"]:
+        for p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_"]:
             params.pop(p, None)
-            
-        params["random_state"] = seed
-        # params["deterministic"] = True
-        params["progress"] = False # Keep sub-processes quiet
-        params["turbo"] = True
+
         # Configure PySR to use our output_dir for its files
         # We use a subfolder for each target to avoid collisions if running in parallel
         # though currently it's sequential.
@@ -105,16 +109,12 @@ class DeepPySRRegressor(PySRRegressor):
         os.makedirs(target_output_dir, exist_ok=True)
         
         params["output_directory"] = target_output_dir
-        # Also use temp_equation_file to avoid leaving files in the root if not requested
-        # but the user wants them in their specified path.
-        # If we set output_directory, PySR should use it.
-        
-        # If procs is not set, default to a safe value
-        if params.get("procs") is None:
-            params["procs"] = max(1, (os.cpu_count() or 2) - 1)
+        pysr_kwargs = self.pysr_kwargs.copy()
 
-        model = PySRRegressor(**params)
-        model.fit(X, y, category=category)
+        model = PySRRegressor(**pysr_kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            model.fit(X, y)
         
         eqs = model.equations_
         if "score" in eqs.columns:
@@ -135,9 +135,9 @@ class DeepPySRRegressor(PySRRegressor):
         
         return sym_expr, score, loss, int(best.get("complexity", -1))
 
-    def fit(self, X, y, category=None):
+    def fit(self, X, y):
         if isinstance(X, pd.DataFrame):
-            self.feature_names_in_ = X.columns.tolist()
+            self.feature_names_in_ = [str(c) for c in X.columns.tolist()]
             X_input_all = X.values
         else:
             self.feature_names_in_ = [f"x{i}" for i in range(X.shape[1])]
@@ -179,7 +179,7 @@ class DeepPySRRegressor(PySRRegressor):
                 # We pass the internal x0, x1... names to _fit_single_target
                 # PySR will use them as variable names
                 sym_expr, score, loss, complexity = self._fit_single_target(
-                    X_fit, target_y, target_name, category = category, seed=layer + len(self.relationships_))
+                    X_fit, target_y, target_name, )
 
                 # Round coefficients
                 for n in sym_expr.atoms(sp.Number):
@@ -255,8 +255,10 @@ class DeepPySRRegressor(PySRRegressor):
             # Map target if it's xi
             if new_rel["target"].startswith("x"):
                 try:
-                    idx = int(new_rel["target"][1:])
-                    new_rel["target"] = mapping.get(new_rel["target"], new_rel["target"])
+                    idx_str = new_rel["target"][1:]
+                    if idx_str.isdigit():
+                        idx = int(idx_str)
+                        new_rel["target"] = mapping.get(new_rel["target"], new_rel["target"])
                 except ValueError:
                     pass
             

@@ -44,69 +44,56 @@ def is_redundant(
     if not all_relationships:
         return False
 
-    # 1. Expand the expression by substituting previous relationships
-    # We do this numerically to avoid SymPy's symbolic bottleneck
-    target_sym = sp.Symbol(target_name)
-    combined_expr = target_sym - sym_expr
-
-    # Sort relationships by layer to ensure we substitute 'deep' vars first
-    sorted_rels = sorted(all_relationships, key=lambda r: r["layer"], reverse=True)
-
-    # 2. Create a substitution map for all intermediate variables
-    sub_map = {rel["target_symbol"]: rel["sympy"] for rel in sorted_rels}
-
-    # 3. Identify truly independent variables (root inputs like x0, x1...)
-    # Instead of full symbolic expansion, we lambdify the expression
-    # with all discovered variables as potential inputs.
-    all_involved = set(str(s) for s in combined_expr.free_symbols)
+    # 1. Identify all involved symbols across all relationships
+    all_involved = set(str(s) for s in sym_expr.free_symbols)
     for r in all_relationships:
         all_involved.update(r["involved"])
-
-    # Remove the target itself and other intermediate symbols
-    root_vars = sorted([v for v in all_involved if v.startswith("x") and v not in sub_map])
+    
+    # 2. Identify root symbols (those that are NOT targets of any relationship)
+    intermediate_targets = {r["target"] for r in all_relationships}
+    root_vars = sorted([v for v in all_involved if v not in intermediate_targets])
     root_symbols = [sp.Symbol(v) for v in root_vars]
 
     try:
-        # Create a fast NumPy function
-        # We use 'lambdify' on the final expanded form
-        final_expr = combined_expr
-        for _ in range(len(all_relationships)): # Iterative expansion
-            new_expr = final_expr.subs(sub_map)
-            if new_expr == final_expr: break
-            final_expr = new_expr
+        # 3. Generate high-volume test data for root symbols
+        n_points = 2000 # Reduced for speed, still enough for redundancy check
+        test_data = {v: np.random.uniform(0.1, 1.0, n_points) for v in root_vars}
 
-        f = sp.lambdify(root_symbols, final_expr, modules="numpy")
-
-        # 4. Generate high-volume test data (Vectorized)
-        n_points = 5000
-        test_data = [np.random.uniform(0.1, 1.0, n_points) for _ in root_symbols]
-
-        # Evaluate
-        y_pred = f(*test_data)
-
-        # If the difference is near zero, the new relationship is already implied.
-        if np.allclose(y_pred, 0, atol=threshold):
-            return True
-
-        # Also check if the expression itself expands to a constant (original behavior).
-        # We check the standard deviation of its expansion.
-        final_rhs = sym_expr
-        for _ in range(len(all_relationships)):
-            new_expr = final_rhs.subs(sub_map)
-            if new_expr == final_rhs: break
-            final_rhs = new_expr
+        # 4. Evaluate relationships layer by layer numerically
+        # Sort by layer to ensure dependencies are computed first
+        sorted_rels = sorted(all_relationships, key=lambda r: r["layer"])
         
-        rhs_symbols = sorted([str(s) for s in final_rhs.free_symbols])
-        if not rhs_symbols: # It's a symbolic constant
-            return True
+        values = test_data.copy()
         
-        f_rhs = sp.lambdify([sp.Symbol(s) for s in rhs_symbols], final_rhs, modules="numpy")
-        rhs_test_data = [np.random.uniform(0.1, 1.0, n_points) for _ in rhs_symbols]
-        if np.std(f_rhs(*rhs_test_data)) < threshold:
+        for rel in sorted_rels:
+            involved = rel["involved"]
+            # Check if we have all needed inputs for this relationship
+            if all(v in values for v in involved):
+                f_rel = sp.lambdify([sp.Symbol(v) for v in involved], rel["sympy"], modules="numpy")
+                args = [values[v] for v in involved]
+                values[rel["target"]] = f_rel(*args)
+
+        # 5. Evaluate the new expression
+        involved_new = sorted([str(s) for s in sym_expr.free_symbols])
+        if not all(v in values for v in involved_new):
+            # Cannot fully expand numerically, might happen if some inputs are missing
+            return False
+            
+        f_new = sp.lambdify([sp.Symbol(v) for v in involved_new], sym_expr, modules="numpy")
+        new_val = f_new(*[values[v] for v in involved_new])
+
+        # 6. Check if new_val is close to target_val (if target is in values)
+        if target_name in values:
+            target_val = values[target_name]
+            if np.allclose(new_val, target_val, atol=threshold):
+                return True
+
+        # 7. Check if it's a constant
+        if np.std(new_val) < threshold:
             return True
 
     except Exception:
-        # Fallback to False if math errors occur (e.g. log of negative)
+        # Fallback to False if math errors occur
         return False
 
     return False
@@ -249,7 +236,15 @@ def plot_n_layer_graph(
 
     edge_labels = nx.get_edge_attributes(G, "label")
     edge_labels = {k: v for k, v in edge_labels.items() if v and v != "linear/mixed" and v != "unused"}
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8, ax=ax_graph, label_pos=0.5, alpha=0.8)
+    
+    # In NetworkX 3.5, draw_networkx_edge_labels can fail with "too many values to unpack"
+    # if it doesn't correctly handle curved edges from our custom annotate() call.
+    # Since we manually annotate edges with arrows and curvature, we only use
+    # draw_networkx_edge_labels for the text labels.
+    try:
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8, ax=ax_graph, label_pos=0.5, alpha=0.8)
+    except Exception as e:
+        print(f"Warning: Could not draw edge labels: {e}")
 
     # ax_graph.set_title(f"Symbolic Relationship Hierarchy (depth={max_l})", fontsize=14)
     ax_graph.set_title(f"DeepPySR Interpretation for Synthetic Data", fontsize=14)
@@ -275,6 +270,15 @@ def plot_circlize(
     if feature_names:
         for name in feature_names:
             all_vars.add(name)
+
+    # 1.5 Create a mapping for display if needed
+    # (Though relationships should already be mapped)
+    display_names = {v: v for v in all_vars}
+    if feature_names:
+        # If there are still x0, x1... in all_vars, map them
+        for i, name in enumerate(feature_names):
+            if f"x{i}" in all_vars:
+                display_names[f"x{i}"] = name
 
     # Sort: 'y' first, then x0, x1, etc.
     def sort_key(v):
@@ -325,7 +329,8 @@ def plot_circlize(
 
         # Add labels outside the track
         # Reduced radius from 115 to 108 and font size from 10 to 9
-        node_track.text(v_name, x=5, r=108, size=9, weight="bold")
+        label = display_names.get(v_name, v_name)
+        node_track.text(label, x=5, r=108, size=9, weight="bold")
 
     # 5. Draw Relationship Links
     for rel in relationships:

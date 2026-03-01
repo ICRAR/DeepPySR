@@ -1,2 +1,2 @@
 layer,target,formula,involved,score,loss,complexity
-1,y,(x0**2 - 0.12)*sin(1.57*c) - sin(1.0*c*(x0 + 1.07) - x0),"c, x0",9.92683072444309,1.0091339e-11,19
+1,y,"Piecewise((x0**2 - 1.0, sin(2*c) > 0), (0.0, True)) - 1.0*sin((c - 1.0)*(1.07*c + x0))","c, x0",12.680554503537543,2.4868659e-14,21

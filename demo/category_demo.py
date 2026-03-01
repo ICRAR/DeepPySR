@@ -5,6 +5,7 @@ import kan as KAN
 from pysr import TemplateExpressionSpec
 from DeepPySR.regressor import DeepPySRRegressor
 from sklearn.metrics import r2_score
+import sympy
 
 # 1. Generate Synthetic Data
 # Create data with 2 features and 3 categories
@@ -19,27 +20,19 @@ for i in range(category.shape[0]):
     else:
         y[i] = np.sin(X[i,0]-1)
 
+X_df = pd.DataFrame({"x0": X[:,0], "x1": X[:,1], "c": category})
 
-category_p_one = category + 1
-X_with_category = np.column_stack([X, category])
-X_with_category = pd.DataFrame(X_with_category,columns=["x0","x1","c"])
 def run_deeppysr():
-    # Create feature DataFrame (excluding the category column)
-    template = TemplateExpressionSpec(
-        expressions=["f"],
-        variable_names=["x0", "x1", "c"],
-        parameters={"p": 3},  # One parameter per category
-        combine="f(x0, x1, p[c])"
-    )
-
+    sympy_cond = lambda x, y: sympy.Piecewise((y, x > 0), (0, True))
     regressor = DeepPySRRegressor(
-        # max_layers=2,           # DeepPySR specific: Depth of the symbolic hierarchy
+        # max_layers=2,
         output_dir="./results/category",
-        stopping_score=2,     # DeepPySR specific: Stop recursion if loss is below this
+        stopping_score=2,
 
         # PySR parameters (inherited)
         unary_operators=["sin","asin"],
-        expression_spec=template,
+        binary_operators=["+","-","*","/","cond(x,y) = x > 0 ? y : y*0"],
+        extra_sympy_mappings={'cond': sympy_cond},
         select_k_features = None,
         # niterations=50,
         # population_size=500,
@@ -56,10 +49,10 @@ def run_deeppysr():
     # y = f(x_i) -> x_i = f(x_j) -> ...
     print("Fitting DeepPySRRegressor (this may take a few minutes)...")
     start_time = time.time()
-    regressor.fit(X_with_category, y)
+    regressor.fit(X_df, y)
     duration = time.time() - start_time
     print(f"Fitting completed in {duration/60:.2f} minutes.")
-    y_pred = regressor.predict(X_with_category)
+    y_pred = regressor.predict(X_df)
     # 4. Access discovered relationships
     print("\nDiscovered Relationships:")
     for rel in regressor.relationships_:
@@ -79,10 +72,10 @@ def run_kan(width=[3,1,1]):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = {}
     dataset["train_input"] = (
-        torch.from_numpy(X_with_category.values).float().to(device)
+        torch.from_numpy(X_df.values).float().to(device)
     )
     dataset["test_input"] = (
-        torch.from_numpy(X_with_category.values).float().to(device)
+        torch.from_numpy(X_df.values).float().to(device)
     )
     dataset["train_label"] = (
         torch.from_numpy(y).float().to(device)
