@@ -5,34 +5,26 @@ import warnings
 import pandas as pd
 import numpy as np
 import sympy as sp
-from pysr import PySRRegressor, jl
+from pysr import PySRRegressor , jl
 from sklearn.exceptions import ConvergenceWarning
 from .utils import is_redundant, ensure_output_dir, plot_n_layer_graph, plot_circlize
 
 # 1. Initialize Julia and add the GPU backend package
-# jl.seval('import Pkg; Pkg.add("CUDA")')
-# jl.seval('using CUDA')
+jl.seval('import Pkg; Pkg.add("CUDA")')
+jl.seval('using CUDA')
 
 class DeepPySRRegressor(PySRRegressor):
     def __init__(
         self,
         max_layers=4,
         output_dir="outputs/deepPySR",
-        binary_operators=None,
-        unary_operators=None,
         decimal = 2,
         stopping_score = 2,
-        pysr_kwargs =None
+        **pysr_kwargs
     ):
-        if binary_operators is None:
-            binary_operators = ["+", "-", "*", "/"]
-        if unary_operators is None:
-            unary_operators = ["sin", "cos", "exp", "log", "sqrt", "tanh", "square", "asin", "acos", "atanh","tan","atan"]
-            
         # Initialize the base PySRRegressor with all other kwargs
         super().__init__(
-            binary_operators=binary_operators,
-            unary_operators=unary_operators,
+            **pysr_kwargs
         )
         self.decimal = decimal
         self.max_layers = max_layers
@@ -40,12 +32,6 @@ class DeepPySRRegressor(PySRRegressor):
         self.stopping_score = stopping_score
         self.relationships_ = []
         self.equations_ = None
-        self.pysr_kwargs = pysr_kwargs or {
-            "model_selection": "best",
-            "binary_operators": ["+", "*"],
-            "unary_operators": ["sin", "cos", "exp", "log", "sqrt", "tanh", "square"],
-            "procs": 4
-        }
 
     def predict(self, X):
         """
@@ -109,9 +95,8 @@ class DeepPySRRegressor(PySRRegressor):
         os.makedirs(target_output_dir, exist_ok=True)
         
         params["output_directory"] = target_output_dir
-        pysr_kwargs = self.pysr_kwargs.copy()
-
-        model = PySRRegressor(**pysr_kwargs)
+        
+        model = PySRRegressor(**params)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", ConvergenceWarning)
             model.fit(X, y)

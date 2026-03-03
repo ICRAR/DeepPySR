@@ -24,24 +24,22 @@ X_df = pd.DataFrame({"x0": X[:,0], "x1": X[:,1], "c": category})
 
 def run_deeppysr():
     sympy_cond = lambda x, y: sympy.Piecewise((y, x > 0), (0, True))
+    pysr_kwargs = {
+        "unary_operators": ["sin","asin"],
+        "binary_operators": ["+", "-", "*", "/", "cond(x,y) = x > 0 ? y : y*0"],
+        "extra_sympy_mappings": {'cond': sympy_cond},
+        "select_k_features": None,
+        "maxsize": 10,
+        "model_selection": "best",
+        "early_stop_condition": "f(loss, complexity) = (loss < 0.0001) && (complexity < 20)",
+        "verbosity": 0,
+        "denoise": True
+    }
     regressor = DeepPySRRegressor(
         # max_layers=2,
         output_dir="./results/category",
         stopping_score=2,
-
-        # PySR parameters (inherited)
-        unary_operators=["sin","asin"],
-        binary_operators=["+","-","*","/","cond(x,y) = x > 0 ? y : y*0"],
-        extra_sympy_mappings={'cond': sympy_cond},
-        select_k_features = None,
-        # niterations=50,
-        # population_size=500,
-        maxsize=10,
-        model_selection="best",
-        # elementwise_loss="L2DistLoss()",
-        early_stop_condition="f(loss, complexity) = (loss < 0.0001) && (complexity < 20)",
-        verbosity = 0,
-        denoise=True
+        **pysr_kwargs
     )
 
     # 3. Fit the model

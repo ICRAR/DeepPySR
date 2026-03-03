@@ -25,7 +25,7 @@ class KANPySRRegressor:
         kan_lamb=0.1,
         kan_lamb_entropy=2.0,
         output_dir="outputs/kan_pysr",
-        pysr_kwargs=None
+        **pysr_kwargs
     ):
         self.kan_width = kan_width
         self.kan_grid = kan_grid
@@ -34,15 +34,30 @@ class KANPySRRegressor:
         self.kan_lamb = kan_lamb
         self.kan_lamb_entropy = kan_lamb_entropy
         self.output_dir = output_dir
-        self.pysr_kwargs = pysr_kwargs or {
-            "model_selection": "best",
-            "binary_operators": ["+", "*"],
-            "unary_operators": ["sin", "cos", "exp", "log", "sqrt", "tanh", "square"],
-            "procs": 4
-        }
+        self.pysr_kwargs = pysr_kwargs
         self.model = None
         self.symbolic_expressions = {}
         self.relationships_ = []
+
+    def get_params(self, deep=True):
+        return {
+            "kan_width": self.kan_width,
+            "kan_grid": self.kan_grid,
+            "kan_k": self.kan_k,
+            "kan_steps": self.kan_steps,
+            "kan_lamb": self.kan_lamb,
+            "kan_lamb_entropy": self.kan_lamb_entropy,
+            "output_dir": self.output_dir,
+            **self.pysr_kwargs
+        }
+
+    def set_params(self, **params):
+        for key, value in params.items():
+            if key in ["kan_width", "kan_grid", "kan_k", "kan_steps", "kan_lamb", "kan_lamb_entropy", "output_dir"]:
+                setattr(self, key, value)
+            else:
+                self.pysr_kwargs[key] = value
+        return self
 
     def fit(self, X, y):
         ensure_output_dir(self.output_dir)
@@ -126,9 +141,7 @@ class KANPySRRegressor:
 
                 print(f"Distilling node {node_target_name} with {len(involved_indices)} inputs: {involved_names}")
 
-                pysr_kwargs = self.pysr_kwargs.copy()
-                
-                pysr_model = PySRRegressor(**pysr_kwargs)
+                pysr_model = PySRRegressor(**self.pysr_kwargs)
                 pysr_model.fit(X_node, y_node, variable_names=involved_names)
 
                 # Get the best formula

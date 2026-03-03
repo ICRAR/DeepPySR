@@ -50,19 +50,21 @@ def run_pysr():
     # Default operators are now:
     # binary: ["+", "-", "*", "/"]
     # unary: ["sin", "cos", "exp", "log", "sqrt", "tanh", "square", "asin", "acos", "atanh"]
+    pysr_kwargs = {
+        "select_k_features": None,
+        "niterations": 100,
+        "population_size": 50,
+        "model_selection": "best",
+        "early_stop_condition": "f(loss, complexity) = (loss < 0.0001) && (complexity < 10)",
+        "verbosity": 0,
+        "denoise": True,
+        "procs": os.cpu_count()-1
+    }
     regressor = DeepPySRRegressor(
         max_layers=4,           # DeepPySR specific: Depth of the symbolic hierarchy
-        output_dir="results/l3_v15",
-        stopping_score=1,     # DeepPySR specific: Stop recursion if loss is below this
-        
-        # PySR parameters (inherited)
-        select_k_features = None,
-        niterations=100,
-        population_size=500,
-        model_selection="best",
-        early_stop_condition="f(loss, complexity) = (loss < 0.0001) && (complexity < 10)",
-        verbosity = 0,
-        denoise=True
+        output_dir="results/l3_v15_test",
+        stopping_score=0.1,     # DeepPySR specific: Stop recursion if loss is below this
+        **pysr_kwargs
     )
 
     # 3. Fit the model

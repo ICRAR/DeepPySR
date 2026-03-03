@@ -85,8 +85,9 @@ def run_deeppysr(X, y, year: int = 8, type='cluster', project_path: str = None, 
         from pathlib import Path
         from pysr import jl
         proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Activating custom Julia project: {proj}")
-        jl.Pkg.activate(proj)
+        print(f"Replacing SymbolicRegression with custom package at: {proj}")
+        jl.seval(f'using Pkg; Pkg.develop(path="{proj}")')
+        jl.seval('using MyPySR')
 
     from DeepPySR.regressor import DeepPySRRegressor
     # 2. Initialize the DeepPySRRegressor
@@ -94,7 +95,7 @@ def run_deeppysr(X, y, year: int = 8, type='cluster', project_path: str = None, 
         max_layers=4,           # DeepPySR specific: Depth of the symbolic hierarchy
         output_dir=f"./results_bmi/{run_type}/yr{year}_{type}_test",
         stopping_score=0.001,     # DeepPySR specific: Stop recursion if loss is below this
-        pysr_kwargs=pysr_kwargs
+        **pysr_kwargs
     )
 
     # 3. Fit the model
@@ -129,15 +130,16 @@ def run_kansr(X, y, year: int = 8, type='cluster', project_path: str = None):
         from pathlib import Path
         from pysr import jl
         proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Activating custom Julia project: {proj}")
-        jl.Pkg.activate(proj)
+        print(f"Replacing SymbolicRegression with custom package at: {proj}")
+        jl.seval(f'using Pkg; Pkg.develop(path="{proj}")')
+        jl.seval('using MyPySR')
 
     from DeepPySR.kan_regressor import KANPySRRegressor
     kansr = KANPySRRegressor(
         kan_width=[X.shape[1], 5, 1], # Simple architecture for demo
         kan_steps=100,
         output_dir=f"./results_bmi/kansr/yr{year}_kansr_{type}",
-        pysr_kwargs=pysr_kwargs
+        **pysr_kwargs
     )
 
     print("Fitting KANPySRRegressor...")
@@ -201,16 +203,14 @@ def main():
 
     # Option 1: Use the original pysr package (set to None)
     # Option 2: Use your custom project (set to path)
-    # project_path = '~/Projects/SymbolicRegression.jl'
-    project_path = None
+    project_path = '~/Projects/mypysr.jl'
 
     if project_path:
         from pathlib import Path
         from pysr import jl
         proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Configuring custom Julia project: {proj}")
-        os.environ["JULIA_PROJECT"] = proj
-        # Note: Actual activation happens inside run_deeppysr/run_kansr
+        print(f"Configuring custom Julia package path: {proj}")
+        # Note: Actual activation/replacement happens inside run_deeppysr/run_kansr
     else:
         print("Using default Julia environment (original pysr)")
 
