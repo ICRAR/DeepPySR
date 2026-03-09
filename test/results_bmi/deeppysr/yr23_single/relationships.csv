@@ -1,6 +1,0 @@
-layer,target,formula,involved,score,loss,complexity
-1,y,0.53*y5_a5_y5_a6_y5_bmiz + 24.532766,y5_a5_y5_a6_y5_bmiz,0.12279117170096145,13.40969,5
-2,y5_a5_y5_a6_y5_bmiz,0.51*y5_a7_y5_a9_y5_a8_y5_a10,y5_a7_y5_a9_y5_a8_y5_a10,0.5507558760659329,7.1804676,3
-3,y5_a7_y5_a9_y5_a8_y5_a10,"SUM_PGS000027_SUM_PGS004150 - 0.27/prepreg_weight_mht_wt_latepreg_weight_m_wt1**1.0 + atan(prepreg_weight_mht_wt_latepreg_weight_m_wt1) - 1.0*atanh(Mod(1.0*sin(0.28/SUM_PGS000027_SUM_PGS004150**1.0 + 0.46*prepreg_weight_mht_wt_latepreg_weight_m_wt1) + 1.0, 2.0) - 1.0)","SUM_PGS000027_SUM_PGS004150, prepreg_weight_mht_wt_latepreg_weight_m_wt1",0.03916202671328676,24.629004,18
-4,SUM_PGS000027_SUM_PGS004150,-1.68*SUM_PGS002853_SUM_PGS000921_SUM_PGS002313_SUM_PGS002161,SUM_PGS002853_SUM_PGS000921_SUM_PGS002313_SUM_PGS002161,0.542230551340596,1.3553039,3
-4,prepreg_weight_mht_wt_latepreg_weight_m_wt1,"height_m + atanh(Mod(1.0*sin(breastfed_any_bfdur1/SUM_PGS002853_SUM_PGS000921_SUM_PGS002313_SUM_PGS002161**1.0) + 1.0, 2.0) - 1.0)**2.0 - 166.53","SUM_PGS002853_SUM_PGS000921_SUM_PGS002313_SUM_PGS002161, breastfed_any_bfdur1, height_m",0.0703766459813759,282.0858,10

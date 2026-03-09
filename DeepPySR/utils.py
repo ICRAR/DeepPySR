@@ -101,7 +101,8 @@ def is_redundant(
 def plot_n_layer_graph(
     relationships: list[dict],
     save_path: str,
-    feature_names: list[str] = None
+    feature_names: list[str] = None,
+    target_variable: str = "Synthetic Data"
 ):
     total_vars = len(feature_names) if feature_names else 0
     G = nx.DiGraph()
@@ -247,7 +248,7 @@ def plot_n_layer_graph(
         print(f"Warning: Could not draw edge labels: {e}")
 
     # ax_graph.set_title(f"Symbolic Relationship Hierarchy (depth={max_l})", fontsize=14)
-    ax_graph.set_title(f"DeepPySR Interpretation for Synthetic Data", fontsize=14)
+    ax_graph.set_title(f"DeepPySR Interpretation for {target_variable}", fontsize=14)
     ax_graph.axis("off")
 
     plt.tight_layout()
@@ -257,7 +258,8 @@ def plot_n_layer_graph(
 def plot_circlize(
         relationships: list[dict],
         save_path: str,
-        feature_names: list[str] = None
+        feature_names: list[str] = None,
+        target_variable: str = "Synthetic Data"
 ):
     # 1. Collect and sort all unique variables
     all_vars = {"y"}
@@ -302,8 +304,15 @@ def plot_circlize(
     # 4. Initialize pyCirclize Circos
     # We assign each variable a sector of equal size (10 units)
     sectors = {v: 10 for v in sorted_vars}
-    circos = Circos(sectors, space=2) # Reduced space from 3 to 2 for compactness
+    
+    # Adaptive sector spacing based on number of variables
+    # More variables -> less space between sectors
+    # Fewer variables -> more space between sectors
+    num_vars = len(sorted_vars)
+    space = max(2, 10 - num_vars * 0.5) 
+    circos = Circos(sectors, space=space)
 
+    # Replace "y" with target_variable name in labels and dots
     for sector in circos.sectors:
         # Create a track for the variable "dots" and labels
         # Track from radius 95 to 100
@@ -328,9 +337,21 @@ def plot_circlize(
         node_track.scatter([5], [97.5], color=color, s=size, edgecolors="black", lw=0.5, zorder=zorder)
 
         # Add labels outside the track
-        # Reduced radius from 115 to 108 and font size from 10 to 9
+        # Use target_variable instead of "y"
         label = display_names.get(v_name, v_name)
-        node_track.text(label, x=5, r=108, size=9, weight="bold")
+        if v_name == "y":
+            label = target_variable
+
+        # Adaptive radius and smaller font size
+        label_radius = 105
+        # Determine orientation: vertical for long labels, horizontal for very short ones?
+        # User requested they all appear outside for the dots, from start till end.
+        # "Vertical" in pycirclize means it points outwards radially.
+        orientation = "vertical"
+
+        # Smaller font size as requested (was 10, now 8)
+        # We can also adjust the figure size based on the longest label
+        node_track.text(label, x=5, r=label_radius, size=8, weight="bold", orientation=orientation)
 
     # 5. Draw Relationship Links
     for rel in relationships:
@@ -361,12 +382,24 @@ def plot_circlize(
 
     # 6. Final Rendering and Export
     # Use GridSpec to place the legend at the bottom of the plot
-    fig = plt.figure(figsize=(3, 4))
+    # Adaptive figure size based on variable name length
+    max_label_len = max([len(display_names.get(v, v)) for v in sorted_vars] + [len(target_variable)])
+    # A base size of 3-4 inches, plus something proportional to the longest label
+    # Max label length of 30-40 characters might need 6-8 inches.
+    base_size = 4
+    # The plot is a circle, labels extend radially.
+    # Long labels can significantly increase the required figure size.
+    # 10 characters might be ~1 inch.
+    added_size_per_char = 0.08
+    added_size = max(0, (max_label_len - 5) * added_size_per_char) 
+    fig_size = base_size + added_size
+    
+    fig = plt.figure(figsize=(fig_size, fig_size + 1))
     gs = fig.add_gridspec(2, 1, height_ratios=[5, 1])
     
     ax_circos = fig.add_subplot(gs[0], projection="polar")
     circos.plotfig(ax=ax_circos)
-    ax_circos.set_title("DeepPySR", fontsize=10, fontweight="bold", pad=10)
+    ax_circos.set_title(f"DeepPySR: {target_variable}", fontsize=12, fontweight="bold", pad=20 + (added_size * 5))
 
     ax_legend = fig.add_subplot(gs[1])
 

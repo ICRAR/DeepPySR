@@ -1,5 +1,0 @@
-layer,target,formula,involved,score,loss,complexity
-1,y,0.53*y5_a5_y5_a6_y5_bmiz + 24.53,y5_a5_y5_a6_y5_bmiz,0.12279109712802475,13.409691,5
-2,y5_a5_y5_a6_y5_bmiz,0.51*y5_a7_y5_a9_y5_a8_y5_a10,y5_a7_y5_a9_y5_a8_y5_a10,0.5507558760659329,7.1804676,3
-3,y5_a7_y5_a9_y5_a8_y5_a10,atan(prepreg_weight_mht_wt_latepreg_weight_m_wt1),prepreg_weight_mht_wt_latepreg_weight_m_wt1,0.05710305925754226,30.620615,2
-4,prepreg_weight_mht_wt_latepreg_weight_m_wt1,height_m + tan(log((height_m + plac_weight + 29.69)**2.0)) - 166.06,"height_m, plac_weight",0.040156119380626076,265.78766,12

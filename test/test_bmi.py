@@ -6,41 +6,52 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import r2_score
-
+from DeepPySR.regressor import DeepPySRRegressor
+from DeepPySR.kan_regressor import KANPySRRegressor
+from kan import KAN
 
 sympy_cond = lambda x, y: sympy.Piecewise((y, x > 0), (0, True))
 # template = TemplateExpressionSpec(expressions=["f", "g", "h", "k"],combine="f + g + h + k")
 pysr_kwargs = {
-                "select_k_features": 10,
+                "parallelism": "multithreading",
+                # "select_k_features": 10,
                 # "expression_spec": template,
-                "complexity_of_variables":0.01,
-                "maxsize":30,
-                "binary_operators": ["+", "*","cond(x,y) = x > 0 ? y : y*0"],
+                # "complexity_of_variables":0.01,
+                "maxsize": 40,
+                "binary_operators": ["+", "*", "/", "-","cond(x,y) = x > 0 ? y : y*0"],
+                # "binary_operators": ["+", "*", "/", "-"],
                 "extra_sympy_mappings":{'cond': sympy_cond},
-                "unary_operators": ["sin","cos","exp", "log","sqrt","abs"],
-                "parsimony":0.001,
-                "niterations":500,
-                "populations": 30,
-                "model_selection":"accuracy", # score, best, accuracy
+                # "unary_operators": ["sin", "cos", "exp", "log","sqrt","abs"],
+                "unary_operators": ["exp", "log"],
+                "parsimony": 0.001,
+                # "niterations": 500,
+                "populations": 15,
+                "population_size": 100,
+                "ncycles_per_iteration": 200,
+                "adaptive_parsimony_scaling": 50.0,
+                # "variable_prune_start": 50, # new defined
+                # "variable_prune_ramp": 150, # new defined
+                # "variable_prune_max": 0.6, # new defined
+                # "model_selection":"accuracy", # score, best, accuracy
                 # "early_stop_condition": "f(loss, complexity) = (loss < 0.00001) && (complexity < 20)",
-                "verbosity":0,
+                "verbosity":1,
                 "denoise":True,
                 "turbo": True,
                 "procs": max(1, (os.cpu_count() or 2) - 1),
-                "loss_function":'''
-                            function eval_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
-                            prediction, flag = eval_tree_array(tree, dataset.X, options)
-                            if !flag
-                            return L(Inf)
-                            end
-                            # log(cosh(x)) acts like x^2/2 for small x and |x| for large x
-                            return sum(log.(cosh.(prediction .- dataset.y))) / dataset.n
-                            end
-                            ''',}
+                # "loss_function":'''
+                #             function eval_loss(tree, dataset::Dataset{T,L}, options)::L where {T,L}
+                #             prediction, flag = eval_tree_array(tree, dataset.X, options)
+                #             if !flag
+                #             return L(Inf)
+                #             end
+                #             # log(cosh(x)) acts like x^2/2 for small x and |x| for large x
+                #             return sum(log.(cosh.(prediction .- dataset.y))) / dataset.n
+                #             end
+                #             ''',
+}
 
 
 def load_data(path: str, year: int = 8):
-    from pysr import TemplateExpressionSpec
     data = pd.read_csv(path)
     dataid = data[["child_id"]].T.drop_duplicates().T.values.reshape(1, -1)[0]
     data.columns = data.columns.str.replace(',','_')
@@ -63,54 +74,33 @@ def load_data(path: str, year: int = 8):
     datain = data.drop(columns=['child_id',f'y{year}bmi',f'pred_y{year}bmi'])
     dataout = data[[f'y{year}bmi']]
 
-    var_names = datain.columns.tolist()
-    combine_str = ''
-    for var_name in var_names:
-        if var_name in params:
-            combine_str += f'{var_name}[{var_name}], '
-        else:
-            combine_str += f'{var_name}, '
-    combine_str = 'f(' + combine_str[:-2] +')'
+    return dataid,datain,dataout
 
-    template = TemplateExpressionSpec(
-        expressions=["f"],
-        variable_names=var_names,
-        parameters=params,
-        combine=combine_str
-    )
-    return dataid,datain,dataout,template
-
-def run_deeppysr(X, y, year: int = 8, type='cluster', project_path: str = None, run_type='deeppysr'):
-    if project_path:
-        from pathlib import Path
-        from pysr import jl
-        proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Replacing SymbolicRegression with custom package at: {proj}")
-        jl.seval(f'using Pkg; Pkg.develop(path="{proj}")')
-        jl.seval('using MyPySR')
-
-    from DeepPySR.regressor import DeepPySRRegressor
+def run_deeppysr(X, y, year: int = 8,type='cluster', r2w = 1.,l = 1.,model_provider='pysr'):
     # 2. Initialize the DeepPySRRegressor
     deeppysr = DeepPySRRegressor(
         max_layers=4,           # DeepPySR specific: Depth of the symbolic hierarchy
-        output_dir=f"./results_bmi/{run_type}/yr{year}_{type}_test",
+        output_dir=f"./results_bmi/deeppysr/yr{year}_{type}_{model_provider}_r2w{r2w}_lambda{l}",
+        pareto_lambda = l,
+        pareto_r2_weight = r2w,
         stopping_score=0.001,     # DeepPySR specific: Stop recursion if loss is below this
-        **pysr_kwargs
+        model_provider=model_provider,
+        **pysr_kwargs,
     )
 
     # 3. Fit the model
     # This will recursively find relationships:
     # y = f(x_i) -> x_i = f(x_j) -> ...
-    print(f"Fitting DeepPySRRegressor ({run_type}) (this may take a few minutes)...")
-    if project_path:
-        print(f"Using custom Julia project at: {project_path}")
+    print(f"Fitting DeepPySRRegressor (this may take a few minutes)...")
     start_time = time.time()
     deeppysr.fit(X, y)
     duration = time.time() - start_time
     print(f"Fitting completed in {duration/60:.2f} minutes.")
 
     y_pred = deeppysr.predict(X)
-    r2 = r2_score(y, y_pred,force_finite=False)
+    # Handle NaNs and Infs in predictions
+    y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
+    r2 = r2_score(y, y_pred)
     print(f"R2 score: {r2:.2f}")
 
     # 4. Access discovered relationships
@@ -123,22 +113,16 @@ def run_deeppysr(X, y, year: int = 8, type='cluster', project_path: str = None, 
     plot_path = "symbolic_hierarchy_demo.png"
     deeppysr.plot(plot_path)
     deeppysr.plot_circle(filename="circle_demo.png")
-    print(f"\n{run_type.capitalize()} run completed! Check output directory for visualizations.")
+    print(f"\nDeeppysr run completed! Check output directory for visualizations.")
 
-def run_kansr(X, y, year: int = 8, type='cluster', project_path: str = None):
-    if project_path:
-        from pathlib import Path
-        from pysr import jl
-        proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Replacing SymbolicRegression with custom package at: {proj}")
-        jl.seval(f'using Pkg; Pkg.develop(path="{proj}")')
-        jl.seval('using MyPySR')
-
-    from DeepPySR.kan_regressor import KANPySRRegressor
+def run_kansr(X, y, year: int = 8, type='cluster', r2w = 1.,l = 1.,model_provider='pysr'):
     kansr = KANPySRRegressor(
         kan_width=[X.shape[1], 5, 1], # Simple architecture for demo
         kan_steps=100,
-        output_dir=f"./results_bmi/kansr/yr{year}_kansr_{type}",
+        output_dir=f"./results_bmi/kansr/yr{year}_{type}_{model_provider}_r2w{r2w}_lambda{l}",
+        pareto_lambda = l,
+        pareto_r2_weight = r2w,
+        model_provider=model_provider,
         **pysr_kwargs
     )
 
@@ -149,6 +133,8 @@ def run_kansr(X, y, year: int = 8, type='cluster', project_path: str = None):
     print(f"Fitting completed in {duration/60:.2f} minutes.")
 
     y_pred = kansr.predict(X)
+    # Handle NaNs and Infs in predictions
+    y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
     r2 = r2_score(y, y_pred)
     print(f"R2 score: {r2:.2f}")
 
@@ -159,7 +145,7 @@ def run_kansr(X, y, year: int = 8, type='cluster', project_path: str = None):
     print(f"\nKANSR Demo completed! Check output directory for visualizations.")
 
 def run_kan(X, y, year: int=8, type='single'):
-    from kan import KAN
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = {}
     dataset['train_input'] = torch.from_numpy(X.values).float().to(device)
@@ -176,6 +162,8 @@ def run_kan(X, y, year: int=8, type='single'):
     # model = model.prune()
     model.auto_symbolic()
     y_pred = model(dataset['train_input']).detach().cpu().numpy()
+    # Handle NaNs and Infs in predictions
+    y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
     model.plot(folder=save_path,in_vars=X.columns.tolist(),out_vars=['y'+str(year)+'bmi'])
     r2 = r2_score(y, y_pred)
     print(f"R2 score: {r2:.2f}")
@@ -197,34 +185,30 @@ def run_kan(X, y, year: int=8, type='single'):
         file.write(str(formula[0]))
 
 def main():
-    # 1. Prepare data
-    year = 8
+    years = [8,10,13,16,20,23,26]
     type = 'single'
+    r2w = [1,1.5,2]
+    l = [0.001,0.005,0.01,0.1]
+    model_provider = ['pypysr']
+    for year in years:
+        for model_provider_ in model_provider:
+            if type == 'single':
+                id, X, y = load_data(f"/home/00101787/Projects/pgs/analysis/analysis_prsmochl_kan/plots_paper/yr{year}_kan/data_single.csv",year=year)
+            else:
+                id, X, y = load_data(f"/home/00101787/Projects/pgs/analysis/analysis_prsmochl_kan/plots_paper/yr{year}_kan/data.csv",year=year)
 
-    # Option 1: Use the original pysr package (set to None)
-    # Option 2: Use your custom project (set to path)
-    project_path = '~/Projects/mypysr.jl'
+            if model_provider == "pypysr":
+                pysr_kwargs["variable_prune_start"] = 50
+                pysr_kwargs["variable_prune_ramp"] = 150
+                pysr_kwargs["variable_prune_max"] = 0.6
 
-    if project_path:
-        from pathlib import Path
-        from pysr import jl
-        proj = str(Path(os.path.expanduser(project_path)).resolve())
-        print(f"Configuring custom Julia package path: {proj}")
-        # Note: Actual activation/replacement happens inside run_deeppysr/run_kansr
-    else:
-        print("Using default Julia environment (original pysr)")
-
-    if type == 'single':
-        id, X, y, template = load_data(f"/home/00101787/Projects/pgs/analysis/analysis_prsmochl_kan/plots_paper/yr{year}_kan/data_single.csv",year=year)
-    else:
-        id, X, y, template = load_data(f"/home/00101787/Projects/pgs/analysis/analysis_prsmochl_kan/plots_paper/yr{year}_kan/data.csv",year=year)
-
-    # Now you can call any of these with the configured project:
-    run_deeppysr(X, y, year, type, project_path=project_path, run_type='deeppysr' if project_path is None else 'pysrvar')
-    # OR
-    # run_kansr(X, y, year, type, project_path=project_path)
-    # OR
-    # run_kan(X, y, year, type)
+            for r2w_ in r2w:
+                for l_ in l:
+                    run_deeppysr(X, y, year, type,r2w = r2w_,l=l_, model_provider=model_provider_)
+                # OR
+                    run_kansr(X, y, year, type, r2w=r2w_,l=l_,model_provider=model_provider_)
+                # OR
+        # run_kan(X, y, year, type)
 
 if __name__ == "__main__":
     main()
