@@ -79,7 +79,7 @@ def load_data(path: str, year: int = 8):
 def run_deeppysr(X, y, year: int = 8,type='cluster', r2w = 1.,l = 1.,model_provider='pysr'):
     # 2. Initialize the DeepPySRRegressor
     deeppysr = DeepPySRRegressor(
-        max_layers=4,           # DeepPySR specific: Depth of the symbolic hierarchy
+        max_layers=3,           # DeepPySR specific: Depth of the symbolic hierarchy
         output_dir=f"./results_bmi/deeppysr/yr{year}_{type}_{model_provider}_r2w{r2w}_lambda{l}",
         pareto_lambda = l,
         pareto_r2_weight = r2w,
@@ -186,9 +186,12 @@ def run_kan(X, y, year: int=8, type='single'):
 
 def main():
     years = [8,10,13,16,20,23,26]
+    # years = [8]
     type = 'single'
     r2w = [1,1.5,2]
     l = [0.001,0.005,0.01,0.1]
+    # r2w = [1.5]
+    # l = [0.005]
     model_provider = ['pypysr']
     for year in years:
         for model_provider_ in model_provider:
@@ -197,16 +200,22 @@ def main():
             else:
                 id, X, y = load_data(f"/home/00101787/Projects/pgs/analysis/analysis_prsmochl_kan/plots_paper/yr{year}_kan/data.csv",year=year)
 
-            if model_provider == "pypysr":
+            if model_provider_ == "pypysr":
                 pysr_kwargs["variable_prune_start"] = 50
                 pysr_kwargs["variable_prune_ramp"] = 150
                 pysr_kwargs["variable_prune_max"] = 0.6
 
             for r2w_ in r2w:
                 for l_ in l:
+                    # if os.path.exists(f"./results_bmi/deeppysr/yr{year}_{type}_{model_provider_}_r2w{r2w_}_lambda{l_}/relationships.csv"):
+                    #     print(f"Relationships already exist for year {year}, type {type}, r2w {r2w_}, lambda {l_}, model_provider {model_provider_}. Skipping.")
+                    #     continue
+                    # else:
+                    #     print(f"Running DeepPySRRegressor for year {year}, type {type}, r2w {r2w_}, lambda {l_}, model_provider {model_provider_}.")
+                    #     run_deeppysr(X, y, year, type,r2w = r2w_,l=l_, model_provider=model_provider_)
                     run_deeppysr(X, y, year, type,r2w = r2w_,l=l_, model_provider=model_provider_)
                 # OR
-                    run_kansr(X, y, year, type, r2w=r2w_,l=l_,model_provider=model_provider_)
+                #     run_kansr(X, y, year, type, r2w=r2w_,l=l_,model_provider=model_provider_)
                 # OR
         # run_kan(X, y, year, type)
 

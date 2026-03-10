@@ -141,6 +141,14 @@ class DeepPySRRegressor:
         os.makedirs(target_output_dir, exist_ok=True)
         
         params["output_directory"] = target_output_dir
+        
+        # Determine variable names for this fit
+        n_features = X.shape[1]
+        if self.model_provider == "pypysr":
+            v_names = [f"v{i}" for i in range(n_features)]
+        else:
+            v_names = [f"x{i}" for i in range(n_features)]
+            
         # Dynamically import PySRRegressor
         if self.model_provider == "pypysr":
             import sys
@@ -175,9 +183,6 @@ class DeepPySRRegressor:
             warnings.simplefilter("ignore", ConvergenceWarning)
             # Ensure variable_names is passed as a list of strings if X is not a DataFrame
             # PySRRegressor should handle it, but for pypysr we want to be explicit
-            v_names = None
-            if not isinstance(X, pd.DataFrame):
-                v_names = [f"x{i}" for i in range(X.shape[1])]
             model.fit(X, y_fit, variable_names=v_names)
         
         eqs = model.equations_
@@ -267,7 +272,7 @@ class DeepPySRRegressor:
             else:
                 idx = int(target_name[1:])
                 parent_idx = None
-                if parent_name and parent_name.startswith("x"):
+                if parent_name and parent_name.startswith("x") and parent_name != "y":
                     try:
                         parent_idx = int(parent_name[1:])
                     except ValueError:
@@ -290,10 +295,17 @@ class DeepPySRRegressor:
                 for n in sym_expr.atoms(sp.Number):
                     sym_expr = sym_expr.xreplace({n: round(float(n), self.decimal)})
 
-                if target_name != "y":
-                    mapping = {sp.Symbol(f"x{k}"): sp.Symbol(f"x{cols[k]}") for k in range(len(cols))}
-                    sym_expr = sym_expr.xreplace(mapping)
-
+                # pypysr uses 'v' prefix to avoid its internal x1->x0 translation
+                # pysr uses 'x' prefix.
+                prefix = "v" if self.model_provider == "pypysr" else "x"
+                
+                mapping = {}
+                for k in range(len(cols)):
+                    mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
+                
+                sym_expr = sym_expr.xreplace(mapping)
+                
+                # Update involved variables after mapping to global x indices
                 involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
 
                 if is_redundant(target_name, sym_expr, self.relationships_):
@@ -354,25 +366,27 @@ class DeepPySRRegressor:
         if not hasattr(self, "feature_names_in_"):
             return self.relationships_
             
+        # Create a mapping from internal names to feature names
+        # Internal names are always x0, x1, ... x{n-1}
         mapping = {f"x{i}": name for i, name in enumerate(self.feature_names_in_)}
+        
+        # Sort internal names by length descending to avoid partial replacements (e.g., x10 replacing x1)
+        internal_names = sorted(mapping.keys(), key=len, reverse=True)
+        
         mapped_rels = []
         for rel in self.relationships_:
             new_rel = rel.copy()
-            # Map target if it's xi
-            if new_rel["target"].startswith("x"):
-                try:
-                    idx_str = new_rel["target"][1:]
-                    if idx_str.isdigit():
-                        idx = int(idx_str)
-                        new_rel["target"] = mapping.get(new_rel["target"], new_rel["target"])
-                except ValueError:
-                    pass
+            
+            # Map target if it's an internal name like xi
+            if new_rel["target"] in mapping:
+                new_rel["target"] = mapping[new_rel["target"]]
             
             # Ensure sym_expr is a sympy expression
             if not hasattr(new_rel["sympy"], "xreplace"):
                 new_rel["sympy"] = sp.sympify(new_rel["sympy"])
 
-            # Map sympy formula
+            # Map sympy formula using SymPy's xreplace with symbols
+            # xreplace with symbols is safe against partial name matches.
             sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
             new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
             new_rel["formula"] = str(new_rel["sympy"])

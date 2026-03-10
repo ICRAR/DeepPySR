@@ -184,7 +184,10 @@ class KANPySRRegressor:
                     self.symbolic_expressions[(l, j)] = sp.Float(0.0)
                     continue
 
-                involved_names = [f"L{l}_N{i}" if l > 0 else f"x{i}" for i in involved_indices]
+                if self.model_provider == "pypysr":
+                    involved_names = [f"L{l}_N{i}" if l > 0 else f"v{i}" for i in involved_indices]
+                else:
+                    involved_names = [f"L{l}_N{i}" if l > 0 else f"x{i}" for i in involved_indices]
                 
                 # Extract inputs to this node
                 X_node = self.model.acts[l][:, involved_indices].detach().cpu().numpy()
@@ -406,38 +409,35 @@ class KANPySRRegressor:
         if not hasattr(self, "feature_names_in_"):
             return self.relationships_
             
-        mapping = {f"x{i}": name for i, name in enumerate(self.feature_names_in_)}
+        # Create a mapping from internal names to feature names
+        # Internal names are always x0, x1, ... x{n-1} or v0, v1, ... for pypysr
+        prefix = "v" if self.model_provider == "pypysr" else "x"
+        mapping = {f"{prefix}{i}": name for i, name in enumerate(self.feature_names_in_)}
+        
         mapped_rels = []
         for rel in self.relationships_:
             new_rel = rel.copy()
-            # Map target if it's xi
-            if new_rel["target"].startswith("x"):
-                try:
-                    idx = int(new_rel["target"][1:])
-                    new_rel["target"] = mapping.get(new_rel["target"], new_rel["target"])
-                except ValueError:
-                    pass
             
-            # Ensure sympy formula is a sympy expression
+            # Map target if it's an internal name like xi
+            if new_rel["target"] in mapping:
+                new_rel["target"] = mapping[new_rel["target"]]
+            
+            # Ensure sym_expr is a sympy expression
             if not hasattr(new_rel["sympy"], "subs"):
                 new_rel["sympy"] = sp.sympify(new_rel["sympy"])
 
             # Map sympy formula
             # Note: For KAN, involved are x{i} at layer 0, and L{l}_N{i} at other layers.
             # We only want to map x{i} to original feature names.
-            sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+            sym_mapping = {sp.Symbol(name): sp.Symbol(mapping[name]) for name in mapping}
             new_rel["sympy"] = new_rel["sympy"].subs(sym_mapping)
             new_rel["formula"] = str(new_rel["sympy"])
             
             # Map involved names in the list too
             new_involved = []
             for inv in new_rel["involved"]:
-                if inv.startswith("x"):
-                    try:
-                        idx = int(inv[1:])
-                        new_involved.append(mapping.get(inv, inv))
-                    except ValueError:
-                        new_involved.append(inv)
+                if inv in mapping:
+                    new_involved.append(mapping[inv])
                 else:
                     new_involved.append(inv)
             new_rel["involved"] = new_involved
