@@ -192,7 +192,7 @@ def main():
     l = [0.001,0.005,0.01,0.1]
     # r2w = [1.5]
     # l = [0.005]
-    model_provider = ['pypysr']
+    model_provider = ['pysr']
     for year in years:
         for model_provider_ in model_provider:
             if type == 'single':
