@@ -16,14 +16,15 @@ class DeepPySRRegressor:
         self,
         max_layers=4,
         output_dir="outputs/deepPySR",
-        # decimal = 2,
         stopping_score = 2,
         model_provider = "pysr",
+        pypysr_path = None,
         pareto_lambda = 0.01,
         pareto_r2_weight = 1.0,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
+        self.pypysr_path = pypysr_path or os.environ.get("PYPYSR_PATH")
         self.pysr_kwargs = pysr_kwargs
 
         self.decimal = 2
@@ -42,6 +43,7 @@ class DeepPySRRegressor:
             "decimal": self.decimal,
             "stopping_score": self.stopping_score,
             "model_provider": self.model_provider,
+            "pypysr_path": self.pypysr_path,
             "pareto_lambda": self.pareto_lambda,
             "pareto_r2_weight": self.pareto_r2_weight,
         }
@@ -156,17 +158,20 @@ class DeepPySRRegressor:
         # Dynamically import PySRRegressor
         if self.model_provider == "pypysr":
             import sys
-            pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
-            if pypysr_path not in sys.path:
+            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
+            if os.path.exists(pypysr_path) and pypysr_path not in sys.path:
                 sys.path.insert(0, pypysr_path)
             from pypysr import PySRRegressor
             if self.pysr_kwargs.get("verbosity", 0) > 0:
-                import pypysr
-                print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
+                try:
+                    import pypysr
+                    print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
+                except ImportError:
+                    print(f"[DeepPySR] Using pypysr (import path: {pypysr_path})")
             model = PySRRegressor(**self.pysr_kwargs)
         else:
             import sys
-            pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
+            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
             if pypysr_path in sys.path:
                 sys.path.remove(pypysr_path)
             from pysr import PySRRegressor

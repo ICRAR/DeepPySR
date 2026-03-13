@@ -10,7 +10,10 @@ setup(
         "sympy",
         "matplotlib",
         "networkx",
-        "pandas"
+        "pandas",
+        "pycirclize",
+        "torch",
+        "pykan"
     ],
     author="FulingChen",
     description="A deep symbolic regression package based on PySR",

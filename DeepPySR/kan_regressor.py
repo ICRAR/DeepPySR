@@ -27,6 +27,7 @@ class KANPySRRegressor:
         kan_lamb_entropy=2.0,
         output_dir="outputs/kan_pysr",
         model_provider="pysr",
+        pypysr_path=None,
         pareto_lambda=0.01,
         pareto_r2_weight=1.0,
         **pysr_kwargs
@@ -39,6 +40,7 @@ class KANPySRRegressor:
         self.kan_lamb_entropy = kan_lamb_entropy
         self.output_dir = output_dir
         self.model_provider = model_provider
+        self.pypysr_path = pypysr_path or os.environ.get("PYPYSR_PATH")
         self.pareto_lambda = pareto_lambda
         self.pareto_r2_weight = pareto_r2_weight
         self.pysr_kwargs = pysr_kwargs
@@ -46,15 +48,15 @@ class KANPySRRegressor:
         # Dynamically import PySRRegressor
         if self.model_provider == "pypysr":
             import sys
-            pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
-            if pypysr_path not in sys.path:
+            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
+            if os.path.exists(pypysr_path) and pypysr_path not in sys.path:
                 sys.path.insert(0, pypysr_path)
             module = importlib.import_module("pypysr")
             if self.pysr_kwargs.get("verbosity", 0) > 0:
                 print(f"[DeepPySR] KAN using pypysr from: {os.path.abspath(module.__file__)}")
         else:
             import sys
-            pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
+            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
             if pypysr_path in sys.path:
                 sys.path.remove(pypysr_path)
             module = importlib.import_module("pysr")
@@ -77,6 +79,7 @@ class KANPySRRegressor:
             "kan_lamb_entropy": self.kan_lamb_entropy,
             "output_dir": self.output_dir,
             "model_provider": self.model_provider,
+            "pypysr_path": self.pypysr_path,
             "pareto_lambda": self.pareto_lambda,
             "pareto_r2_weight": self.pareto_r2_weight,
             **self.pysr_kwargs
@@ -84,24 +87,24 @@ class KANPySRRegressor:
 
     def set_params(self, **params):
         for key, value in params.items():
-            if key in ["kan_width", "kan_grid", "kan_k", "kan_steps", "kan_lamb", "kan_lamb_entropy", "output_dir", "model_provider"]:
+            if key in ["kan_width", "kan_grid", "kan_k", "kan_steps", "kan_lamb", "kan_lamb_entropy", "output_dir", "model_provider", "pypysr_path"]:
                 setattr(self, key, value)
             else:
                 self.pysr_kwargs[key] = value
         
-        # Re-initialize the internal model if provider changed
-        if "model_provider" in params:
+        # Re-initialize the internal model if provider or path changed
+        if "model_provider" in params or "pypysr_path" in params:
             if self.model_provider == "pypysr":
                 import sys
-                pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
-                if pypysr_path not in sys.path:
+                pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
+                if os.path.exists(pypysr_path) and pypysr_path not in sys.path:
                     sys.path.insert(0, pypysr_path)
                 module = importlib.import_module("pypysr")
                 if self.pysr_kwargs.get("verbosity", 0) > 0:
                     print(f"[DeepPySR] KAN (re)using pypysr from: {os.path.abspath(module.__file__)}")
             else:
                 import sys
-                pypysr_path = os.path.expanduser("~/Projects/mypysr.jl/python")
+                pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
                 if pypysr_path in sys.path:
                     sys.path.remove(pypysr_path)
                 module = importlib.import_module("pysr")
