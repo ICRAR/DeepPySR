@@ -111,6 +111,10 @@ class DeepPySRRegressor:
                     except Exception:
                         pass
 
+            # Handle ComplexInfinity (zoo) and Infinity (oo) which can cause KeyError in lambdify for some printers
+            curr_expr = curr_expr.subs({sp.zoo: sp.nan, sp.oo: sp.oo}) 
+            # Note: sp.oo is usually handled, but zoo is not. Replacing zoo with nan is safe.
+
             func = sp.lambdify(symbols, curr_expr, modules=modules)
             
             # Get values for involved symbols
