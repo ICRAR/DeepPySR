@@ -144,7 +144,13 @@ def plot_n_layer_graph(
                         add_nodes_recursive(vname, node_id, current_layer + 1, max_layers)
 
     max_rel_layer = max((r["layer"] for r in relationships), default=0)
-    add_nodes_recursive("y", None, 0, max_rel_layer)
+    
+    # Handle multiple target variables
+    if isinstance(target_variable, list):
+        for tv in target_variable:
+            add_nodes_recursive(tv, None, 0, max_rel_layer)
+    else:
+        add_nodes_recursive(target_variable, None, 0, max_rel_layer)
 
     layers = {}
     for nid, data in node_data.items():
@@ -154,12 +160,33 @@ def plot_n_layer_graph(
         layers[l].append(nid)
 
     pos = {}
+    layout_tree_children = {}
     max_l = max(layers.keys()) if layers else 0
-    pos["y"] = np.array([0.0, 0.0])
+
+    # Sort roots by target_variable order if it's a list
+    roots = []
+    if isinstance(target_variable, list):
+        roots = [tv for tv in target_variable if tv in node_data]
+    elif target_variable in node_data:
+        roots = [target_variable]
     
-    layout_tree_children = {} 
-    visited = {"y"}
-    queue = ["y"]
+    if not roots:
+        # Fallback to layer 0 nodes if no matches
+        roots = [nid for nid, data in node_data.items() if data["layer"] == 0]
+
+    visited = set(roots)
+    queue = list(roots)
+    
+    # Position roots
+    n_roots = len(roots)
+    for i, root in enumerate(roots):
+        if n_roots > 1:
+            # Spread roots if there are multiple
+            angle = (i / n_roots) * 2 * np.pi
+            pos[root] = np.array([0.5 * np.cos(angle), 0.5 * np.sin(angle)])
+        else:
+            pos[root] = np.array([0.0, 0.0])
+
     while queue:
         parent = queue.pop(0)
         layout_tree_children[parent] = []
@@ -190,7 +217,14 @@ def plot_n_layer_graph(
             child_end = start_angle + (i + 1) * (sector_width / n_children)
             assign_radial_pos(child, child_start, child_end, radius_step)
 
-    assign_radial_pos("y", 0, 2 * np.pi)
+    for i, root in enumerate(roots):
+        if n_roots > 1:
+            root_start = (i / n_roots) * 2 * np.pi
+            root_end = ((i + 1) / n_roots) * 2 * np.pi
+        else:
+            root_start = 0
+            root_end = 2 * np.pi
+        assign_radial_pos(root, root_start, root_end, radius_step=1.0)
 
     for nid in node_data:
         if nid not in pos:
@@ -262,7 +296,13 @@ def plot_circlize(
         target_variable: str = "Synthetic Data"
 ):
     # 1. Collect and sort all unique variables
-    all_vars = {"y"}
+    all_vars = set()
+    if isinstance(target_variable, list):
+        for tv in target_variable:
+            all_vars.add(tv)
+    else:
+        all_vars.add(target_variable)
+        
     for rel in relationships:
         all_vars.add(rel["target"])
         for v in rel["involved"]:
@@ -282,19 +322,27 @@ def plot_circlize(
             if f"x{i}" in all_vars:
                 display_names[f"x{i}"] = name
 
-    # Sort: 'y' first, then x0, x1, etc.
+    # Sort: root targets first, then x0, x1, etc.
+    roots_set = set(target_variable) if isinstance(target_variable, list) else {target_variable}
+    
     def sort_key(v):
-        if v == "y":
-            return (0, 0, "")
+        if v in roots_set:
+            # If multiple roots, maintain their relative order
+            if isinstance(target_variable, list):
+                return (0, target_variable.index(v), v)
+            return (0, 0, v)
         if v.startswith("x") and v[1:].isdigit():
             return (1, int(v[1:]), v)
         return (2, 0, v)
 
     sorted_vars = sorted(list(all_vars), key=sort_key)
 
-    # 2. Identify variables directly influencing 'y'
-    y_rel = next((r for r in relationships if r["target"] == "y"), None)
-    direct_to_y = set(y_rel["involved"]) if y_rel else set()
+    # 2. Identify variables directly influencing roots
+    direct_to_roots = set()
+    for tv in roots_set:
+        tv_rel = next((r for r in relationships if r["target"] == tv), None)
+        if tv_rel:
+            direct_to_roots.update(tv_rel["involved"])
     
     # 3. Define layer colors
     max_layer = max((r["layer"] for r in relationships), default=1)
@@ -312,7 +360,7 @@ def plot_circlize(
     space = max(2, 10 - num_vars * 0.5) 
     circos = Circos(sectors, space=space)
 
-    # Replace "y" with target_variable name in labels and dots
+    # 5. Draw sectors and nodes
     for sector in circos.sectors:
         # Create a track for the variable "dots" and labels
         # Track from radius 95 to 100
@@ -320,11 +368,11 @@ def plot_circlize(
 
         v_name = sector.name
         # Determine styling
-        if v_name == "y":
+        if v_name in roots_set:
             color = "#D32F2F" # Professional Dark Red
             size = 120 # Reduced from 150
             zorder = 5
-        elif v_name in direct_to_y:
+        elif v_name in direct_to_roots:
             color = "#1976D2" # Professional Dark Blue
             size = 80 # Reduced from 100
             zorder = 4

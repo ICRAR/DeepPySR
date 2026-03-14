@@ -129,7 +129,12 @@ class DeepPySRRegressor:
                 res = np.full(X_input.shape[0], res)
             values[target] = res
             
-        return values['y']
+        if isinstance(self.target_name_, list):
+            # Return multi-output predictions as a 2D array
+            preds = [values[t] for t in self.target_name_]
+            return np.column_stack(preds)
+        else:
+            return values[self.target_name_]
 
     def _fit_single_target(self, X, y, target_name):
         # Create a new PySRRegressor instance with the same parameters as self
@@ -246,10 +251,20 @@ class DeepPySRRegressor:
     def fit(self, X, y):
         if isinstance(y, pd.Series):
             self.target_name_ = str(y.name) if y.name else "y"
+            y_input = y.values
         elif isinstance(y, pd.DataFrame):
-            self.target_name_ = str(y.columns[0])
+            if y.shape[1] == 1:
+                self.target_name_ = str(y.columns[0])
+                y_input = y.values.flatten()
+            else:
+                self.target_name_ = [str(c) for c in y.columns]
+                y_input = y.values
         else:
-            self.target_name_ = "y"
+            y_input = np.array(y)
+            if y_input.ndim == 1:
+                self.target_name_ = "y"
+            else:
+                self.target_name_ = [f"y{i}" for i in range(y_input.shape[1])]
 
         if isinstance(X, pd.DataFrame):
             self.feature_names_in_ = [str(c) for c in X.columns.tolist()]
@@ -261,7 +276,15 @@ class DeepPySRRegressor:
         self.n_features_in_ = X_input_all.shape[1]
         ensure_output_dir(self.output_dir)
         self.relationships_ = []
-        queue = [("y", y, 1, None)]
+        
+        # Initialize queue with all targets
+        queue = []
+        if isinstance(self.target_name_, list):
+            for i, name in enumerate(self.target_name_):
+                queue.append((name, y_input[:, i], 1, None))
+        else:
+            queue.append((self.target_name_, y_input, 1, None))
+            
         processed_targets = set()
 
         while queue:
@@ -269,22 +292,34 @@ class DeepPySRRegressor:
             if layer > self.max_layers:
                 continue
 
-            if target_name in processed_targets and target_name != "y":
+            # Skip if target already processed, but allow roots to be re-processed if they appear as features
+            # (though in multi-output, roots shouldn't typically be features of each other initially,
+            # but DeepPySR's logic might allow it later).
+            is_root = (isinstance(self.target_name_, list) and target_name in self.target_name_) or \
+                      (not isinstance(self.target_name_, list) and target_name == self.target_name_)
+            
+            if target_name in processed_targets and not is_root:
                 continue
             processed_targets.add(target_name)
 
             print(f"--- Fitting {target_name} at layer {layer} ---")
 
-            if target_name == "y":
+            if is_root:
                 X_fit = X_input_all
                 cols = list(range(X_input_all.shape[1]))
             else:
-                idx = int(target_name[1:])
+                try:
+                    idx = int(target_name[1:])
+                except (ValueError, IndexError):
+                    # For non-indexed targets that aren't root, we might have an issue
+                    # but typically intermediate targets are x0, x1...
+                    idx = -1
+                
                 parent_idx = None
-                if parent_name and parent_name.startswith("x") and parent_name != "y":
+                if parent_name and parent_name.startswith("x") and not ((isinstance(self.target_name_, list) and parent_name in self.target_name_) or (not isinstance(self.target_name_, list) and parent_name == self.target_name_)):
                     try:
                         parent_idx = int(parent_name[1:])
-                    except ValueError:
+                    except (ValueError, IndexError):
                         pass
 
                 cols = [j for j in range(X_input_all.shape[1]) if j != idx and j != parent_idx]
@@ -334,7 +369,7 @@ class DeepPySRRegressor:
                     "r2": r2
                 }
 
-                if score < self.stopping_score and target_name != "y":
+                if score < self.stopping_score and not is_root:
                     print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
                 else:
                     self.relationships_.append(relationship)
@@ -352,7 +387,8 @@ class DeepPySRRegressor:
         
         # Populate equations_ with the top-level relationship for compatibility
         if self.relationships_:
-            y_rel = next((r for r in self.relationships_ if r['target'] == 'y'), None)
+            root_name = self.target_name_[0] if isinstance(self.target_name_, list) else self.target_name_
+            y_rel = next((r for r in self.relationships_ if r['target'] == root_name), None)
             if y_rel:
                 # We create a minimal DataFrame that PySR expects for equations_
                 self.equations_ = pd.DataFrame([
@@ -365,7 +401,7 @@ class DeepPySRRegressor:
                     }
                 ])
                 # These attributes are often checked by PySR or scikit-learn
-                self.nout_ = 1
+                self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
                 self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
 
         return self
@@ -447,20 +483,33 @@ class DeepPySRRegressor:
         print(f"Plot saved to {path}")
 
     def sympy(self):
-        """Returns the SymPy expression for the top-level relationship."""
+        """Returns the SymPy expression(s) for the top-level relationship(s)."""
         if not self.relationships_:
             return None
-        y_rel = next((r for r in self.relationships_ if r['target'] == 'y'), None)
-        if not y_rel:
-            return None
-        
-        expr = y_rel['sympy']
-        if not hasattr(self, "feature_names_in_"):
-            return expr
             
-        # Map x0, x1... to original feature names
-        mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
-        return expr.xreplace(mapping)
+        if isinstance(self.target_name_, list):
+            exprs = {}
+            for name in self.target_name_:
+                rel = next((r for r in self.relationships_ if r['target'] == name), None)
+                if rel:
+                    expr = rel['sympy']
+                    if hasattr(self, "feature_names_in_"):
+                        sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+                        expr = expr.xreplace(sym_mapping)
+                    exprs[name] = expr
+            return exprs
+        else:
+            y_rel = next((r for r in self.relationships_ if r['target'] == self.target_name_), None)
+            if not y_rel:
+                return None
+            
+            expr = y_rel['sympy']
+            if not hasattr(self, "feature_names_in_"):
+                return expr
+                
+            # Map x0, x1... to original feature names
+            mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+            return expr.xreplace(mapping)
 
     def latex(self):
         """Returns the LaTeX representation of the top-level relationship."""
