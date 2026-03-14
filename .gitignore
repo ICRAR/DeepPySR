@@ -6,5 +6,6 @@
 /**/outputs/
 /test_data/
 /test/model/
-/test_bmi/results_bmi/deeppysr/*/
-/test_bmi/results_bmi/agg_deeppysr/*/
+/test_bmi/results_bmi/*/*/
+/test_bmi/model/
+/model/

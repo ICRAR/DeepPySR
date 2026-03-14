@@ -83,8 +83,11 @@ def clean_data(threshold: float = 0.1):
         
     return df_cleaned
 
-def load_agg_data():
+def load_agg_data(age=None):
     data = clean_data()
+    if age is not None:
+        data = data[data['age'] == age]
+
     dataid = data[["child_id"]].T.drop_duplicates().T.values.reshape(1, -1)[0]
     datain = data.drop(columns=['child_id','target_bmi'])
     dataout = data[['target_bmi']]
