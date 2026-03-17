@@ -31,6 +31,13 @@ def calculate_complexity(formula_str):
         # Fallback: count words/operators as a very rough estimate
         return len(re.findall(r'\w+|[+\-*/()^]', formula_str))
 
+def truncate_formula(formula, max_length=50):
+    if not isinstance(formula, str):
+        return formula
+    if len(formula) <= max_length:
+        return formula
+    return formula[:max_length] + "..."
+
 def parse_folder_name(folder_name):
     # Example: yr8_single_pypysr_r2w1.5_lambda0.001
     year_match = re.search(r'yr(\d+)', folder_name)
@@ -836,8 +843,30 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
     
     best_long_metrics = df_long.query(" & ".join(query_parts)).sort_values('age')
 
+    # 1.5 Most Interpretable Longitudinal Model (Complexity < 13, highest overall_r2)
+    interpretable_long_df = df_long[df_long['complexity'] < 13]
+    best_interp_long_metrics = pd.DataFrame()
+    if not interpretable_long_df.empty:
+        best_interp_long_idx = interpretable_long_df['overall_r2'].idxmax()
+        interp_long_params_series = df_long.loc[best_interp_long_idx, [c for c in param_cols if c in df_long.columns]]
+        query_parts_interp = []
+        for col, val in interp_long_params_series.items():
+            if isinstance(val, str):
+                query_parts_interp.append(f"`{col}` == '{val}'")
+            else:
+                query_parts_interp.append(f"`{col}` == {val}")
+        best_interp_long_metrics = df_long.query(" & ".join(query_parts_interp)).sort_values('age')
+
     # 2. Best age model for EACH age (highest r2 for that age)
     best_age_metrics = df_age.loc[df_age.groupby('age')['r2'].idxmax()].sort_values('age')
+
+    # 2.5 Most Interpretable Age-Specific Model (Complexity < 13, highest overall_r2 among those, OR just best per age among <13?)
+    # Usually we want the best per age that is also interpretable.
+    interpretable_age_df = df_age[df_age['complexity'] < 13]
+    best_interp_age_metrics = pd.DataFrame()
+    if not interpretable_age_df.empty:
+        # Pick the best interpretable model for each age
+        best_interp_age_metrics = interpretable_age_df.loc[interpretable_age_df.groupby('age')['r2'].idxmax()].sort_values('age')
 
     # Plot comparison
     titles = ['R2 Score', 'Formula Complexity', 'MAE', 'RMSE', 'Feature Importance (Baseline Models)']
@@ -860,41 +889,43 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
     
     # Define colors for baselines
     baseline_colors = {
-        'kan': 'green',
-        'kansym': 'lightgreen',
-        'elasticnet': 'orange',
-        'erf': 'purple',
-        'xgboost': 'brown',
-        'mlp': 'pink'
+        'elasticnet': 'coral',
+        'xgboost': 'orange',
+        'kan': 'magenta',
+        'kansym': 'purple',
+        'mlp': 'green',
+        'erf': 'blue',
     }
 
     for i, metric in enumerate(metrics):
         row, col = metric_pos[metric]
-        # Longitudinal line
+        # 1. Add Longitudinal Models first
+        # Best DeepPySR Longitudinal
         fig.add_trace(go.Scatter(
             x=best_long_metrics['age'], 
             y=best_long_metrics[metric],
             mode='lines+markers',
             name='Best DeepPySR Longitudinal',
-            line=dict(color='blue', width=3),
+            line=dict(color='red', width=3),
             showlegend=(i == 0),
             hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Best DeepPySR Longitudinal<br>Formula: %{text}<extra></extra>",
-            text=best_long_metrics['formula']
-        ), row=row, col=col)
-        
-        # Age-specific line
-        fig.add_trace(go.Scatter(
-            x=best_age_metrics['age'], 
-            y=best_age_metrics[metric],
-            mode='lines+markers',
-            name='Best DeepPySR Age-Specific',
-            line=dict(color='red', width=3, dash='dash'),
-            showlegend=(i == 0),
-            hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Best DeepPySR Age-Specific<br>Formula: %{text}<extra></extra>",
-            text=best_age_metrics['formula']
+            text=best_long_metrics['formula'].apply(lambda x: truncate_formula(x, 50))
         ), row=row, col=col)
 
-        # Add Baselines
+        # Most Interpretable DeepPySR Longitudinal
+        if not best_interp_long_metrics.empty:
+            fig.add_trace(go.Scatter(
+                x=best_interp_long_metrics['age'], 
+                y=best_interp_long_metrics[metric],
+                mode='lines+markers',
+                name='Most Interpretable DeepPySR Longitudinal',
+                line=dict(color='black', width=2),
+                showlegend=(i == 0),
+                hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Most Interp DeepPySR Longitudinal<br>Formula: %{text}<extra></extra>",
+                text=best_interp_long_metrics['formula'].apply(lambda x: truncate_formula(x, 50))
+            ), row=row, col=col)
+
+        # Baseline Longitudinal Models
         if baseline_long_dir:
             bl_long_csv = os.path.join(baseline_long_dir, 'baseline_longitudinal_metrics.csv')
             if os.path.exists(bl_long_csv):
@@ -915,9 +946,36 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
                         legendgroup=f'bl_long_{model}',
                         opacity=0.7,
                         hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Longitudinal " + model.upper() + "<br>Formula: %{text}<extra></extra>",
-                        text=model_df['formula'] if 'formula' in model_df.columns else [""] * len(model_df)
+                        text=model_df['formula'].apply(lambda x: truncate_formula(x, 75)) if 'formula' in model_df.columns else [""] * len(model_df)
                     ), row=row, col=col)
 
+        # 2. Add Age-Specific Models
+        # Best DeepPySR Age-Specific
+        fig.add_trace(go.Scatter(
+            x=best_age_metrics['age'], 
+            y=best_age_metrics[metric],
+            mode='lines+markers',
+            name='Best DeepPySR Age-Specific',
+            line=dict(color='red', width=3, dash='dash'),
+            showlegend=(i == 0),
+            hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Best DeepPySR Age-Specific<br>Formula: %{text}<extra></extra>",
+            text=best_age_metrics['formula'].apply(lambda x: truncate_formula(x, 75))
+        ), row=row, col=col)
+
+        # Most Interpretable DeepPySR Age-Specific
+        if not best_interp_age_metrics.empty:
+            fig.add_trace(go.Scatter(
+                x=best_interp_age_metrics['age'], 
+                y=best_interp_age_metrics[metric],
+                mode='lines+markers',
+                name='Most Interpretable DeepPySR Age-Specific',
+                line=dict(color='black', width=2, dash='dash'),
+                showlegend=(i == 0),
+                hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Most Interp DeepPySR Age-Specific<br>Formula: %{text}<extra></extra>",
+                text=best_interp_age_metrics['formula'].apply(lambda x: truncate_formula(x, 75))
+            ), row=row, col=col)
+
+        # Baseline Age-Specific Models
         if baseline_age_dir:
             bl_age_csv = os.path.join(baseline_age_dir, 'baseline_age_metrics.csv')
             if os.path.exists(bl_age_csv):
@@ -938,7 +996,7 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
                         legendgroup=f'bl_age_{model}',
                         opacity=0.7,
                         hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Age-Specific " + model.upper() + "<br>Formula: %{text}<extra></extra>",
-                        text=model_df['formula'] if 'formula' in model_df.columns else [""] * len(model_df)
+                        text=model_df['formula'].apply(lambda x: truncate_formula(x, 75)) if 'formula' in model_df.columns else [""] * len(model_df)
                     ), row=row, col=col)
         
         fig.update_xaxes(title_text="Age", row=row, col=col)
@@ -1039,12 +1097,14 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
         height=1400,
         width=2000,
         title_text="Comparison: Best Longitudinal vs Best Age-Specific Models",
+
         legend=dict(
             orientation="v",
             yanchor="middle",
             y=0.5,
             xanchor="left",
-            x=1.02
+            x=1.02,
+
         ),
         xaxis5=dict(
             rangeslider=dict(visible=True),
@@ -1055,6 +1115,7 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
     output_path = os.path.join(os.path.dirname(long_dir), 'longitudinal_vs_age_comparison.html')
     fig.write_html(output_path)
     print(f"Comparison plot saved to {output_path}")
+
 
 if __name__ == "__main__":
     base_directory = os.path.dirname(os.path.abspath(__file__))
@@ -1091,5 +1152,6 @@ if __name__ == "__main__":
     if os.path.exists(deeppysr_longitudinal_dir) and os.path.exists(deeppysr_age_dir):
         compare_longitudinal_vs_age(deeppysr_longitudinal_dir, deeppysr_age_dir, 
                                     baseline_longitudinal_dir, baseline_age_dir)
+
 
 

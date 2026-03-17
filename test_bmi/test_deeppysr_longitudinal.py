@@ -20,15 +20,15 @@ pysr_kwargs = {
                 "extra_sympy_mappings":{'cond': sympy_cond},
                 # "unary_operators": ["sin", "cos", "exp", "log","sqrt","abs"],
                 "unary_operators": ["exp", "log"],
-                "parsimony": 0.01,#0.001,
+                "parsimony": 0.001,#0.001,
                 # "niterations": 500,
                 "populations": 20,#15,
                 "population_size": 100,
                 "ncycles_per_iteration": 200,
-                "adaptive_parsimony_scaling": 100.0,#50.0,
+                "adaptive_parsimony_scaling": 50.0,#50.0,
                 "variable_prune_start": 50,#40,50, # new defined
                 "variable_prune_ramp": 150,#150,80 # new defined
-                "variable_prune_max": 0.6,#0.6,0.7 # new defined
+                "variable_prune_max": 0.7,#0.6,0.7 # new defined
                 # "model_selection":"accuracy", # score, best, accuracy
                 # "early_stop_condition": "f(loss, complexity) = (loss < 0.00001) && (complexity < 20)",
                 "verbosity":1,
@@ -95,11 +95,13 @@ def main():
     prune_start = pysr_kwargs["variable_prune_start"]
     prune_ramp = pysr_kwargs["variable_prune_ramp"]
     prune_max = pysr_kwargs["variable_prune_max"]
-    is_longitudal = False
+    is_longitudal = True
 
     age = [8,10,14,17,20,23,27]
-    r2w = [1,1.5,2]
-    l = [0.001,0.005,0.01,0.1]
+    # r2w = [1,1.5,2]
+    # l = [0.001,0.005,0.01,0.1]
+    r2w = [1.5]
+    l = [0.005]
     if is_longitudal:
         id, X, y = load_agg_data()
         for r2w_ in r2w:
@@ -110,7 +112,7 @@ def main():
                 csv_path = os.path.join(outdir,"relationships.csv")
                 if os.path.exists(csv_path):
                     df = pd.read_csv(csv_path)
-                    if df["layer"].max() >= 1:
+                    if df["layer"].max() >= 2:
                         print(f"Relationships already exist for r2w {r2w_}, lambda {l_}. Skipping.")
                         continue
 

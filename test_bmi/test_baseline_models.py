@@ -9,7 +9,7 @@ from xgboost import XGBRegressor
 from kan import KAN
 import torch
 from sklearn.neural_network import MLPRegressor
-from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.model_selection import KFold, StratifiedGroupKFold
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import permutation_importance
 from utils import load_agg_data
@@ -151,9 +151,9 @@ def run_baselines():
                 
                 # Setup CV
                 if setting == 'longitudinal':
-                    # Stratified on age
-                    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-                    splits = skf.split(X_values, X['age'])
+                    # Stratified on age, grouped by child_id
+                    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+                    splits = sgkf.split(X_values, X['age'], groups=current_id)
                 else:
                     # Simple KFold for age-specific
                     kf = KFold(n_splits=5, shuffle=True, random_state=42)
