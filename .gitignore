@@ -5,7 +5,9 @@
 /**/*kan*/
 /**/outputs/
 /test_data/
-/test/model/
-/test_bmi/results_bmi/*/*/
-/test_bmi/model/
-/model/
+/test/bmi/results_bmi/baseline_age/*/
+/test/bmi/results_bmi/baseline_longitudinal/*/
+/test/bmi/results_bmi/deeppysr_age/*/
+/test/bmi/results_bmi/deeppysr_longitudinal/*/
+/test/bmi/results_bmi/deeppysr_old/*/
+/test/bmi/model/

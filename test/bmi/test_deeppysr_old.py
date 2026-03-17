@@ -97,7 +97,7 @@ def run_kansr(X, y, year: int = 8, type='cluster', r2w = 1.,l = 1.,model_provide
     kansr = KANPySRRegressor(
         kan_width=[X.shape[1], 5, 1], # Simple architecture for demo
         kan_steps=100,
-        output_dir=f"./results_bmi/kansr/yr{year}_{type}_{model_provider}_r2w{r2w}_lambda{l}",
+        output_dir=f"results_bmi/kansr/yr{year}_{type}_{model_provider}_r2w{r2w}_lambda{l}",
         pareto_lambda = l,
         pareto_r2_weight = r2w,
         model_provider=model_provider,
