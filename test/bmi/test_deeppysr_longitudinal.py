@@ -98,10 +98,8 @@ def main():
     is_longitudal = True
 
     age = [8,10,14,17,20,23,27]
-    # r2w = [1,1.5,2]
-    # l = [0.001,0.005,0.01,0.1]
-    r2w = [1.5]
-    l = [0.005]
+    r2w = [1, 1.5, 2]
+    l = [0.001, 0.005, 0.01, 0.1]
     if is_longitudal:
         id, X, y = load_agg_data()
         for r2w_ in r2w:

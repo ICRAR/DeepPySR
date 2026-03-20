@@ -94,25 +94,95 @@ class DeepPySRRegressor:
             
             # Use extra_mappings to ensure custom operators are correctly translated to numpy
             # Priority is given to extra_mappings to avoid conflicts with numpy functions
-            modules = [extra_mappings, 'numpy']
-            
-            # If the expression contains custom functions that are mapped to SymPy Piecewise
-            # (common in PySR), we might need to replace them with Piecewise before lambdifying
-            # if the mapping provided is SymPy-based rather than NumPy-based.
+            # We map custom functions to SymPy Piecewise first, before lambdifying.
             curr_expr = expr
+            
+            # Identify and replace custom functions in extra_mappings
+            # We map custom functions to SymPy expressions first, before lambdifying.
+            curr_expr = expr
+            
+            # Map of name to function/lambda for lambdify
+            custom_funcs = {}
             for name, mapping in extra_mappings.items():
                 if hasattr(mapping, '__call__'):
-                    # Try to see if it's a SymPy-returning lambda by testing with symbols
-                    try:
-                        test_args = [sp.Symbol(f"tmp{i}") for i in range(len(inspect.signature(mapping).parameters))]
-                        test_res = mapping(*test_args)
-                        if isinstance(test_res, sp.Basic):
-                            # It's a SymPy-returning mapping. We can use it to replace the function in the expression.
-                            f_sym = sp.Function(name)
-                            curr_expr = curr_expr.replace(f_sym, mapping)
-                    except Exception:
-                        pass
+                    f_sym = sp.Function(name)
+                    if curr_expr.has(f_sym):
+                        # Try to replace calls to this function with the result of calling the mapping
+                        # We use SymPy's replace method which can handle function replacements
+                        def make_replacer(m, fs):
+                            def replacement(*args):
+                                try:
+                                    res = m(*args)
+                                    if isinstance(res, sp.Basic):
+                                        return res
+                                except Exception:
+                                    pass
+                                return fs(*args) # Fallback to original
+                            return replacement
+                        
+                        # We call it twice to handle nested custom functions if any
+                        curr_expr = curr_expr.replace(f_sym, make_replacer(mapping, f_sym))
+                        
+                        # If after replacement it still exists, it means mapping didn't handle it
+                        # as a SymPy expression, so we pass it to lambdify directly.
+                        if curr_expr.has(f_sym):
+                            custom_funcs[name] = mapping
+                else:
+                    # Not a callable, likely a direct mapping string/dict for lambdify
+                    custom_funcs[name] = mapping
 
+            # A special case: SymPy's ITE (If-Then-Else) or Piecewise 
+            # can't handle Piecewise in the condition. We use piecewise_fold
+            # to lift nested Piecewise and merge them into a single top-level Piecewise.
+            try:
+                curr_expr = sp.piecewise_fold(curr_expr)
+            except Exception:
+                # Fallback if piecewise_fold fails for some reason
+                pass
+
+            # Actually, even after piecewise_fold, we might have ITE(piecewise, ...)
+            # if piecewise_fold didn't resolve everything.
+            def merge_ite_piecewise(e):
+                if isinstance(e, sp.ITE) and isinstance(e.args[0], sp.Piecewise):
+                    cond_piecewise = e.args[0]
+                    true_val = e.args[1]
+                    false_val = e.args[2]
+                    
+                    new_args = []
+                    for val, cond in cond_piecewise.args:
+                        # If cond is true, result is ITE(val, true_val, false_val)
+                        new_val = sp.ITE(val, true_val, false_val)
+                        new_args.append((new_val, cond))
+                    return sp.Piecewise(*new_args)
+                
+                if hasattr(e, 'args') and e.args:
+                    new_args = [merge_ite_piecewise(arg) for arg in e.args]
+                    if new_args != list(e.args):
+                        return e.func(*new_args)
+                return e
+
+            curr_expr = merge_ite_piecewise(curr_expr)
+
+            # Ensure we use a safe select that handles non-boolean conditions in Piecewise
+            def safe_select(condlist, choicelist, default=np.nan):
+                safe_condlist = []
+                for c in condlist:
+                    if isinstance(c, np.ndarray) and c.dtype != bool:
+                        try:
+                            # Try to convert to boolean
+                            safe_condlist.append(c.astype(bool))
+                        except Exception:
+                            # If conversion fails, keep original and let np.select handle it
+                            safe_condlist.append(c)
+                    else:
+                        safe_condlist.append(c)
+                return np.select(safe_condlist, choicelist, default=default)
+
+            # We pass both extra_mappings (for direct function names) 
+            # and a dictionary of custom_funcs (mappings) to modules.
+            # We also ensure 'select' is mapped to our safe_select.
+            modules = [custom_funcs, extra_mappings, {'select': safe_select}, 'numpy']
+            
             # Handle ComplexInfinity (zoo) and Infinity (oo) which can cause KeyError in lambdify for some printers
             curr_expr = curr_expr.subs({sp.zoo: sp.nan, sp.oo: sp.oo}) 
             # Note: sp.oo is usually handled, but zoo is not. Replacing zoo with nan is safe.
@@ -251,16 +321,16 @@ class DeepPySRRegressor:
     def fit(self, X, y):
         if isinstance(y, pd.Series):
             self.target_name_ = str(y.name) if y.name else "y"
-            y_input = y.values
+            y_input = y.values.astype(np.float64)
         elif isinstance(y, pd.DataFrame):
             if y.shape[1] == 1:
                 self.target_name_ = str(y.columns[0])
-                y_input = y.values.flatten()
+                y_input = y.values.flatten().astype(np.float64)
             else:
                 self.target_name_ = [str(c) for c in y.columns]
-                y_input = y.values
+                y_input = y.values.astype(np.float64)
         else:
-            y_input = np.array(y)
+            y_input = np.array(y).astype(np.float64)
             if y_input.ndim == 1:
                 self.target_name_ = "y"
             else:
@@ -268,10 +338,10 @@ class DeepPySRRegressor:
 
         if isinstance(X, pd.DataFrame):
             self.feature_names_in_ = [str(c) for c in X.columns.tolist()]
-            X_input_all = X.values
+            X_input_all = X.values.astype(np.float64)
         else:
             self.feature_names_in_ = [f"x{i}" for i in range(X.shape[1])]
-            X_input_all = X
+            X_input_all = X.astype(np.float64)
 
         self.n_features_in_ = X_input_all.shape[1]
         ensure_output_dir(self.output_dir)
@@ -336,8 +406,9 @@ class DeepPySRRegressor:
                     sym_expr = sp.sympify(sym_expr)
 
                 # Round coefficients
-                for n in sym_expr.atoms(sp.Number):
-                    sym_expr = sym_expr.xreplace({n: round(float(n), self.decimal)})
+                if hasattr(sym_expr, "atoms"):
+                    for n in sym_expr.atoms(sp.Number):
+                        sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
 
                 # pypysr uses 'v' prefix to avoid its internal x1->x0 translation
                 # pysr uses 'x' prefix.
@@ -347,7 +418,8 @@ class DeepPySRRegressor:
                 for k in range(len(cols)):
                     mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
                 
-                sym_expr = sym_expr.xreplace(mapping)
+                if hasattr(sym_expr, "xreplace"):
+                    sym_expr = sym_expr.xreplace(mapping)
                 
                 # Update involved variables after mapping to global x indices
                 involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
@@ -433,7 +505,8 @@ class DeepPySRRegressor:
             # Map sympy formula using SymPy's xreplace with symbols
             # xreplace with symbols is safe against partial name matches.
             sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
-            new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
+            if hasattr(new_rel["sympy"], "xreplace"):
+                new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
             new_rel["formula"] = str(new_rel["sympy"])
             
             # Map involved

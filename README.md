@@ -60,3 +60,5 @@ If you are using the `pypysr` model provider, which calls a Julia backend (`mypy
    ```
 
 By default, it looks for `~/Projects/mypysr.jl/python`.
+
+/home/00101787/Projects/DeepPySR/.venv/bin/python3 -c "from juliacall import Main as jl; jl.seval('using Pkg; Pkg.activate(\"/home/00101787/Projects/DeepPySR/.venv/lib/python3.12/site-packages/pypysr/julia_src\")')
