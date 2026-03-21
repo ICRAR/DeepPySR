@@ -55,6 +55,21 @@ def parse_params(model_name):
     if r2_weight_match: params['r2w'] = float(r2_weight_match.group(1))
     if lambda_match: params['l'] = float(lambda_match.group(1))
     
+    # Standard SR params
+    par_match = re.search(r'par([\d.]+)', model_name)
+    popsz_match = re.search(r'popsz(\d+)', model_name)
+    scl_match = re.search(r'scl([\d.]+)', model_name)
+    lambda_long_match = re.search(r'lambda([\d.]+)', model_name)
+
+    if par_match: params['parsimony'] = float(par_match.group(1))
+    if popsz_match: params['pop_size'] = int(popsz_match.group(1))
+    if scl_match: params['parsimony_scaling'] = float(scl_match.group(1))
+    if lambda_long_match: params['l'] = float(lambda_long_match.group(1))
+    
+    # Extract cfg from folder name
+    cfg_match = re.search(r'cfg(\w+)', model_name)
+    if cfg_match: params['cfg'] = cfg_match.group(1)
+
     if kan_lamb_match: params['kan_lamb'] = float(kan_lamb_match.group(1))
     if kan_l1_match: params['kan_l1'] = float(kan_l1_match.group(1))
     if kan_ent_match: params['kan_ent'] = float(kan_ent_match.group(1))
@@ -316,5 +331,131 @@ def run_cvd_analysis():
         full_fi_df.to_csv(fi_out_path, index=False)
         print(f"Aggregated feature importance saved to {fi_out_path}")
 
+def compare_arg_configs_best(base_dir):
+    """
+    Compare the four SR argument configurations for CVD.
+    """
+    import matplotlib.pyplot as plt
+    import os
+    import pandas as pd
+
+    csv_path = os.path.join(base_dir, 'aggregated_results.csv')
+            
+    if not os.path.exists(csv_path):
+        print(f"Error: aggregated results CSV not found in {base_dir}. Skipping arg-config comparison.")
+        return
+
+    df = pd.read_csv(csv_path)
+
+    if 'cfg' not in df.columns:
+        print("Warning: 'cfg' column not found in metrics. Skipping plot.")
+        return
+    
+    # Filter for DeepPySR models only (they have 'cfg' populated)
+    df = df[df['model'].str.contains('DeepPySR', case=False, na=False)].copy()
+    
+    # Filter for consistent r2w of 1 and lambda of 0.001
+    df = df[
+        (df['r2w'] == 1) & 
+        (df['l'] == 0.001)
+    ]
+    
+    # Define the config requirements (must match folder naming/config in test_all_models.py)
+    arg_configs = {
+        "stdsr": {
+            "parsimony_scaling": 0.0,
+            "pmax": 0.0,
+            "prnst": 0,
+            "ramp": 0,
+        },
+        "srprn": {
+            "parsimony_scaling": 0.0,
+            "prnst": 50,
+            "ramp": 150,
+            "pmax": 0.7,
+        },
+        "srpsm": {
+            "parsimony_scaling": 1040.0,
+            "pmax": 0.0,
+            "prnst": 0,
+            "ramp": 0,
+        },
+        "fullsr": {
+            "parsimony_scaling": 1040.0,
+            "prnst": 50,
+            "ramp": 150,
+            "pmax": 0.7,
+        },
+    }
+
+    # Filter df to only include rows that match the arg_configs requirements for each cfg
+    filtered_rows = []
+    for cfg_name, requirements in arg_configs.items():
+        cfg_df = df[df['cfg'] == cfg_name]
+        for col, val in requirements.items():
+            if col in cfg_df.columns:
+                cfg_df = cfg_df[cfg_df[col] == val]
+        filtered_rows.append(cfg_df)
+    
+    best_df = pd.concat(filtered_rows) if filtered_rows else pd.DataFrame(columns=df.columns)
+    
+    if best_df.empty:
+        print("No data found for comparison.")
+        return
+
+    # In CVD, we don't have 'age', so we plot as a bar chart across configurations
+    metrics = ['accuracy', 'f1', 'complexity', 'auc']
+    titles = ['Accuracy', 'F1 Score', 'Complexity', 'AUC']
+    ylabel = ['Accuracy', 'F1 Score', 'Complexity', 'AUC']
+    
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    axes = axes.flatten()
+
+    fig.suptitle(f"Comparison of Configurations: CVD DeepPySR (r2w=1, lambda=0.001)", fontsize=16)
+    
+    configs = ["stdsr", "srprn", "srpsm", "fullsr"]
+    colors = {
+        'stdsr': '#1f77b4',
+        'srprn': '#ff7f0e',
+        'srpsm': '#2ca02c',
+        'fullsr': '#d62728',
+    }
+    
+    # Label mapping for the plot
+    labels = {
+        "stdsr": "stdsr\n(scl=0, prn_max=0)",
+        "srprn": "srprn\n(scl=0, prn=50/150/0.7)",
+        "srpsm": "srpsm\n(scl=1040, prn_max=0)",
+        "fullsr": "fullsr\n(scl=1040, prn=50/150/0.7)",
+    }
+
+    plot_data = best_df.copy()
+    # Sort or reindex by configs
+    plot_data['cfg'] = pd.Categorical(plot_data['cfg'], categories=configs, ordered=True)
+    plot_data = plot_data.sort_values('cfg')
+
+    for i, metric in enumerate(metrics):
+        bars = axes[i].bar(plot_data['cfg'].map(labels), plot_data[metric], color=[colors[c] for c in plot_data['cfg']])
+        axes[i].set_title(titles[i])
+        axes[i].set_ylabel(ylabel[i])
+        axes[i].grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        # Add values on top of bars
+        for bar in bars:
+            yval = bar.get_height()
+            axes[i].text(bar.get_x() + bar.get_width()/2, yval, f'{yval:.3f}' if metric != 'complexity' else f'{int(yval)}', 
+                         va='bottom', ha='center', fontsize=10)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    output_png = os.path.join(base_dir, 'argconfigs_best_comparison.png')
+    plt.savefig(output_png)
+    print(f"Arg-config best performance comparison plot saved to {output_png}")
+    plt.close()
+
 if __name__ == "__main__":
     run_cvd_analysis()
+    # Add the comparison plot
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    out_root = os.path.join(base_dir, 'results_cvd')
+    compare_arg_configs_best(out_root)

@@ -80,12 +80,41 @@ def run_all_cvd_models():
     }
 
     summary_results = []
-    r2w_list = [1, 1.5, 2]
-    l_list = [0.001, 0.005, 0.01]
-    pop_list = [30]
-    prnst_list = [50]
-    ramp_list = [80]
-    pmax_list = [0.7]
+    
+    # Define four argument configurations for DeepPySR
+    arg_configs = {
+        # Standard SR (no pruning, no adaptive parsimony scaling)
+        "stdsr": {
+            "adaptive_parsimony_scaling": 0.0,
+            "variable_prune_max": 0.0,
+            "variable_prune_start": 0,
+            "variable_prune_ramp": 0,
+        },
+        # SR with pruning only
+        "srprn": {
+            "adaptive_parsimony_scaling": 0.0,
+            "variable_prune_start": 50,
+            "variable_prune_ramp": 150,
+            "variable_prune_max": 0.7,
+        },
+        # SR with parsimony scaling only
+        "srpsm": {
+            "adaptive_parsimony_scaling": 1040.0,
+            "variable_prune_max": 0.0,
+            "variable_prune_start": 0,
+            "variable_prune_ramp": 0,
+        },
+        # Full SR (use current/default arguments)
+        "fullsr": {
+            "adaptive_parsimony_scaling": 1040.0,
+            "variable_prune_start": 50,
+            "variable_prune_ramp": 150,
+            "variable_prune_max": 0.7,
+        },
+    }
+
+    r2w_list = [1,1.5,2]
+    l_list = [0.001,0.005,0.01]
     
     kan_lamb_list = [0.0, 0.01, 0.1, 0.5]
     kan_lamb_l1_list = [0.0, 0.1, 1.0]
@@ -191,107 +220,102 @@ def run_all_cvd_models():
 
             for r2w in r2w_list:
                 for l in l_list:
-                    # For PySR, we only search r2w and l to keep it simple, or as per previous work
-                    # For DeepPySR, we expand the search as requested
                     if model_name == 'DeepPySR':
-                        for pop in pop_list:
-                            for prnst in prnst_list:
-                                for ramp in ramp_list:
-                                    for pmax in pmax_list:
-                                        full_model_name = f"{model_name}_pop{pop}_prnst{prnst}_ramp{ramp}_max{pmax}_r2w{r2w}_l{l}"
-                                        print(f"\n--- Evaluating {full_model_name} ---")
-                                        all_y_true, all_y_pred, all_y_prob = [], [], []
-                                        all_patient_ids = []
-                                        equations = []
-                                        
-                                        model_out_root = os.path.join(out_root, model_name.lower(), f"pop{pop}_prnst{prnst}_ramp{ramp}_max{pmax}_r2w{r2w}_l{l}")
-                                        os.makedirs(model_out_root, exist_ok=True)
-                                        
-                                        # Check if already done
-                                        if os.path.exists(os.path.join(model_out_root, 'predictions.csv')) and \
-                                           os.path.exists(os.path.join(model_out_root, 'nocv', 'predictions.csv')):
-                                            print(f"Skipping {full_model_name} as predictions and nocv predictions exist.")
-                                            continue
+                        for cfg_name, cfg_overrides in arg_configs.items():
+                            parsimony = pypysr_kwargs["parsimony"]
+                            population = pypysr_kwargs["populations"]
+                            pop_size = pypysr_kwargs["population_size"]
+                            parsimony_scaling = cfg_overrides.get("adaptive_parsimony_scaling", pypysr_kwargs.get("adaptive_parsimony_scaling"))
+                            prune_start = cfg_overrides.get("variable_prune_start", pypysr_kwargs.get("variable_prune_start"))
+                            prune_ramp = cfg_overrides.get("variable_prune_ramp", pypysr_kwargs.get("variable_prune_ramp"))
+                            prune_max = cfg_overrides.get("variable_prune_max", pypysr_kwargs.get("variable_prune_max"))
 
-                                        if not os.path.exists(os.path.join(model_out_root, 'predictions.csv')):
-                                            for fold, (train_idx, test_idx) in enumerate(skf.split(X_values, y_values)):
-                                                print(f"  Fold {fold+1}/5...")
-                                                X_train, X_test = X_values[train_idx], X_values[test_idx]
-                                                y_train, y_test = y_values[train_idx], y_values[test_idx]
-                                                pids_test = patient_ids_values[test_idx]
-                                                
-                                                fold_outdir = os.path.join(model_out_root, f"fold_{fold}")
-                                                os.makedirs(fold_outdir, exist_ok=True)
-                                                
-                                                provider = 'pypysr'
-                                                current_kwargs = pypysr_kwargs.copy()
-                                                current_kwargs.update({
-                                                    "populations": pop,
-                                                    "variable_prune_start": prnst,
-                                                    "variable_prune_ramp": ramp,
-                                                    "variable_prune_max": pmax,
-                                                })
-                                                
-                                                model = DeepPySRRegressor(
-                                                    max_layers=1,
-                                                    output_dir=fold_outdir,
-                                                    stopping_score=0.001,
-                                                    model_provider=provider,
-                                                    pareto_lambda=l,
-                                                    pareto_r2_weight=r2w,
-                                                    **current_kwargs,
-                                                )
-                                                
-                                                model.fit(X_train, y_train)
-                                                y_pred_raw = model.predict(X_test)
-                                                y_pred = (y_pred_raw > 0.5).astype(int)
-                                                
-                                                all_y_true.extend(y_test)
-                                                all_y_pred.extend(y_pred)
-                                                all_y_prob.extend(np.clip(y_pred_raw, 0, 1))
-                                                all_patient_ids.extend(pids_test)
-                                                
-                                                if model.relationships_:
-                                                    equations.append(model.relationships_[0]['formula'])
-                                                model.save_relationships()
-                                                model.plot()
+                            full_model_name = (f"cfg{cfg_name}_par{parsimony}_pop{population}_popsz{pop_size}_"
+                                              f"scl{parsimony_scaling}_prnst{prune_start}_ramp{prune_ramp}_max{prune_max}_"
+                                              f"r2w{r2w}_lambda{l}")
+                            print(f"\n--- Evaluating {full_model_name} ---")
+                            
+                            model_out_root = os.path.join(out_root, model_name.lower(), full_model_name)
+                            os.makedirs(model_out_root, exist_ok=True)
+                            
+                            # Check if already done
+                            if os.path.exists(os.path.join(model_out_root, 'predictions.csv')) and \
+                               os.path.exists(os.path.join(model_out_root, 'nocv', 'predictions.csv')):
+                                print(f"Skipping {full_model_name} as predictions and nocv predictions exist.")
+                                continue
 
-                                            save_metrics(full_model_name, model_out_root, 
-                                                              np.array(all_y_true), np.array(all_y_pred), np.array(all_y_prob),
-                                                              np.array(all_patient_ids))
+                            if not os.path.exists(os.path.join(model_out_root, 'predictions.csv')):
+                                all_y_true, all_y_pred, all_y_prob = [], [], []
+                                all_patient_ids = []
+                                equations = []
+                                for fold, (train_idx, test_idx) in enumerate(skf.split(X_values, y_values)):
+                                    print(f"  Fold {fold+1}/5...")
+                                    X_train, X_test = X_values[train_idx], X_values[test_idx]
+                                    y_train, y_test = y_values[train_idx], y_values[test_idx]
+                                    pids_test = patient_ids_values[test_idx]
+                                    
+                                    fold_outdir = os.path.join(model_out_root, f"fold_{fold}")
+                                    os.makedirs(fold_outdir, exist_ok=True)
+                                    
+                                    provider = 'pypysr'
+                                    current_kwargs = pypysr_kwargs.copy()
+                                    current_kwargs.update(cfg_overrides)
+                                    
+                                    model = DeepPySRRegressor(
+                                        max_layers=1,
+                                        output_dir=fold_outdir,
+                                        stopping_score=0.001,
+                                        model_provider=provider,
+                                        pareto_lambda=l,
+                                        pareto_r2_weight=r2w,
+                                        **current_kwargs,
+                                    )
+                                    
+                                    model.fit(X_train, y_train)
+                                    y_pred_raw = model.predict(X_test)
+                                    y_pred = (y_pred_raw > 0.5).astype(int)
+                                    
+                                    all_y_true.extend(y_test)
+                                    all_y_pred.extend(y_pred)
+                                    all_y_prob.extend(np.clip(y_pred_raw, 0, 1))
+                                    all_patient_ids.extend(pids_test)
+                                    
+                                    if model.relationships_:
+                                        equations.append(model.relationships_[0]['formula'])
+                                    model.save_relationships()
+                                    # model.plot()
 
-                                        # --- Train on full dataset (No-CV) for symbolic models (DeepPySR) ---
-                                        print(f"  Training (No-CV) for {full_model_name}...")
-                                        nocv_out_root = os.path.join(model_out_root, "nocv")
-                                        if os.path.exists(os.path.join(nocv_out_root, 'predictions.csv')):
-                                            print(f"  Skipping (No-CV) as predictions.csv exists.")
-                                        else:
-                                            os.makedirs(nocv_out_root, exist_ok=True)
-                                            provider = 'pypysr'
-                                            current_kwargs = pypysr_kwargs.copy()
-                                            current_kwargs.update({
-                                                "populations": pop,
-                                                "variable_prune_start": prnst,
-                                                "variable_prune_ramp": ramp,
-                                                "variable_prune_max": pmax,
-                                            })
-                                            model_nocv = DeepPySRRegressor(
-                                                max_layers=1,
-                                                output_dir=nocv_out_root,
-                                                stopping_score=0.001,
-                                                model_provider=provider,
-                                                pareto_lambda=l,
-                                                pareto_r2_weight=r2w,
-                                                **current_kwargs,
-                                            )
-                                            model_nocv.fit(X_values, y_values)
-                                            y_pred_raw_nocv = model_nocv.predict(X_values)
-                                            y_pred_nocv = (y_pred_raw_nocv > 0.5).astype(int)
-                                            save_metrics(f"{full_model_name}_nocv", nocv_out_root, 
-                                                         y_values, y_pred_nocv, np.clip(y_pred_raw_nocv, 0, 1),
-                                                         patient_ids_values)
-                                            model_nocv.save_relationships()
-                                            model_nocv.plot()
+                                save_metrics(full_model_name, model_out_root, 
+                                                  np.array(all_y_true), np.array(all_y_pred), np.array(all_y_prob),
+                                                  np.array(all_patient_ids))
+
+                            # --- Train on full dataset (No-CV) for symbolic models (DeepPySR) ---
+                            print(f"  Training (No-CV) for {full_model_name}...")
+                            nocv_out_root = os.path.join(model_out_root, "nocv")
+                            if os.path.exists(os.path.join(nocv_out_root, 'predictions.csv')):
+                                print(f"  Skipping (No-CV) as predictions.csv exists.")
+                            else:
+                                os.makedirs(nocv_out_root, exist_ok=True)
+                                provider = 'pypysr'
+                                current_kwargs = pypysr_kwargs.copy()
+                                current_kwargs.update(cfg_overrides)
+                                model_nocv = DeepPySRRegressor(
+                                    max_layers=1,
+                                    output_dir=nocv_out_root,
+                                    stopping_score=0.001,
+                                    model_provider=provider,
+                                    pareto_lambda=l,
+                                    pareto_r2_weight=r2w,
+                                    **current_kwargs,
+                                )
+                                model_nocv.fit(X_values, y_values)
+                                y_pred_raw_nocv = model_nocv.predict(X_values)
+                                y_pred_nocv = (y_pred_raw_nocv > 0.5).astype(int)
+                                save_metrics(f"{full_model_name}_nocv", nocv_out_root, 
+                                             y_values, y_pred_nocv, np.clip(y_pred_raw_nocv, 0, 1),
+                                             patient_ids_values)
+                                model_nocv.save_relationships()
+                                # model_nocv.plot()
                     else: # PySR
                         full_model_name = f"{model_name}_r2w{r2w}_l{l}"
                         print(f"\n--- Evaluating {full_model_name} ---")
