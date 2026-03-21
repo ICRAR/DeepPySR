@@ -53,8 +53,9 @@ def parse_folder_name(folder_name):
     return year, model_provider, r2_weight, complexity_lambda
 
 def parse_agg_folder_name(folder_name):
-    # Example: par0.001_pop15_popsz100_scl50.0_prnst50_ramp150_max0.7_r2w1_lambda0.005
+    # Example: cfgstdsr_par0.001_pop15_popsz100_scl50.0_prnst50_ramp150_max0.7_r2w1_lambda0.005
     patterns = {
+        'cfg': r'cfg([A-Za-z0-9_]+)',
         'parsimony': r'par([\d.]+)',
         'population': r'pop(\d+)',
         'pop_size': r'popsz(\d+)',
@@ -93,8 +94,8 @@ def aggregate_agg_results(base_dir):
             file_path = os.path.join(root, 'relationships.csv')
             df = pd.read_csv(file_path)
 
-            # Filter for target 'y'
-            df_y = df[df['target'] == 'y'].copy()
+            # Filter for target 'y' or 'target_bmi'
+            df_y = df[df['target'].isin(['y', 'target_bmi'])].copy()
 
             if not df_y.empty:
                 # Add metadata columns
@@ -132,52 +133,6 @@ def aggregate_agg_results(base_dir):
     aggregated_df.to_csv(output_path, index=False)
     print(f"Aggregated results saved to {output_path}")
 
-def aggregate_results_bmi(base_dir):
-    all_data = []
-    
-    for root, dirs, files in os.walk(base_dir):
-        if 'relationships.csv' in files:
-            folder_name = os.path.basename(root)
-            year, provider, r2w, compl_lambda = parse_folder_name(folder_name)
-            
-            file_path = os.path.join(root, 'relationships.csv')
-            df = pd.read_csv(file_path)
-
-            # Filter for target 'y'
-            df_y = df[df['target'] == 'y'].copy()
-
-            if not df_y.empty:
-                # Add metadata columns
-                df_y.insert(0, 'year', year)
-                df_y.insert(1, 'model_provider', provider)
-                df_y.insert(2, 'r2_weight', r2w)
-                df_y.insert(3, 'complexity_lambda', compl_lambda)
-                
-                all_data.append(df_y)
-    
-    if not all_data:
-        print("No data found.")
-        return
-    
-    aggregated_df = pd.concat(all_data, ignore_index=True)
-    
-    # Sort by year, r2, complexity order
-    # Note: 'complexity' is a column in the original CSV
-    # The requirement says: "sort them in year, r2, complexity order"
-    aggregated_df = aggregated_df.sort_values(by=['year', 'r2', 'complexity'], ascending=[True, False, True])
-    
-    # Rename columns to match requested names if necessary
-    # yr8_single_pypysr_r2w1.5_lambda0.001 indicates:
-    # year is 8, model provider is pypysr, pareto r2 weight is 1.5, lambda for complexity is 0.001
-    aggregated_df = aggregated_df.rename(columns={
-        'model_provider': 'model provider',
-        'r2_weight': 'pareto r2 weight',
-        'complexity_lambda': 'lambda for complexity'
-    })
-    
-    output_path = os.path.join(base_dir, 'results_bmi/deeppysr_old/aggregated_results_bmi.csv')
-    aggregated_df.to_csv(output_path, index=False)
-    print(f"Aggregated results saved to {output_path}")
 
 def calculate_performance_metrics(base_dir):
     _, X, y_target = load_agg_data()
@@ -199,8 +154,8 @@ def calculate_performance_metrics(base_dir):
             file_path = os.path.join(root, 'relationships.csv')
             rel_df = pd.read_csv(file_path)
             
-            # Find formula for 'y'
-            y_rel = rel_df[rel_df['target'] == 'y']
+            # Find formula for 'y' or 'target_bmi'
+            y_rel = rel_df[rel_df['target'].isin(['y', 'target_bmi'])]
             if y_rel.empty:
                 continue
             
@@ -300,7 +255,7 @@ def plot_performance_metrics_interactive(base_dir):
     
     # Columns that define a combination
     param_cols = [
-        'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
+        'cfg', 'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
         'prune_start', 'prune_ramp', 'prune_max', 
         'pareto r2 weight', 'lambda for complexity'
     ]
@@ -432,9 +387,10 @@ def plot_performance_metrics_interactive(base_dir):
     print(f"Interactive plot saved to {output_html}")
 
 def parse_age_folder_name(folder_name):
-    # Example: age10_par0.01_pop20_popsz100_scl100.0_prnst50_ramp150_max0.6_r2w1.5_lambda0.001
+    # Example: age10_cfgstdsr_par0.01_pop20_popsz100_scl100.0_prnst50_ramp150_max0.6_r2w1.5_lambda0.001
     patterns = {
         'age': r'age(\d+)',
+        'cfg': r'cfg([A-Za-z0-9_]+)',
         'parsimony': r'par([\d.]+)',
         'population': r'pop(\d+)',
         'pop_size': r'popsz(\d+)',
@@ -478,6 +434,8 @@ def aggregate_age_results(base_dir):
 
             if not df_y.empty:
                 # Add metadata columns
+                # Filter out None values to keep DataFrame clean
+                params = {k: v for k, v in params.items() if v is not None}
                 for i, (key, value) in enumerate(params.items()):
                     df_y.insert(i, key, value)
                 
@@ -489,8 +447,8 @@ def aggregate_age_results(base_dir):
     
     aggregated_df = pd.concat(all_data, ignore_index=True)
     
-    # Sort by age, r2, complexity
-    sort_cols = ['age', 'r2_weight', 'complexity_lambda', 'r2', 'complexity']
+    # Sort by age, cfg, r2, complexity
+    sort_cols = ['age', 'cfg', 'r2_weight', 'complexity_lambda', 'r2', 'complexity']
     sort_cols = [c for c in sort_cols if c in aggregated_df.columns]
     
     ascending = [True] * len(sort_cols)
@@ -600,7 +558,7 @@ def plot_age_performance_metrics_interactive(base_dir):
     df = pd.read_csv(csv_path)
     
     param_cols = [
-        'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
+        'cfg', 'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
         'prune_start', 'prune_ramp', 'prune_max', 
         'pareto r2 weight', 'lambda for complexity'
     ]
@@ -1117,6 +1075,198 @@ def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, basel
     print(f"Comparison plot saved to {output_path}")
 
 
+
+
+def compare_arg_configs_best(base_dir):
+    """
+    Compare the four SR argument configurations by selecting the best performance
+    (highest R2) for each configuration at each age.
+    """
+    import matplotlib.pyplot as plt
+
+    # Check for both possible performance metric filenames
+    csv_paths = [
+        os.path.join(base_dir, 'performance_metrics_bmi.csv'),
+        os.path.join(base_dir, 'performance_metrics_age_bmi.csv')
+    ]
+    
+    csv_path = None
+    for path in csv_paths:
+        if os.path.exists(path):
+            csv_path = path
+            break
+            
+    if csv_path is None:
+        print(f"Error: performance metrics CSV not found in {base_dir}. Skipping arg-config comparison.")
+        return
+
+    df = pd.read_csv(csv_path)
+
+    if 'cfg' not in df.columns:
+        print("Warning: 'cfg' column not found in metrics. Skipping plot.")
+        return
+    
+    if 'age' not in df.columns:
+        print("Warning: 'age' column not found in metrics. Skipping plot.")
+        return
+
+    # Determine if this is longitudinal or age-specific
+    is_longitudinal = 'longitudinal' in base_dir.lower()
+
+    # Filter for consistent r2w of 1 and lambda of 0.001
+    df = df[
+        (df['pareto r2 weight'] == 1) & 
+        (df['lambda for complexity'] == 0.001)
+    ]
+    
+    # Define the config requirements
+    arg_configs = {
+        "stdsr": {
+            "parsimony_scaling": 0.0,
+            "prune_max": 0.0,
+            "prune_start": 0,
+            "prune_ramp": 0,
+        },
+        "srprn": {
+            "parsimony_scaling": 0.0,
+            "prune_start": 50,
+            "prune_ramp": 150,
+            "prune_max": 0.7,
+        },
+        "srpsm": {
+            "parsimony_scaling": 1040.0,
+            "prune_max": 0.0,
+            "prune_start": 0,
+            "prune_ramp": 0,
+        },
+        "fullsr": {
+            "parsimony_scaling": 1040.0,
+            "prune_start": 50,
+            "prune_ramp": 150,
+            "prune_max": 0.7,
+        },
+    }
+
+    # Clean up cfg names (sometimes they have suffixes like _par0)
+    def clean_cfg(name):
+        if not isinstance(name, str): return name
+        name = name.lower()
+        for target in ['stdsr', 'srpsm', 'srprn', 'fullsr']:
+            if target in name:
+                return target
+        return name
+
+    df['cfg_clean'] = df['cfg'].apply(clean_cfg)
+
+    # Filter df to only include rows that match the arg_configs requirements for each cfg_clean
+    filtered_rows = []
+    for cfg_name, requirements in arg_configs.items():
+        cfg_df = df[df['cfg_clean'] == cfg_name]
+        for col, val in requirements.items():
+            cfg_df = cfg_df[cfg_df[col] == val]
+        filtered_rows.append(cfg_df)
+    
+    df = pd.concat(filtered_rows) if filtered_rows else pd.DataFrame(columns=df.columns)
+
+    # For each configuration and age, find the row with the best R2
+    # We dropna on cfg to avoid issues with baseline or other non-SR folders if any
+    df = df.dropna(subset=['cfg_clean'])
+    
+    best_models = []
+    
+    # Handle fullsr in longitudinal setting separately
+    if is_longitudinal:
+        # Find the fullsr model with the highest overall_r2
+        fullsr_df = df[df['cfg_clean'] == 'fullsr']
+        if not fullsr_df.empty:
+            # overall_r2 should be the same for all rows of the same model (same hyperparameters)
+            # but we want the highest across all models
+            best_overall_r2 = fullsr_df['overall_r2'].max()
+            # Select all rows for the model(s) that achieved this best overall_r2
+            # Since multiple models might have same overall_r2, we pick one (the first one's parameters)
+            best_model_params = fullsr_df[fullsr_df['overall_r2'] == best_overall_r2].iloc[0]
+            
+            # Now get all rows (for all ages) for this specific model configuration
+            # A model is defined by its hyperparameters in the df
+            param_cols = ['parsimony', 'population', 'pop_size', 'parsimony_scaling', 
+                          'prune_start', 'prune_ramp', 'prune_max', 'pareto r2 weight', 'lambda for complexity']
+            
+            query = " & ".join([f"`{col}` == {best_model_params[col]}" for col in param_cols])
+            best_fullsr_rows = fullsr_df.query(query)
+            best_models.append(best_fullsr_rows)
+            
+        # For other configs in longitudinal, or all in age-specific, use the per-age best
+        other_configs = [c for c in df['cfg_clean'].unique() if c != 'fullsr']
+        for cfg in other_configs:
+            for age, group in df[df['cfg_clean'] == cfg].groupby('age'):
+                best_row = group.loc[group['r2'].idxmax()]
+                best_models.append(pd.DataFrame([best_row]))
+    else:
+        # Age-specific: Best R2 for each age for all configs
+        for (cfg, age), group in df.groupby(['cfg_clean', 'age']):
+            best_row = group.loc[group['r2'].idxmax()]
+            best_models.append(pd.DataFrame([best_row]))
+    
+    if not best_models:
+        print("No data found for comparison.")
+        return
+
+    best_df = pd.concat(best_models)
+    best_df['cfg'] = best_df['cfg_clean']
+    
+    if best_df.empty:
+        print("No data found for comparison.")
+        return
+
+    # Plotting with matplotlib
+    metrics = ['r2', 'mae', 'complexity', 'rmse']
+    titles = ['Best R2 Score', 'Best MAE', 'Complexity of Best R2 Model', 'Best RMSE']
+    ylabel = ['R2 Score', 'MAE', 'Complexity', 'RMSE']
+    
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    axes = axes.flatten()
+
+    # Add a super title to indicate the model type
+    model_type = "Longitudinal Model" if is_longitudinal else "Age-specific Model"
+    fig.suptitle(f"Comparison of Configurations: {model_type} (r2w=1, lambda=0.001)", fontsize=16)
+    
+    configs = sorted(best_df['cfg'].unique())
+    colors = {
+        'stdsr': '#1f77b4',
+        'srprn': '#ff7f0e',
+        'srpsm': '#2ca02c',
+        'fullsr': '#d62728',
+    }
+    
+    # Label mapping for the plot
+    labels = {
+        "stdsr": "stdsr (scl=0, prn_max=0)",
+        "srprn": "srprn (scl=0, prn=50/150/0.7)",
+        "srpsm": "srpsm (scl=1040, prn_max=0)",
+        "fullsr": "fullsr (scl=1040, prn=50/150/0.7)",
+    }
+    
+    for cfg in configs:
+        cfg_data = best_df[best_df['cfg'] == cfg].sort_values('age')
+        color = colors.get(cfg.lower(), None)
+        label = labels.get(cfg.lower(), cfg)
+        
+        for i, metric in enumerate(metrics):
+            axes[i].plot(cfg_data['age'], cfg_data[metric], marker='o', label=label, color=color, linewidth=2)
+            axes[i].set_title(titles[i])
+            axes[i].set_xlabel('Age')
+            axes[i].set_ylabel(ylabel[i])
+            axes[i].grid(True, linestyle='--', alpha=0.7)
+
+    axes[0].legend()
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    output_png = os.path.join(base_dir, 'argconfigs_best_comparison.png')
+    plt.savefig(output_png)
+    print(f"Arg-config best performance comparison plot saved to {output_png}")
+    plt.close()
+
+
 if __name__ == "__main__":
     base_directory = os.path.dirname(os.path.abspath(__file__))
     
@@ -1131,6 +1281,8 @@ if __name__ == "__main__":
         aggregate_agg_results(deeppysr_longitudinal_dir)
         calculate_performance_metrics(deeppysr_longitudinal_dir)
         plot_performance_metrics_interactive(deeppysr_longitudinal_dir)
+        # Compare four settings and plot the best ones
+        compare_arg_configs_best(deeppysr_longitudinal_dir)
 
     # Process results_bmi/deeppysr_age
     deeppysr_age_dir = os.path.join(base_directory, 'results_bmi', 'deeppysr_age')
@@ -1138,6 +1290,8 @@ if __name__ == "__main__":
         aggregate_age_results(deeppysr_age_dir)
         calculate_age_performance_metrics(deeppysr_age_dir)
         plot_age_performance_metrics_interactive(deeppysr_age_dir)
+        # Compare four settings and plot the best ones for age-specific models
+        compare_arg_configs_best(deeppysr_age_dir)
 
     # Process baseline models
     baseline_longitudinal_dir = os.path.join(base_directory, 'results_bmi', 'baseline_longitudinal')

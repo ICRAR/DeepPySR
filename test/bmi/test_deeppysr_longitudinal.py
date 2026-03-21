@@ -47,17 +47,22 @@ pysr_kwargs = {
                 #             ''',
 }
 
-def run_deeppysr(X, y, outdir,r2w = 1.,l = 1.):
+def run_deeppysr(X, y, outdir, r2w=1.0, l=1.0, pysr_overrides=None):
 
     # 2. Initialize the DeepPySRRegressor
+    # Merge overrides with base kwargs if provided
+    final_kwargs = dict(pysr_kwargs)
+    if pysr_overrides:
+        final_kwargs.update(pysr_overrides)
+
     deeppysr = DeepPySRRegressor(
         max_layers=1,           # DeepPySR specific: Depth of the symbolic hierarchy
         output_dir=outdir,
-        pareto_lambda = l,
-        pareto_r2_weight = r2w,
+        pareto_lambda=l,
+        pareto_r2_weight=r2w,
         stopping_score=0.001,     # DeepPySR specific: Stop recursion if loss is below this
         model_provider='pypysr',
-        **pysr_kwargs,
+        **final_kwargs,
     )
 
     # 3. Fit the model
@@ -88,51 +93,97 @@ def run_deeppysr(X, y, outdir,r2w = 1.,l = 1.):
     print(f"\nDeeppysr run completed! Check output directory for visualizations.")
 
 def main():
-    parsimony = pysr_kwargs["parsimony"]
-    population = pysr_kwargs["populations"]
-    pop_size = pysr_kwargs["population_size"]
-    parsimony_scaling = pysr_kwargs["adaptive_parsimony_scaling"]
-    prune_start = pysr_kwargs["variable_prune_start"]
-    prune_ramp = pysr_kwargs["variable_prune_ramp"]
-    prune_max = pysr_kwargs["variable_prune_max"]
     is_longitudal = True
 
+    # Define four argument configurations
+    arg_configs = {
+        # Standard SR (no pruning, no adaptive parsimony scaling)
+        "stdsr": {
+            "adaptive_parsimony_scaling": 0.0,
+            "variable_prune_max": 0.0,
+            "variable_prune_start": 0,
+            "variable_prune_ramp": 0,
+        },
+        # SR with pruning only
+        "srprn": {
+            "adaptive_parsimony_scaling": 0.0,
+            "variable_prune_start": 50,
+            "variable_prune_ramp": 150,
+            "variable_prune_max": 0.7,
+        },
+        # SR with parsimony scaling only
+        "srpsm": {
+            "adaptive_parsimony_scaling": 1040.0,
+            "variable_prune_max": 0.0,
+            "variable_prune_start": 0,
+            "variable_prune_ramp": 0,
+        },
+        # Full SR (use current/default arguments)
+        "fullsr": {
+            "adaptive_parsimony_scaling": 1040.0,
+            "variable_prune_start": 50,
+            "variable_prune_ramp": 150,
+            "variable_prune_max": 0.7,
+        },
+    }
+
     age = [8,10,14,17,20,23,27]
-    r2w = [1, 1.5, 2]
-    l = [0.001, 0.005, 0.01, 0.1]
+    # r2w = [1, 1.5, 2]
+    # l = [0.001, 0.005, 0.01, 0.1]
+    r2w = [1]
+    l= [0.001]
     if is_longitudal:
         id, X, y = load_agg_data()
-        for r2w_ in r2w:
-            for l_ in l:
-                outdir = (f"./results_bmi/deeppysr_longitudinal/par{parsimony}_pop{population}_popsz{pop_size}_"
-                          f"scl{parsimony_scaling}_prnst{prune_start}_ramp{prune_ramp}_max{prune_max}_"
-                          f"r2w{r2w_}_lambda{l_}")
-                csv_path = os.path.join(outdir,"relationships.csv")
-                if os.path.exists(csv_path):
-                    df = pd.read_csv(csv_path)
-                    if df["layer"].max() >= 2:
-                        print(f"Relationships already exist for r2w {r2w_}, lambda {l_}. Skipping.")
-                        continue
+        for cfg_name, cfg_overrides in arg_configs.items():
+            # Prepare naming values based on overrides (fallback to base defaults)
+            parsimony = pysr_kwargs["parsimony"]
+            population = pysr_kwargs["populations"]
+            pop_size = pysr_kwargs["population_size"]
+            parsimony_scaling = cfg_overrides.get("adaptive_parsimony_scaling", pysr_kwargs.get("adaptive_parsimony_scaling"))
+            prune_start = cfg_overrides.get("variable_prune_start", pysr_kwargs.get("variable_prune_start"))
+            prune_ramp = cfg_overrides.get("variable_prune_ramp", pysr_kwargs.get("variable_prune_ramp"))
+            prune_max = cfg_overrides.get("variable_prune_max", pysr_kwargs.get("variable_prune_max"))
 
-                print(f"Running DeepPySRRegressor for r2w {r2w_}, lambda {l_}.")
-                run_deeppysr(X, y, outdir,r2w = r2w_,l=l_)
+            for r2w_ in r2w:
+                for l_ in l:
+                    outdir = (f"./results_bmi/deeppysr_longitudinal/cfg{cfg_name}_par{parsimony}_pop{population}_popsz{pop_size}_"
+                              f"scl{parsimony_scaling}_prnst{prune_start}_ramp{prune_ramp}_max{prune_max}_"
+                              f"r2w{r2w_}_lambda{l_}")
+                    csv_path = os.path.join(outdir, "relationships.csv")
+                    if os.path.exists(csv_path):
+                        df = pd.read_csv(csv_path)
+                        if df["layer"].max() >= 2:
+                            print(f"[{cfg_name}] Relationships already exist for r2w {r2w_}, lambda {l_}. Skipping.")
+                            continue
+
+                    print(f"[{cfg_name}] Running DeepPySRRegressor for r2w {r2w_}, lambda {l_}.")
+                    run_deeppysr(X, y, outdir, r2w=r2w_, l=l_, pysr_overrides=cfg_overrides)
     else:
         for age_ in age:
             id, X, y = load_agg_data(age=age_)
-            for r2w_ in r2w:
-                for l_ in l:
-                    outdir = (f"./results_bmi/deeppysr_age/age{age_}_par{parsimony}_pop{population}_popsz{pop_size}_"
-                              f"scl{parsimony_scaling}_prnst{prune_start}_ramp{prune_ramp}_max{prune_max}_"
-                              f"r2w{r2w_}_lambda{l_}")
-                    csv_path = os.path.join(outdir,"relationships.csv")
-                    if os.path.exists(csv_path):
-                        df = pd.read_csv(csv_path)
-                        if df["layer"].max() >= 1:
-                            print(f"Relationships already exist for age{age_} r2w {r2w_}, lambda {l_}. Skipping.")
-                            continue
+            for cfg_name, cfg_overrides in arg_configs.items():
+                parsimony = pysr_kwargs["parsimony"]
+                population = pysr_kwargs["populations"]
+                pop_size = pysr_kwargs["population_size"]
+                parsimony_scaling = cfg_overrides.get("adaptive_parsimony_scaling", pysr_kwargs.get("adaptive_parsimony_scaling"))
+                prune_start = cfg_overrides.get("variable_prune_start", pysr_kwargs.get("variable_prune_start"))
+                prune_ramp = cfg_overrides.get("variable_prune_ramp", pysr_kwargs.get("variable_prune_ramp"))
+                prune_max = cfg_overrides.get("variable_prune_max", pysr_kwargs.get("variable_prune_max"))
 
-                    print(f"Running DeepPySRRegressor for age{age_} r2w {r2w_}, lambda {l_}.")
-                    run_deeppysr(X, y, outdir,r2w = r2w_,l=l_)
+                for r2w_ in r2w:
+                    for l_ in l:
+                        outdir = (f"./results_bmi/deeppysr_age/age{age_}_cfg{cfg_name}_par{parsimony}_pop{population}_popsz{pop_size}_"
+                                  f"scl{parsimony_scaling}_prnst{prune_start}_ramp{prune_ramp}_max{prune_max}_"
+                                  f"r2w{r2w_}_lambda{l_}")
+                        csv_path = os.path.join(outdir, "relationships.csv")
+                        if os.path.exists(csv_path):
+                            df = pd.read_csv(csv_path)
+                            if df["layer"].max() >= 1:
+                                print(f"[{cfg_name}] Relationships already exist for age{age_} r2w {r2w_}, lambda {l_}. Skipping.")
+                                continue
+
+                        print(f"[{cfg_name}] Running DeepPySRRegressor for age{age_} r2w {r2w_}, lambda {l_}.")
+                        run_deeppysr(X, y, outdir, r2w=r2w_, l=l_, pysr_overrides=cfg_overrides)
 
 
 if __name__ == "__main__":
