@@ -61,4 +61,9 @@ If you are using the `pypysr` model provider, which calls a Julia backend (`mypy
 
 By default, it looks for `~/Projects/mypysr.jl/python`.
 
-/home/00101787/Projects/DeepPySR/.venv/bin/python3 -c "from juliacall import Main as jl; jl.seval('using Pkg; Pkg.activate(\"/home/00101787/Projects/DeepPySR/.venv/lib/python3.12/site-packages/pypysr/julia_src\")')
+6. Dynamic Parsimony Scaling
+   Implement a feedback loop where adaptive_parsimony_scaling is adjusted based on the current R2:
+
+Start with low parsimony to find a good fit.
+As the R2 reaches a threshold (e.g.,
+), increase the parsimony scaling to "squeeze" the expression into a simpler form.

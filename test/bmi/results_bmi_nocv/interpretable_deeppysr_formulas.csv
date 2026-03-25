@@ -1,15 +1,15 @@
 age,type,model,formula,r2,complexity
-8,longitudinal,fullsr_r2w1.5_l0.005_nocv,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age),0.7555948719017459,11
-10,longitudinal,srpsm_r2w1.5_l0.001_nocv,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28,0.6200591086323571,26
-14,longitudinal,fullsr_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.5023988005683067,19
-17,longitudinal,fullsr_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.4141933621859215,19
-20,longitudinal,fullsr_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.3899146178730104,19
-23,longitudinal,fullsr_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.35717570520247044,19
-27,longitudinal,fullsr_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.32461747892428716,19
-8,age-specific,fullsr_r2w2_l0.001_nocv,"(SUM_PGS002161*y1_mon1 + y5_bmiz + 0.65*death_p + 0.87)*exp(y5_bmiz*cond(y5_bmiz, 0.46)) + 15.07",0.8103381004614518,20
-10,age-specific,fullsr_r2w1_l0.005_nocv,SUM_PGS002313 + 0.18*m_wt1/y1_a8**1.0 + 3.33*exp(SUM_PGS002161 + 0.57*y5_bmiz) + 13.43,0.6499517990660166,21
-14,age-specific,fullsr_r2w1.5_l0.005_nocv,"1.24*y5_bmiz + sex + 1.24*sibling_pos*(SUM_PGS002161 + cond(SUM_PGS002161, cond(SUM_PGS002853, SUM_PGS002853))) + exp(y5_bmiz*(SUM_PGS002853*death_p + 0.83)) + 17.36",0.5409030963302282,28
-17,age-specific,fullsr_r2w1_l0.005_nocv,"SUM_PGS002853 + y5_bmiz*(cond(2.0*y5_bmiz - 1.76, 1.38*preeclam + cob_p + cats_quant_preg) + 0.4) + y5_bmiz - 1.0*mht_wt + 24.57",0.4675161424668677,27
-20,age-specific,srpsm_r2w2_l0.001_nocv,"SUM_PGS002313 + y5_bmiz + 0.09*m_wt1 + (SUM_PGS002853 + cond(y5_bmiz - 1.23, 1.37))*(y5_bmiz + smk_exp1 + 0.97) + 18.72",0.417029613631272,23
-23,age-specific,fullsr_r2w2_l0.005_nocv,"SUM_PGS002853 + sex*(SUM_PGS002853 + y5_bmiz + cond(SUM_PGS002161 + 0.02, asthma_m + cond(y5_bmiz*hhincome_1 - 0.77*edu_m_0, exp(cats_preg) + 1.23))) + 23.4",0.4361960877009621,28
-27,age-specific,srpsm_r2w2_l0.01_nocv,-1.25*famsize_child0 + 1.25*y5_a6 + 3.75*exp(SUM_PGS002853 + SUM_PGS002313) + exp(sibling_pos - 1.0*mht_wt) + 2.57,0.37343299785637574,24
+8,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.005_nocv,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age),0.7555948719017459,11
+10,longitudinal,srpsm_nit40_pop20_sz100_vps0_vpr0_aps50_r2w1.5_l0.001_nocv,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28,0.6200591086323571,26
+14,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.5023988005683067,19
+17,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.4141933621859215,19
+20,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.3899146178730104,19
+23,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.35717570520247044,19
+27,longitudinal,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.01_nocv,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age),0.32461747892428716,19
+8,age-specific,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w2_l0.001_nocv,"(SUM_PGS002161*y1_mon1 + y5_bmiz + 0.65*death_p + 0.87)*exp(y5_bmiz*cond(y5_bmiz, 0.46)) + 15.07",0.8103381004614518,20
+10,age-specific,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1_l0.005_nocv,SUM_PGS002313 + 0.18*m_wt1/y1_a8**1.0 + 3.33*exp(SUM_PGS002161 + 0.57*y5_bmiz) + 13.43,0.6499517990660166,21
+14,age-specific,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1.5_l0.005_nocv,"1.24*y5_bmiz + sex + 1.24*sibling_pos*(SUM_PGS002161 + cond(SUM_PGS002161, cond(SUM_PGS002853, SUM_PGS002853))) + exp(y5_bmiz*(SUM_PGS002853*death_p + 0.83)) + 17.36",0.5409030963302282,28
+17,age-specific,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w1_l0.005_nocv,"SUM_PGS002853 + y5_bmiz*(cond(2.0*y5_bmiz - 1.76, 1.38*preeclam + cob_p + cats_quant_preg) + 0.4) + y5_bmiz - 1.0*mht_wt + 24.57",0.4675161424668677,27
+20,age-specific,srpsm_nit40_pop20_sz100_vps0_vpr0_aps50_r2w2_l0.001_nocv,"SUM_PGS002313 + y5_bmiz + 0.09*m_wt1 + (SUM_PGS002853 + cond(y5_bmiz - 1.23, 1.37))*(y5_bmiz + smk_exp1 + 0.97) + 18.72",0.417029613631272,23
+23,age-specific,fullsr_nit40_pop20_sz100_vps50_vpr100_aps50_r2w2_l0.005_nocv,"SUM_PGS002853 + sex*(SUM_PGS002853 + y5_bmiz + cond(SUM_PGS002161 + 0.02, asthma_m + cond(y5_bmiz*hhincome_1 - 0.77*edu_m_0, exp(cats_preg) + 1.23))) + 23.4",0.4361960877009621,28
+27,age-specific,srpsm_nit40_pop20_sz100_vps0_vpr0_aps50_r2w2_l0.01_nocv,-1.25*famsize_child0 + 1.25*y5_a6 + 3.75*exp(SUM_PGS002853 + SUM_PGS002313) + exp(sibling_pos - 1.0*mht_wt) + 2.57,0.37343299785637574,24

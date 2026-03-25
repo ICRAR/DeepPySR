@@ -504,16 +504,48 @@ def plot_results(df):
 
 def plot_settings_comparison(df):
     """
-    Plot performance (r2, mse, mae, complexity) for 4 settings of DeepPySR (fullsr, stdsr, srpsm, srprn) 
-    and PySR variants using r2w=1 and lambda=0.0001 (or l0.001 as found in folders).
+    Plot performance (r2, rmse, mae, complexity) for 4 settings of DeepPySR (fullsr, stdsr, srpsm, srprn) 
+    and PySR variants using r2w=1 and lambda=0.001 (or 0.0001).
     """
-    # Filter for r2w1 and l0.001 (assuming 0.001 based on folder names)
-    # The user said 0.0001, but the folders say 0.001. I'll search for 'r2w1_' and 'l0.00'
-    target_settings = ['fullsr_r2w1_l0.001', 'stdsr_r2w1_l0.001', 'srpsm_r2w1_l0.001', 'srprn_r2w1_l0.001', 'pysr_r2w1_l0.001']
+    # Look for folders containing 'r2w1' and 'l0.001' or 'l0.0001'
+    # We want to find representative settings.
+    # If the old ones (nit40) exist, they are found by their names.
+    # If new ones (vps...) exist, we might need a different logic.
     
-    # If no 0.001 but 0.0001 is found
-    if df[df['model'].str.contains('r2w1_l0.001', na=False)].empty and not df[df['model'].str.contains('r2w1_l0.0001', na=False)].empty:
-        target_settings = [s.replace('0.001', '0.0001') for s in target_settings]
+    # Try to find common patterns
+    all_models = df['model'].unique()
+    
+    # Identify target models: we want those with r2w1 and a small lambda
+    # and we want to include 'fullsr', 'stdsr', 'srpsm', 'srprn', and 'pysr'
+    # Or if those prefixes are gone, we pick some from the new grid search.
+    
+    base_names = ['fullsr', 'stdsr', 'srpsm', 'srprn', 'pysr']
+    target_settings = []
+    
+    # Check for r2w1 and l0.001 first
+    for base in base_names:
+        matches = [m for m in all_models if m.startswith(base) and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+        if matches:
+            # Pick the first one (usually there's only one per base with these params)
+            target_settings.append(matches[0])
+            
+    # If we didn't find the old ones, maybe we are in the new grid search era
+    if not target_settings:
+        # Just pick some from the new grid search?
+        # For now, let's look for 'vps'
+        vps_matches = [m for m in all_models if 'vps' in m and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+        if vps_matches:
+            # Pick a few representative ones?
+            # User might want to see the best one.
+            # For the plot to be consistent with previous 4+1 layout, let's pick 5.
+            target_settings = sorted(vps_matches)[:4]
+            pysr_matches = [m for m in all_models if m.startswith('pysr') and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+            if pysr_matches:
+                target_settings.append(pysr_matches[0])
+
+    if not target_settings:
+        print(f"Warning: No data found for settings comparison")
+        return
 
     plot_df = df[df['model'].isin(target_settings)].copy()
     if plot_df.empty:
@@ -545,7 +577,11 @@ def plot_settings_comparison(df):
                          linestyle=linestyle, linewidth=3.0, palette=model_colors,
                          marker='o', markersize=8)
             
-            lambda_val = "0.001" if "l0.001" in target_settings[0] else "0.0001"
+            lambda_val = "unknown"
+            for lv in ["0.001", "0.0001", "0.005", "0.01"]:
+                if f"l{lv}" in target_settings[0]:
+                    lambda_val = lv
+                    break
             type_label = "Age-specific" if t == 'age-specific' else "Longitudinal"
             ax.set_title(f'{type_label}: {metric.upper()} vs Age', fontsize=20, fontweight='bold', pad=15)
             ax.set_ylabel(metric.upper(), fontsize=16)
@@ -679,11 +715,8 @@ def aggregate_feature_importance():
         print(f"Combined feature importance plot saved to {plot_path}")
 
 if __name__ == "__main__":
-    base_results_path = os.path.join(current_dir, "results_bmi_all", "bmi_aggregated_results.csv")
-    if not os.path.exists(base_results_path):
-        df = process_results()
-    else:
-        df = pd.read_csv(base_results_path)
+    # Always re-process results to ensure it reflects current folder structure/names
+    df = process_results()
 
     plot_results(df)
     plot_settings_comparison(df)

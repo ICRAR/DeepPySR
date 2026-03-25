@@ -11,32 +11,50 @@ from DeepPySR.regressor import DeepPySRRegressor
 
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
-    return {
-        "stdsr": {
-            "adaptive_parsimony_scaling": 0.0,
-            "variable_prune_max": 0.0,
-            "variable_prune_start": 0,
-            "variable_prune_ramp": 0,
-        },
-        "srprn": {
-            "adaptive_parsimony_scaling": 0.0,
-            "variable_prune_start": 50,
-            "variable_prune_ramp": 150,
-            "variable_prune_max": 0.7,
-        },
-        "srpsm": {
-            "adaptive_parsimony_scaling": 50.0,
-            "variable_prune_max": 0.0,
-            "variable_prune_start": 0,
-            "variable_prune_ramp": 0,
-        },
-        "fullsr": {
-            "adaptive_parsimony_scaling": 50.0,
-            "variable_prune_start": 50,
-            "variable_prune_ramp": 150,
-            "variable_prune_max": 0.7,
-        },
+    configs = {}
+    vps_list = [25, 50, 75]
+    vpr_list = [50, 100, 150]
+    aps_list = [0.1, 1.0, 10.0, 50.0]
+    vpm = 0.7  # Fixed tuned value for variable_prune_max
+
+    # 1. stdsr: All parameters set to 0
+    configs["stdsr_vps0_vpr0_aps0"] = {
+        "adaptive_parsimony_scaling": 0.0,
+        "variable_prune_start": 0,
+        "variable_prune_ramp": 0,
+        "variable_prune_max": 0.0,
     }
+
+    # 2. srpsm: Only tune adaptive_parsimony_scaling, others set to 0
+    for aps in aps_list:
+        configs[f"srpsm_vps0_vpr0_aps{aps}"] = {
+            "adaptive_parsimony_scaling": aps,
+            "variable_prune_start": 0,
+            "variable_prune_ramp": 0,
+            "variable_prune_max": 0.0,
+        }
+
+    # 3. srprn: Only tune variable_prune_start/ramp/max, set adaptive_parsimony_scaling to 0
+    for vps in vps_list:
+        for vpr in vpr_list:
+            configs[f"srprn_vps{vps}_vpr{vpr}_aps0"] = {
+                "adaptive_parsimony_scaling": 0.0,
+                "variable_prune_start": vps,
+                "variable_prune_ramp": vpr,
+                "variable_prune_max": vpm,
+            }
+
+    # 4. fullsr: Tune all 4 parameters
+    for vps in vps_list:
+        for vpr in vpr_list:
+            for aps in aps_list:
+                configs[f"fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
+                    "adaptive_parsimony_scaling": aps,
+                    "variable_prune_start": vps,
+                    "variable_prune_ramp": vpr,
+                    "variable_prune_max": vpm,
+                }
+    return configs
 
 # --- KAN Wrapper ---
 class KANWrapper:
@@ -221,13 +239,13 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "extra_sympy_mappings": {'cond': sympy_cond},
         "unary_operators": ["exp", "log"],
         "parsimony": 0.001,
-        "populations": 20,
-        "population_size": 100,
+        "populations": 30,
+        "population_size": 200,
         "ncycles_per_iteration": 200,
         "verbosity": 1,
         "denoise": False, # Denoising can be very slow or get stuck, disabled for stability
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,
-        "niterations": 40,
+        "niterations": 100,
         "timeout_in_seconds": 600, # 10 minute timeout per fit to prevent hanging
     }

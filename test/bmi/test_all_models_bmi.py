@@ -29,6 +29,12 @@ def main():
     deeppysr_configs = get_deeppysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
     
+    # Extract parameters for folder naming
+    nit = pysr_base_kwargs.get('niterations', 100)
+    pop = pysr_base_kwargs.get('populations', 30)
+    sz = pysr_base_kwargs.get('population_size', 200)
+    param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
+    
     for setting in settings:
         print(f"\n{'='*20}\nSetting: {setting}\n{'='*20}")
         if setting == 'longitudinal':
@@ -87,7 +93,11 @@ def main():
             for cfg_name, cfg_overrides in deeppysr_configs.items():
                 for r2w in r2w_list:
                     for l in lambda_list:
-                        full_cfg_name = f"{cfg_name}_r2w{r2w}_l{l}"
+                        parts = cfg_name.split('_', 1)
+                        setting_prefix = parts[0]
+                        params_part = parts[1] if len(parts) > 1 else ""
+                        
+                        full_cfg_name = f"{setting_prefix}_{param_suffix}_{params_part}_r2w{r2w}_l{l}"
                         deeppysr_out = os.path.join(run_out_root, "deeppysr", full_cfg_name)
                         if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
                             continue
@@ -111,7 +121,8 @@ def main():
             print(f"Evaluating DeepPySR (pysr) Model...")
             for r2w in r2w_list:
                 for l in lambda_list:
-                    full_name = f"pysr_r2w{r2w}_l{l}"
+                    # aps set to 50 as requested
+                    full_name = f"pysr_{param_suffix}_aps50_r2w{r2w}_l{l}"
                     deeppysr_pysr_out = os.path.join(run_out_root, "pysr", full_name)
                     if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
                         continue
@@ -151,7 +162,7 @@ def main():
                 # or as the user says "4 settings", maybe they mean the 4 cfg_names with default r2w/l
                 for r2w in r2w_list:
                     for l in lambda_list:
-                        full_cfg_name = f"{cfg_name}_r2w{r2w}_l{l}_nocv"
+                        full_cfg_name = f"{cfg_name}_{param_suffix}_r2w{r2w}_l{l}_nocv"
                         deeppysr_out = os.path.join(run_out_root_nocv, "deeppysr", full_cfg_name)
                         if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
                             print(f"  {full_cfg_name}...")
@@ -171,7 +182,8 @@ def main():
             # 4.2 DeepPySR (pysr) No-CV
             for r2w in r2w_list:
                 for l in lambda_list:
-                    full_name = f"pysr_r2w{r2w}_l{l}_nocv"
+                    # aps set to 50 as requested
+                    full_name = f"pysr_{param_suffix}_aps50_r2w{r2w}_l{l}_nocv"
                     deeppysr_pysr_out = os.path.join(run_out_root_nocv, "pysr", full_name)
                     if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
                         print(f"  {full_name}...")

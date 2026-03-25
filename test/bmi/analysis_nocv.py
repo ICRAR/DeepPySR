@@ -508,19 +508,34 @@ def plot_results(df):
 def plot_settings_comparison(df):
     """
     Plot performance (r2, rmse, mae, complexity) for 4 settings of DeepPySR (fullsr, stdsr, srpsm, srprn) 
-    and PySR variants using r2w=1 and lambda=0.001_nocv.
+    and PySR variants using r2w=1 and lambda=0.001 (or 0.0001).
     """
-    base_dir = os.path.join(current_dir, "results_bmi_nocv")
-    target_settings = ['fullsr_r2w1_l0.001_nocv', 'stdsr_r2w1_l0.001_nocv', 'srpsm_r2w1_l0.001_nocv', 'srprn_r2w1_l0.001_nocv', 'pysr_r2w1_l0.001_nocv']
+    # Look for folders containing 'r2w1' and 'l0.001' or 'l0.0001'
+    all_models = df['model'].unique()
     
+    base_names = ['fullsr', 'stdsr', 'srpsm', 'srprn', 'pysr']
+    target_settings = []
+    
+    for base in base_names:
+        matches = [m for m in all_models if m.startswith(base) and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+        if matches:
+            target_settings.append(matches[0])
+            
+    if not target_settings:
+        vps_matches = [m for m in all_models if 'vps' in m and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+        if vps_matches:
+            target_settings = sorted(vps_matches)[:4]
+            pysr_matches = [m for m in all_models if m.startswith('pysr') and 'r2w1_' in m and ('l0.001' in m or 'l0.0001' in m)]
+            if pysr_matches:
+                target_settings.append(pysr_matches[0])
+
+    if not target_settings:
+        print(f"Warning: No data found for settings comparison")
+        return
+
     plot_df = df[df['model'].isin(target_settings)].copy()
     if plot_df.empty:
-        print(f"Warning: No data found for settings: {target_settings}")
-        # Try without _nocv suffix if empty
-        alt_settings = [s.replace('_nocv', '') for s in target_settings]
-        plot_df = df[df['model'].isin(alt_settings)].copy()
-        if plot_df.empty:
-            return
+        return
 
     metrics = ['r2', 'rmse', 'mae', 'complexity']
     types = ['age-specific', 'longitudinal']
@@ -544,7 +559,11 @@ def plot_settings_comparison(df):
                          linestyle=linestyle, linewidth=3.0, palette=model_colors,
                          marker='o', markersize=8)
             
-            lambda_val = "0.001"
+            lambda_val = "unknown"
+            for lv in ["0.001", "0.0001", "0.005", "0.01"]:
+                if f"l{lv}" in target_settings[0]:
+                    lambda_val = lv
+                    break
             type_label = "Age-specific" if t == 'age-specific' else "Longitudinal"
             ax.set_title(f'{type_label}: {metric.upper()} vs Age', fontsize=20, fontweight='bold', pad=15)
             ax.set_ylabel(metric.upper(), fontsize=18)
