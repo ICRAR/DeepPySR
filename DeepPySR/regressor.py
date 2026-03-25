@@ -193,7 +193,8 @@ class DeepPySRRegressor:
             args = [values[s] for s in involved]
             
             # Compute and store
-            res = func(*args)
+            with np.errstate(all='ignore'):
+                res = func(*args)
             if isinstance(res, (int, float, np.number)):
                 # If it's a scalar, broadcast it to the input shape
                 res = np.full(X_input.shape[0], res)
@@ -202,9 +203,12 @@ class DeepPySRRegressor:
         if isinstance(self.target_name_, list):
             # Return multi-output predictions as a 2D array
             preds = [values[t] for t in self.target_name_]
-            return np.column_stack(preds)
+            res = np.column_stack(preds)
         else:
-            return values[self.target_name_]
+            res = values[self.target_name_]
+            
+        # Robustly handle NaNs and Infs
+        return np.nan_to_num(res, nan=0.0, posinf=1e10, neginf=-1e10)
 
     def _fit_single_target(self, X, y, target_name):
         # Create a new PySRRegressor instance with the same parameters as self
@@ -212,8 +216,22 @@ class DeepPySRRegressor:
         params = self.get_params()
 
         # Remove deepPySR specific params before passing to PySRRegressor
-        for p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight"]:
-            params.pop(p, None)
+        for p in [
+            "max_layers", "output_dir", "decimal", "stopping_score", "relationships_", 
+            "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path",
+            "variable_prune_max", "variable_prune_start", "variable_prune_ramp"
+        ]:
+            if self.model_provider != "pypysr" and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
+                params.pop(p, None)
+            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
+                params.pop(p, None)
+
+        # Apply conservative defaults for stability if not provided
+        if "procs" not in params:
+            # Use at most 4 workers to avoid Distributed.ProcessExitedException (memory exhaustion)
+            # Standard PySR 1.x default is often too aggressive for many-layered DeepPySR
+            params["procs"] = min((os.cpu_count() or 2) - 1, 4)
+
 
         # Configure PySR to use our output_dir for its files
         # We use a subfolder for each target to avoid collisions if running in parallel
@@ -237,23 +255,23 @@ class DeepPySRRegressor:
             if os.path.exists(pypysr_path) and pypysr_path not in sys.path:
                 sys.path.insert(0, pypysr_path)
             from pypysr import PySRRegressor
-            if self.pysr_kwargs.get("verbosity", 0) > 0:
+            if params.get("verbosity", 0) > 0:
                 try:
                     import pypysr
                     print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
                 except ImportError:
                     print(f"[DeepPySR] Using pypysr (import path: {pypysr_path})")
-            model = PySRRegressor(**self.pysr_kwargs)
+            model = PySRRegressor(**params)
         else:
             import sys
             pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
             if pypysr_path in sys.path:
                 sys.path.remove(pypysr_path)
             from pysr import PySRRegressor
-            if self.pysr_kwargs.get("verbosity", 0) > 0:
+            if params.get("verbosity", 0) > 0:
                 import pysr
                 print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
-            model = PySRRegressor(**self.pysr_kwargs)
+            model = PySRRegressor(**params)
 
         if target_name == 'y':
             if hasattr(y, 'values'):
@@ -284,6 +302,7 @@ class DeepPySRRegressor:
             try:
                 # Use model.predict to get predictions for this equation
                 # Passing the index allows getting predictions for specific equations in Hall of Fame
+                # If a worker process has died, this might throw Distributed.ProcessExitedException
                 y_pred = model.predict(X, index=idx)
                 # Handle NaNs and Infs in predictions
                 y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
@@ -301,8 +320,22 @@ class DeepPySRRegressor:
                     best_r2 = r2
                     best_idx = idx
             except Exception as e:
-                print(f"Error calculating Score for equation {idx}: {e}")
+                # Catching Distributed.ProcessExitedException or other Julia/PySR errors
+                print(f"[DeepPySR] Warning: Error calculating Score for equation {idx} (possibly dead worker): {e}")
+                # Forcing a small delay to let things settle, and potentially a worker restart if PySR handles it, 
+                # but mostly we just want to avoid crashing.
+                if "ProcessExitedException" in str(e):
+                    # If a worker died, try to avoid calling predict(index=...) again immediately
+                    print("[DeepPySR] Worker process died. Aborting Pareto score optimization for this target.")
+                    break
                 continue
+        
+        # If all equation evaluations failed, best_idx might be 0 but best_score still -inf
+        if best_score == -np.inf:
+            print("[DeepPySR] Warning: All equation evaluations failed. Using default first equation.")
+            best_idx = 0
+            best_r2 = 0.0
+            best_score = 0.0
             
         best = eqs.iloc[best_idx]
         formula = str(best["equation"]) if "equation" in best else str(best.get("sympy_format", ""))
@@ -404,6 +437,10 @@ class DeepPySRRegressor:
                 # Ensure sym_expr is a sympy expression
                 if not hasattr(sym_expr, "xreplace"):
                     sym_expr = sp.sympify(sym_expr)
+
+                if is_root:
+                    self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
+                    self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
 
                 # Round coefficients
                 if hasattr(sym_expr, "atoms"):

@@ -3,7 +3,8 @@ import os
 # Fix for JuliaCall/PySR segfaults: Must be set before juliacall is imported
 os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
 # Set Julia threads before initializing Julia
-os.environ["JULIA_NUM_THREADS"] = str(max(1, (os.cpu_count() or 2) - 1))
+# Use a conservative number of threads to avoid memory exhaustion during parallel searches
+os.environ["JULIA_NUM_THREADS"] = str(min((os.cpu_count() or 2) - 1, 8))
 
 # Try to initialize JuliaCall as early as possible to avoid conflict with torch
 try:

@@ -1,0 +1,631 @@
+age,model,type,r2,rmse,mae,complexity,formula
+27,srprn_r2w2_l0.005_nocv,age-specific,0.26965994325441867,4.720580079025735,3.3686934590910633,10,y5_a6/(0.73 - 1.0*SUM_PGS002161)**1.0
+27,srprn_r2w1_l0.001_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,fullsr_r2w1_l0.005_nocv,age-specific,0.3944307534189503,4.29847806328052,3.1440528633406415,34,"-1.0*y1_sm4*SUM_PGS002853 + asthma_m + hhincome_0 + y5_a6 + (SUM_PGS002853*(sibling_pos + abroad_fa*exp(cond(SUM_PGS002161, y1_bmifa))) + 0.06*latepreg_weight)*(exp(SUM_PGS002313) + 0.63) + 0.62"
+27,fullsr_r2w2_l0.001_nocv,age-specific,0.3988803993437984,4.2826566107081625,3.17754908041916,42,2.32/(b_parasc**1.0*(b_parasc + mo_party*log(smk_t2 + 0.73) + SUM_PGS002853 + asthma_m - 1.0*preg_gain - 3.62)**1.0) + b_parasc + SUM_PGS002853 + SUM_PGS002161*y5_a6 + asthma_m + y5_a6 + 2.6
+27,srpsm_r2w1.5_l0.01_nocv,age-specific,0.3867207143955307,4.32575538275071,3.1516586721581006,32,"1.48*SUM_PGS002853 + 1.69*SUM_PGS002313 + 1.48*y5_a6 + 1.48*(mode_delivery + 0.6)*cond(mo_party*SUM_PGS002853 - 1.2, exp(preg_alc)) + 1.48*cond(SUM_PGS003884, asthma_m)"
+27,srprn_r2w1.5_l0.005_nocv,age-specific,0.3115799892573089,4.583102304693982,3.309238557840508,11,1.31*asthma_m + 1.31*y5_a6*(SUM_PGS002161 + 1.07)
+27,stdsr_r2w2_l0.001_nocv,age-specific,0.2681474177390002,4.7254656832464415,3.4722769842910806,9,1.5*SUM_PGS002313 + 1.5*y5_a6 + 0.72
+27,srprn_r2w2_l0.001_nocv,age-specific,0.2646317920923563,4.7368020271043765,3.424879705388049,7,1.93*SUM_PGS000921 + 1.93*y5_a6
+27,srprn_r2w1.5_l0.01_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,srpsm_r2w1_l0.01_nocv,age-specific,0.35348308859151656,4.441429303593691,3.1973111249439525,21,2.65*SUM_PGS002313 - 0.52*y1_a10 + 0.3*y5_a10 + (SUM_PGS002853 + y5_bmiz)*(asthma_m + 1.81) + 28.59
+27,srprn_r2w2_l0.01_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,stdsr_r2w1_l0.005_nocv,age-specific,0.3136042985121241,4.576359003689923,3.2353829262579783,12,-1.0*alc_t3 + (SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,fullsr_r2w1_l0.001_nocv,age-specific,0.39323640542409166,4.302714861817732,3.0850230333011193,50,SUM_PGS002853*sibling_pos + SUM_PGS002313*log(m_schyr) - 1.0*ppd + hhincome_0*exp(-1.0*m_schlev) + (b_parasc + mode_delivery - 1.0*y5_a8 + y5_a9 + (SUM_PGS002313 - 1.0*ppd)*log(y5_a9) - 2.45)/mht_wt**1.0 + y5_a6 + 6.71
+27,fullsr_r2w2_l0.005_nocv,age-specific,0.3969386083967109,4.2895681461654815,3.156351196717447,35,y5_a6 + (hhincome_0 - 1.0*alc_t2)*(0.23/(-1.0*ppd + wtgain)**1.0 + log(0.17*y5_bmiz + 0.17*y5_a10)) + 3.32*exp(SUM_PGS002853) + 2.48
+27,srpsm_r2w2_l0.01_nocv,age-specific,0.37343299785637574,4.372366603637245,3.1576179276215774,24,-1.25*famsize_child0 + 1.25*y5_a6 + 3.75*exp(SUM_PGS002853 + SUM_PGS002313) + exp(sibling_pos - 1.0*mht_wt) + 2.57
+27,srprn_r2w1_l0.005_nocv,age-specific,0.3124848975425141,4.580089136169237,3.294499954815289,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.41)
+27,stdsr_r2w1.5_l0.001_nocv,age-specific,0.26434265661044154,4.737733154479999,3.39992769599661,9,1.44*SUM_PGS002853 + 1.44*y5_a6 - 0.41
+27,srprn_r2w1.5_l0.001_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,fullsr_r2w1.5_l0.01_nocv,age-specific,0.36869529628534625,4.388866001984852,3.149988349841888,21,parity_m*(SUM_PGS002853 + log(hhincome_0) - 0.46) + (SUM_PGS002853 + y5_bmiz)*(asthma_m*preg_plan + log(y5_a9)) + 24.16
+27,srprn_r2w1_l0.01_nocv,age-specific,0.30504837795748563,4.604792822510072,3.370124534441589,9,5.12*SUM_PGS002853 + y5_bmiz + y5_a6 + 6.64
+27,srpsm_r2w2_l0.001_nocv,age-specific,0.3591643025187484,4.42187189754662,3.158422840807645,27,"SUM_PGS000027 + 1.85*y5_bmiz - 1.0*ppd + hhincome_0 + (SUM_PGS002853 + 2.55)*(SUM_PGS002161*y5_bmiz*cond(y5_bmiz, preg_gain) + 2.69) - 23.3"
+27,srpsm_r2w1_l0.001_nocv,age-specific,0.3958466752346528,4.2934498433329775,3.2000497340384975,38,"asthma_m - 1.0*y1_a6 + 2.63*(y5_bmiz + cond(SUM_PGS002853, -0.76) + log(y5_a7))*(SUM_PGS002853 + plac_abrup + (hhincome_0 - 1.43)/preg_gain**1.0 + 0.68) + cond(1.68, SUM_PGS000027) - 2.37"
+27,stdsr_r2w1.5_l0.01_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,fullsr_r2w1.5_l0.001_nocv,age-specific,0.3101780813336079,4.587766477457882,3.2086728886653977,42,SUM_PGS002853/(-1.0*SUM_PGS002853 + 2.28*exp(0.15/SUM_PGS000027**1.0 + 0.13*hhincome_0) - 3.88)**1.0 + SUM_PGS003884 + (2.0*SUM_PGS002853 + y5_bmiz)*(y5_bmiz*log(hhincome_0) + 2.19) + 23.21
+27,stdsr_r2w1_l0.01_nocv,age-specific,0.27208061796555816,4.712750525532162,3.4006914944372326,7,1.52*SUM_PGS002313 + 1.52*y5_a6
+27,stdsr_r2w1_l0.001_nocv,age-specific,0.27483593267088935,4.703822736107881,3.3810221054877188,9,2.12*SUM_PGS002313 + 1.75*y5_a6 - 3.79
+27,srpsm_r2w2_l0.005_nocv,age-specific,0.0,10.613550141524499,3.6118093779992777,40,"SUM_PGS002313 + y5_bmiz + hhincome_0 + y5_a6 - 0.09/(SUM_PGS002313 + hhincome_0 - 2.52)**1.0 + cond(5.81, SUM_PGS002853*(parity_m + log(y5_a6) - 1.21)/(0.25 - 1.0*SUM_PGS002313)**1.0) + 5.7"
+27,fullsr_r2w1.5_l0.005_nocv,age-specific,0.3655181799155176,4.39989588843363,3.2081745874970817,25,0.03*SUM_PGS002853*sibling_pos*breastfed_ever*latepreg_weight + y5_bmiz + y5_a6 + log(plac_weight) + exp(-1.0*m_schlev)*log(hhincome_0)
+27,srpsm_r2w1.5_l0.005_nocv,age-specific,0.3744769956605649,4.368722424987561,3.115866559103095,36,SUM_PGS002853*(mo_party + 1.2) + 0.79*hhincome_0 - 0.36*y1_a10 + 320.31/(-4.56*SUM_PGS002313 - 4.56*y5_bmiz - 4.56*log(b_abdom) + 37.88)**1.0 + 13.06
+27,fullsr_r2w2_l0.01_nocv,age-specific,0.4144094597816447,4.2269765165505,3.1140815339104355,33,(-8.16*ppd + y5_a9)*(b_parasc/(preg_gain**1.0*(marry - 0.84)**1.0) + 3.88*SUM_PGS002853)/y1_a10**1.0 + y5_a6 + 5.79
+27,stdsr_r2w2_l0.01_nocv,age-specific,0.3094262389742546,4.590265918068913,3.3338335120381593,7,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42)
+27,fullsr_r2w1_l0.01_nocv,age-specific,0.35095295519476943,4.450111548032299,3.1641049025432717,14,hhincome_0 + (SUM_PGS002853 + SUM_PGS002313 + y5_bmiz + 1.76)*log(y5_a9) + 21.02
+27,stdsr_r2w1.5_l0.005_nocv,age-specific,0.31308102691567286,4.578103057780409,3.2761447370299255,9,(SUM_PGS002853 + y5_a6)*(SUM_PGS002161 + 1.42) - 0.29
+27,srpsm_r2w1_l0.005_nocv,age-specific,0.3772838866465007,4.358909584548064,3.131679497918361,32,"y5_bmiz*log(y5_a10) + age - 1.0*ppd + (parity_m*cond(y5_bmiz, -5.98*neo_unit + log(y5_a10)) + 1.63)*(SUM_PGS002853 + SUM_PGS002313 + 0.6) - 1.74"
+27,stdsr_r2w2_l0.005_nocv,age-specific,0.3138880075934921,4.575413128885757,3.358951985261284,9,SUM_PGS002853 + asthma_m + y5_a6*(SUM_PGS002161 + 1.42)
+27,srpsm_r2w1.5_l0.001_nocv,age-specific,0.3963335068807664,4.291719646368702,3.196841414163716,49,-1.23*b_parasc*asthma_m*(smk_t3 - 1.0*log(edu_m_0)) + 1.23*SUM_PGS002161*y5_a6 + 1.23*smk_t2 + 1.23*y5_a6 + 0.02*(0.39*mode_delivery - 0.09)**0.9*exp(0.9*mo_party + 0.9*hhincome_0) + 2.52
+27,pysr_r2w2_l0.01_nocv,age-specific,0.35650828479390073,4.431025902351259,3.2324801536468755,17,(SUM_PGS002161 + 1.3898816)*(SUM_PGS002853*parity_m + asthma_m*preg_plan - 1.0*ppd + y5_a6)
+27,pysr_r2w2_l0.001_nocv,age-specific,0.38566674583484595,4.329470862078748,3.1235892841599746,41,"SUM_PGS002853 + 1.3*SUM_PGS002313 + asthma_m - 1.0*ppd + smk_t2 + sibling_pos*Piecewise((sibling_pos, SUM_PGS002313 - 1.0*log(log(mht_wt)) + 0.57 > 0), (0.0, True))/mht_wt**1.0 + 1.3*y5_a6 + 2.71"
+27,pysr_r2w1_l0.001_nocv,age-specific,0.39435041632773626,4.298763179948728,3.1657707519309066,49,"1.63048620145601*SUM_PGS002853*preg_plan + 1.32134807207256*SUM_PGS003884 + asthma_m + 1.32134807207256*y5_a6 + 1.32134807207256*Piecewise((4.68, SUM_PGS002853*parity_m + 0.7*SUM_PGS002853*alc_t3 - 1.0*mht_wt + 1.26 > 0), (0.0, True)) + exp(Piecewise((-1.19, parity_m > 0), (0.0, True))) - 0.451582493064563"
+27,pysr_r2w1.5_l0.005_nocv,age-specific,0.3749226205955095,4.367166000615108,3.1820992754837385,29,"2.0*SUM_PGS002313 + SUM_PGS003884 + 0.718068602263668*hhincome_0 + 1.31578947368421*y5_a6 - 1.0*Piecewise((-5.05, SUM_PGS002853*sibling_pos - 1.54 > 0), (0.0, True)) + 1.6677174"
+27,pysr_r2w2_l0.005_nocv,age-specific,0.42262617446736883,4.197216338576945,3.0105475929468124,45,preg_thyroid/(y5_bmiz + 0.33)**1.0 + 0.62*mo_party + 0.62*hhincome_0 + (0.34*mo_party + 0.34*childcare_1)*(SUM_PGS000027 + SUM_PGS004150 - 1.0*y1_a9 - 30.06) + (SUM_PGS002853 + y5_bmiz + 1.69)*log(y5_a9) + 19.52
+27,pysr_r2w1_l0.01_nocv,age-specific,0.38319261930616866,4.338180219290373,3.1085684570060175,19,1.71*SUM_PGS002853*sibling_pos + y5_a6 + y5_a9*(0.02*b_parasc*hhincome_0 + SUM_PGS002161) + 5.34
+27,pysr_r2w1_l0.005_nocv,age-specific,0.3945025495742802,4.298223242425344,3.1492905355980163,49,2.08*SUM_PGS002853 + 2.08*SUM_PGS002313 + 2.08*y5_bmiz - 2.0764906*ppd + 2.08*(exp(parity_m) + 31.38)/agebirth_p_y**1.0 + hhincome_0 + 2.08*exp(y5_bmiz)/preg_gain**1.0 - 1.0*mht_wt - 0.4*y1_a10 + 27.53
+27,pysr_r2w1.5_l0.01_nocv,age-specific,0.4037000712160209,4.265453261936479,3.1756258539891564,34,"2.60859634615385*SUM_PGS002853 + 2.60859634615385*SUM_PGS002313 + 1.36*y5_a6 + 3.5808737/(reledu_mo/birth_month**1.0 - 1.0*Piecewise((3.19, asthma_m > 0), (0.0, True)))**1.0 + 2.9022803"
+27,pysr_r2w1.5_l0.001_nocv,age-specific,0.3976478562112118,4.2870449686602585,3.1387860844413256,47,0.56*hhincome_0*exp(mo_party)/m_schyr**1.0 + SUM_PGS003884 + y5_bmiz + childcareprof_1 + 0.31*exp(hhincome_0)/preg_gain**1.0 + y5_a6 + 2.24*exp(SUM_PGS002853) + log(m_wt1) - 1.84 + 2.81*exp(-1.0*sibling_pos)
+20,srprn_r2w2_l0.005_nocv,age-specific,0.35297795105752827,3.933121008669991,2.9565898283403893,7,y5_bmiz + 0.1*m_wt1 + y5_a6
+20,srprn_r2w1_l0.001_nocv,age-specific,0.3381909379754532,3.977810802602751,2.885530624654612,12,m_wt1/m_schyr**1.0 + y5_bmiz + y5_a6 + 0.06
+20,fullsr_r2w1_l0.005_nocv,age-specific,0.39746205717011573,3.7955084989441774,2.7472118569961235,26,"-1.0*y5_bmiz + 0.08*m_wt1 + cond(smk_t2, mo_party) + exp(exp(exp((SUM_PGS002853 + y5_bmiz)/y1_a6**1.0))) + 2.4"
+20,fullsr_r2w2_l0.001_nocv,age-specific,0.42889339079321565,3.6951864874998237,2.7616490837996777,41,"y5_bmiz + y5_a6 + (-1.0*childcarerel_1 - 0.21*m_wt1 - 0.21*(y5_a9 + 28.08)*cond(-1.0*mo_grav + y5_a9 - 10.02, y1_sm16))/(SUM_PGS002853 - 1.0*log(y1_a6))**1.0 + 0.84"
+20,srpsm_r2w1.5_l0.01_nocv,age-specific,0.3995444880827824,3.788943995164526,2.8133253549987023,22,"SUM_PGS002313 + y5_bmiz + asthma_m + y5_a6 + cond(preg_gain - 1.0*exp(fam_splitup0), 2.39*SUM_PGS002853 - 9.57) + 16.11"
+20,srprn_r2w1.5_l0.005_nocv,age-specific,0.323791576690714,4.020851707330242,3.0269043141840344,5,y5_a6*(SUM_PGS002161 + 1.37)
+20,stdsr_r2w2_l0.001_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,srprn_r2w2_l0.001_nocv,age-specific,0.3268250032056941,4.011822932165581,2.9918688006987737,10,-1.0*childcarecentre_1 + y5_a6*(SUM_PGS002161 + 1.37)
+20,srprn_r2w1.5_l0.01_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,srpsm_r2w1_l0.01_nocv,age-specific,0.4073350569429527,3.764284049818283,2.805212834872962,21,"2.48*SUM_PGS002313 + 0.08*m_wt1 + y5_a6 + cond(-0.52*y5_bmiz + wtgain, -2.58) + 5.82"
+20,srprn_r2w2_l0.01_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,stdsr_r2w1_l0.005_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,fullsr_r2w1_l0.001_nocv,age-specific,0.41710158740421177,3.7331393746021457,2.8199013734680944,47,y5_bmiz + asthma_m - 1.0*preg_dia + y5_a6 + (2.0*SUM_PGS002853 + log(mode_delivery))/(y5_bmiz*gest*(-1.0*preeclam + childcarerel_1)/birth_head_circum**1.0 + mht_wt)**1.0 + 5.79*exp(SUM_PGS002313) + log(ga_wt1) + 0.81
+20,fullsr_r2w2_l0.005_nocv,age-specific,0.0,7.589002234732094,6.175748014208757,25,SUM_PGS002853 + y5_a6 + (SUM_PGS002853 + 0.036828994323301244*y5_a6 - 3.58)*(preg_plan + 0.21*mode_delivery + death_p - 1.0*preg_dia) + 4.97
+20,srpsm_r2w2_l0.01_nocv,age-specific,0.40381395630169425,3.7754495446157277,2.7681356340377357,33,"SUM_PGS002313*(mht_wt - 1.28) + y5_bmiz + age + smk_exp1 + 1.62*exp(SUM_PGS002313 + 1.23/preg_gain**1.0 + cond(0.97 - 1.0*preg_dia, y5_bmiz)) + 3.96"
+20,srprn_r2w1_l0.005_nocv,age-specific,0.3581355155063568,3.917413729593568,2.91143685402008,11,y5_bmiz - 1.0*childcarecentre_1 + 0.1*m_wt1 + y5_a6
+20,stdsr_r2w1.5_l0.001_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,srprn_r2w1.5_l0.001_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,fullsr_r2w1.5_l0.01_nocv,age-specific,0.416322639363657,3.7356329058048052,2.7613121344928695,26,"preg_plan*(SUM_PGS002853 + SUM_PGS003884 + cond(2.95 - 1.0*mht_wt, y5_bmiz + asthma_m) - 1.0*log(mht_wt - 1.27)) + y5_a6 + 5.54"
+20,srprn_r2w1_l0.01_nocv,age-specific,0.3107551433470799,4.059425121875668,3.0020508917707662,5,SUM_PGS000921 + 1.63*y5_a6
+20,srpsm_r2w2_l0.001_nocv,age-specific,0.417029613631272,3.7333698434336737,2.7615523934208785,23,"SUM_PGS002313 + y5_bmiz + 0.09*m_wt1 + (SUM_PGS002853 + cond(y5_bmiz - 1.23, 1.37))*(y5_bmiz + smk_exp1 + 0.97) + 18.72"
+20,srpsm_r2w1_l0.001_nocv,age-specific,0.4020800466328338,3.7809356975919464,2.8401978859007624,33,"1.64*SUM_PGS002853 + wtgain*(3.91*SUM_PGS002313 + 3.91*cond(SUM_PGS002853, cond(exp(marry) - 8.62, y5_bmiz))) + y5_a6 - 1408.21/(latepreg_weight + y5_a5)**1.0 + 18.71"
+20,stdsr_r2w1.5_l0.01_nocv,age-specific,0.34424599655128063,3.959571990065334,2.9955121670100064,11,SUM_PGS002853 + 2.69*y5_bmiz + 0.09*m_wt1 + 18.09
+20,fullsr_r2w1.5_l0.001_nocv,age-specific,0.31789065002745875,4.038357562065892,3.1695753996353195,23,y1_sm16 + 0.0007455718994770192*m_wt1**2 + 1.35*y5_a6 + 1.35*(SUM_PGS002853 + plac_abrup)*log(y5_a7) - 2.62
+20,stdsr_r2w1_l0.01_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,stdsr_r2w1_l0.001_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,srpsm_r2w2_l0.005_nocv,age-specific,0.28333261749031036,4.1393923008286295,3.3018274698641332,37,y5_bmiz + 0.79*y5_a6 + (SUM_PGS002853*mode_delivery + 0.67*(y5_bmiz - 0.77)*(alc_t2 + 1.03)*(y5_bmiz + alc_t2 + 0.19)*log(sex - 0.03) + 5.72)*exp(0.01*m_wt1)
+20,fullsr_r2w1.5_l0.005_nocv,age-specific,0.38556128946976553,3.832807896416568,2.8198264384948972,21,1.35*SUM_PGS002853 + 1.35*SUM_PGS000921 + 0.09*m_wt1 + 0.09*ga_wt1 + 1.35*y5_a6 - 1.2
+20,srpsm_r2w1.5_l0.005_nocv,age-specific,0.4513827375706029,3.621700244384755,2.6133057751752253,38,"1.19*SUM_PGS002853 + preg_plan*(y5_bmiz + exp(SUM_PGS002313)) + 1.19*m_wt1*(cond(-1.0*m_schyr + y5_a10 + 0.85*exp(1.78*SUM_PGS002313 + 1.78*y5_bmiz), 0.05) + 0.06) + 17.7"
+20,fullsr_r2w2_l0.01_nocv,age-specific,0.391346539810408,3.8147213124758155,2.804274391341188,18,0.04*m_wt1*(SUM_PGS002313 + 2.91) + (y5_bmiz - 1.0*preg_dia)*log(y5_a9) + 18.74
+20,stdsr_r2w2_l0.01_nocv,age-specific,0.3364464846319559,3.9830498806813037,2.9622908784380027,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.35)
+20,fullsr_r2w1_l0.01_nocv,age-specific,0.3738169823042623,3.8692644277424697,2.8557244538359665,15,"-1.0*SUM_PGS002853 + (SUM_PGS002853 + cond(y5_bmiz, y5_bmiz) + 5.23)*log(m_wt1)"
+20,stdsr_r2w1.5_l0.005_nocv,age-specific,0.32744245567645613,4.009982639321561,2.969798743962932,7,(SUM_PGS002161 + 1.32)*(y5_a6 + 0.47)
+20,srpsm_r2w1_l0.005_nocv,age-specific,0.3881075915620843,3.824857861122193,2.808239207922698,18,3.05*SUM_PGS002853 + 1.28*y5_a6 + 193.29*exp(-376.61/m_wt1**1.0)
+20,stdsr_r2w2_l0.005_nocv,age-specific,0.32365120346034804,4.021269027371493,2.8976706165400667,8,y5_a6 + (SUM_PGS002853 + 3.02)*log(y5_a10)
+20,srpsm_r2w1.5_l0.001_nocv,age-specific,0.435324542969624,3.6743220926275537,2.6418345354387935,48,"y5_bmiz + 0.07*m_wt1 + 0.39*y5_a8 + (y5_bmiz + death_p + 1.2)*(-1.0*SUM_PGS002853*(cond(preg_dia, 3.63) - 1.88) + y5_bmiz/agebirth_m_y**1.0 + hhincome_0*(hhincome_0*cats_quant_preg + miggen_child)/agebirth_m_y**1.0) + 15.85"
+20,pysr_r2w2_l0.01_nocv,age-specific,0.3928555600134477,3.8099895033926354,2.803946641438447,27,y1_sm16 + 0.39*SUM_PGS004150 + 1.51*preg_plan*(SUM_PGS002853 - 1.0*mht_wt) + 4.62*preg_plan - 0.39*alc_t3 + 1.3458755*y5_a6
+20,pysr_r2w2_l0.001_nocv,age-specific,0.43391524892997346,3.6789043471779905,2.721925762097922,41,"SUM_PGS000921 + y5_bmiz*death_p + y5_bmiz + plac_abrup + 0.08*m_wt1 + Piecewise((SUM_PGS002853 + exp(y5_bmiz*(death_p - 0.1) + y5_bmiz), hhincome_0 - 1.17351087099181*exp(-1.0*SUM_PGS002853 + death_p) > 0), (0.0, True)) + 22.058455"
+20,pysr_r2w1_l0.001_nocv,age-specific,0.4067642266051543,3.766096414805388,2.728349027593111,34,preg_thyroid + 0.09*preg_plan*y5_a10 + 0.09*m_wt1 + 65.56*(SUM_PGS002853 + SUM_PGS000921 + smk_t2*(plac_abrup + dogs_preg) + plac_abrup + y5_a6)/y5_a4**1.0 + 0.23
+20,pysr_r2w1.5_l0.005_nocv,age-specific,0.4156381326345383,3.7378227428401747,2.7512216636709743,34,"1.67145906122449*SUM_PGS002853*mode_delivery + 1.67145906122449*y5_bmiz + asthma_m + Piecewise((SUM_PGS002853**2*death_p**2*y5_a6 + 4.08, y5_bmiz - 1.23 > 0), (0.0, True)) + 22.8724624489796"
+20,pysr_r2w2_l0.005_nocv,age-specific,0.41508880056636543,3.7395792088967332,2.7853337212483087,29,-1.0*con_anomalies + (SUM_PGS002853 + SUM_PGS002313*exp(death_p) + asthma_m + y5_a6 + exp(SUM_PGS002853*death_p*exp(mo_party)) - 1.12)*log(log(m_wt1))
+20,pysr_r2w1_l0.01_nocv,age-specific,0.3953045863131083,3.8022975999225643,2.8337203095194985,24,"2.85714285714286*SUM_PGS002853 + y5_bmiz + asthma_m + y5_a6 + Piecewise((10.13*y5_bmiz, y1_sm16 - 1.0*death_p < 0), (0.0, True)) + 5.588865"
+20,pysr_r2w1_l0.005_nocv,age-specific,0.4397358650230946,3.659941798495334,2.720696664411724,40,"0.08*m_wt1 + y5_a6 - 1.0*Piecewise((preg_dia - 1.81, SUM_PGS003884 + smk_exp1 - 0.44 > 0), (0.0, True)) + Piecewise((y5_bmiz + mode_delivery + 0.19, SUM_PGS002853 - 0.3 > 0), (0.0, True)) - 1.0*exp(wtgain) + 0.87"
+20,pysr_r2w1.5_l0.01_nocv,age-specific,0.4018373483299098,3.781702968841078,2.8179589663954947,30,"y1_sm16 + 1.49*SUM_PGS002853 + asthma_m - 1.49*mht_wt + 1.49*y5_a6 + exp(SUM_PGS002313 + exp(Piecewise((parity_m, death_p - 1.0*dogs_preg > 0), (0.0, True))))"
+20,pysr_r2w1.5_l0.001_nocv,age-specific,0.4366592987134339,3.669976920507848,2.679555473515529,38,"y5_bmiz + sex*(Piecewise(((preeclam + 0.598802395209581*hhincome_0)*(y5_bmiz + asthma_m), y5_bmiz + plac_abrup - 0.75 > 0), (0.0, True)) - 0.11) + 1.28*(SUM_PGS002313 - 1.0*prepreg_psych)*(mht_wt - 0.7) + 26.17"
+10,srprn_r2w2_l0.005_nocv,age-specific,0.5647833342775368,2.184371379126936,1.6829195232879854,7,SUM_PGS002853 + y5_bmiz + y5_a6 + 0.28
+10,srprn_r2w1_l0.001_nocv,age-specific,0.5735946058875199,2.162146235184157,1.6621041100199492,7,2.0*SUM_PGS002853 + y5_bmiz + y5_a6
+10,fullsr_r2w1_l0.005_nocv,age-specific,0.6499517990660166,1.9590144696701335,1.5035757767592957,21,SUM_PGS002313 + 0.18*m_wt1/y1_a8**1.0 + 3.33*exp(SUM_PGS002161 + 0.57*y5_bmiz) + 13.43
+10,fullsr_r2w2_l0.001_nocv,age-specific,0.6601531299713678,1.9302579776398694,1.4712927803798586,35,"-1.0*m_vege + SUM_PGS002313 + SUM_PGS003884 + cond(SUM_PGS003884, y5_bmiz) + cond((mo_party + y5_bmiz + 0.11)*exp(SUM_PGS002313) - 1.54, death_p + exp(abroad_mo)) + exp(0.89*y5_bmiz) + 17.06"
+10,srpsm_r2w1.5_l0.01_nocv,age-specific,0.6255737972743677,2.0260811478231435,1.5681467790272419,13,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz*(0.38*y5_a6 - 4.64) + 18.54
+10,srprn_r2w1.5_l0.005_nocv,age-specific,0.5677026344493806,2.177033005247447,1.6984055271796208,6,y5_bmiz + exp(y5_bmiz) + 16.95
+10,stdsr_r2w2_l0.001_nocv,age-specific,0.5869900035907745,2.1279136501838978,1.6423962125043505,10,1.25*SUM_PGS002313 + 1.25*exp(y5_bmiz) + 17.66
+10,srprn_r2w2_l0.001_nocv,age-specific,0.5723439378699225,2.16531475421682,1.670864148465392,11,-1.0*m_vege + y5_bmiz + exp(y5_bmiz) + 16.9
+10,srprn_r2w1.5_l0.01_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,srpsm_r2w1_l0.01_nocv,age-specific,0.6077064924225731,2.0738592550971067,1.5882897356926031,10,y5_bmiz + exp(SUM_PGS002853 + 0.75*y5_bmiz) + 16.53
+10,srprn_r2w2_l0.01_nocv,age-specific,0.5677026344493806,2.177033005247447,1.6984055271796208,6,y5_bmiz + exp(y5_bmiz) + 16.95
+10,stdsr_r2w1_l0.005_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,fullsr_r2w1_l0.001_nocv,age-specific,0.6448539626683892,1.9732277091675434,1.5311880185745508,33,"-1.0*m_vege + 2.0*SUM_PGS002313 + SUM_PGS003884 + death_p + cond(exp(0.02/SUM_PGS002313**1.0) - 0.55, y5_bmiz + 0.77*exp(y5_bmiz) + 0.34) + 18.08"
+10,fullsr_r2w2_l0.005_nocv,age-specific,0.6344313521388518,2.0019728803256376,1.5135675648981202,17,-1.0*m_vege + 6.0*exp(0.5*SUM_PGS002313 + 0.5*y5_bmiz) + 13.98
+10,srpsm_r2w2_l0.01_nocv,age-specific,0.6233770817097328,2.0320158487976654,1.5743719176284467,12,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz + 0.81*exp(y5_bmiz) + 17.76
+10,srprn_r2w1_l0.005_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,stdsr_r2w1.5_l0.001_nocv,age-specific,0.5735946058875199,2.162146235184157,1.6621041100199492,7,2.0*SUM_PGS002853 + y5_bmiz + y5_a6
+10,srprn_r2w1.5_l0.001_nocv,age-specific,0.5711139273598533,2.1684264224739684,1.6510619432660336,6,y5_bmiz + exp(y5_bmiz) + 16.73
+10,fullsr_r2w1.5_l0.01_nocv,age-specific,0.6246291031402181,2.0286354845500467,1.5712016947236553,12,2.36*SUM_PGS002313 + 2.36*exp(0.71*y5_bmiz) + 17.63
+10,srprn_r2w1_l0.01_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,srpsm_r2w2_l0.001_nocv,age-specific,0.658209786125536,1.9357690004259716,1.490796962145812,38,1.28*death_p + (0.03*y5_a9 + 0.22)*(-1.0*y1_bmifa + log(mo_grav) + 0.19) + 3.96*exp(5.78*SUM_PGS002161*exp(-1.0*occup_f1_1) + 0.52*y5_bmiz) + 13.33
+10,srpsm_r2w1_l0.001_nocv,age-specific,0.6374877671440004,1.9935863525929558,1.53695415499263,19,SUM_PGS002313 + y5_bmiz + 0.77*exp(y5_bmiz) + 1.65*exp(SUM_PGS002313 + y5_bmiz*death_p) + 17.36
+10,stdsr_r2w1.5_l0.01_nocv,age-specific,0.5735946058875199,2.162146235184157,1.6621041100199492,7,2.0*SUM_PGS002853 + y5_bmiz + y5_a6
+10,fullsr_r2w1.5_l0.001_nocv,age-specific,0.6575863190621862,1.937533735471926,1.5078002175331726,48,"-1.0*m_vege + 2.0*SUM_PGS002313 + cond(apgar, 1.17*y5_bmiz + 1.17*(y5_bmiz + 0.15)*cond(y5_bmiz/SUM_PGS003884**1.0, 2.0*death_p + cond(SUM_PGS003884*y5_bmiz, y5_bmiz)) + 1.17*log(483.2*m_wt1) + 7.38) + 0.15"
+10,stdsr_r2w1_l0.01_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,stdsr_r2w1_l0.001_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,srpsm_r2w2_l0.005_nocv,age-specific,0.628736100681259,2.0175071366724597,1.532059136231956,12,5.99*exp(0.5*SUM_PGS002313 + 0.5*y5_bmiz) + 13.98
+10,fullsr_r2w1.5_l0.005_nocv,age-specific,0.6454724093906927,1.9715088839333226,1.5403586723833131,25,2.0*SUM_PGS002313 + 3.39*exp(y5_bmiz*(0.17*death_p + 0.17*prepreg_weight/y5_a3**1.0 + 0.39)) + 16.3
+10,srpsm_r2w1.5_l0.005_nocv,age-specific,0.6233770817097328,2.0320158487976654,1.5743719176284467,12,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz + 0.81*exp(y5_bmiz) + 17.76
+10,fullsr_r2w2_l0.01_nocv,age-specific,0.6248136066222718,2.028136862629377,1.5657770630454533,12,2.0*SUM_PGS002313 + y5_bmiz + exp(0.91*y5_bmiz) + 18.76
+10,stdsr_r2w2_l0.01_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,fullsr_r2w1_l0.01_nocv,age-specific,0.6030270562610976,2.0861915055066644,1.5887430161533294,8,SUM_PGS002313 + y5_bmiz + exp(y5_bmiz) + 17.68
+10,stdsr_r2w1.5_l0.005_nocv,age-specific,0.5611143888102272,2.1935593542027076,1.6846780496172475,5,SUM_PGS003884 + y5_bmiz + y5_a6
+10,srpsm_r2w1_l0.005_nocv,age-specific,0.6175180980107258,2.0477605118244853,1.5760616513674295,15,(y5_bmiz + 0.44*y5_a6 + 0.44*exp(y5_bmiz))*exp(SUM_PGS002161) + 9.68
+10,stdsr_r2w2_l0.005_nocv,age-specific,0.5677026344493806,2.177033005247447,1.6984055271796208,6,y5_bmiz + exp(y5_bmiz) + 16.95
+10,srpsm_r2w1.5_l0.001_nocv,age-specific,0.6501393133703608,1.958489695592715,1.5250307784513215,34,"2.0*SUM_PGS002313 + y5_bmiz + 2.0*age + 0.74*exp(cond(SUM_PGS003884, y5_bmiz)) - 1.5 + 8.88*exp(-1.04*mht_wt*exp(-1.0*cond(death_p, y5_bmiz)))"
+10,pysr_r2w2_l0.01_nocv,age-specific,0.6329589843571009,2.006000411627852,1.5540981681887698,14,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz + (death_p + 0.76)*exp(y5_bmiz) + 17.8
+10,pysr_r2w2_l0.001_nocv,age-specific,0.6128865428618441,2.0601215886830233,1.488343391419854,30,0.86*mo_party*SUM_PGS002853*(SUM_PGS002853 + childcare_1) + 0.86*y5_bmiz - 0.02*ga_us + 2.88494796631221*exp(0.72*SUM_PGS002313 + 0.72*y5_bmiz) + 20.97323556
+10,pysr_r2w1_l0.001_nocv,age-specific,0.6666291235045877,1.9117783858697892,1.4765113281693698,43,"SUM_PGS002853*Piecewise((mo_party + 2.15976625378492*(SUM_PGS002313 + ethn3_m)*exp(-1.0*y1_sm4), SUM_PGS002853 > 0), (0.0, True)) + y5_bmiz + 0.697676326071031*(SUM_PGS002313 + 0.6)*exp(-1.0*y1_sm4 + y5_bmiz) + exp(0.95*y5_bmiz) + 16.65"
+10,pysr_r2w1.5_l0.005_nocv,age-specific,0.6426177145101251,1.9794303721620792,1.5459992291567077,22,"SUM_PGS002853 + (2*SUM_PGS002161*sibling_pos + y5_bmiz)*(Piecewise((y5_bmiz + death_p, y5_bmiz > 0), (0.0, True)) + 1.4) + 17.45"
+10,pysr_r2w2_l0.005_nocv,age-specific,0.637271769074989,1.9941801900406675,1.5429705455328389,26,-1.0*m_vege + SUM_PGS002853 + 2.19*SUM_PGS000027 + y5_bmiz + (SUM_PGS002161 + death_p)*exp(y5_bmiz) + exp(0.85*y5_bmiz) - 68.42
+10,pysr_r2w1_l0.01_nocv,age-specific,0.6030270562610976,2.0861915055066644,1.5887430161533294,8,SUM_PGS002313 + y5_bmiz + exp(y5_bmiz) + 17.68
+10,pysr_r2w1_l0.005_nocv,age-specific,0.6219567554971898,2.0358438280613496,1.5945640561362473,14,SUM_PGS002853 + SUM_PGS002313 + 0.87719298245614*y5_bmiz + 0.87719298245614*exp(y5_bmiz) + 17.7526421052632
+10,pysr_r2w1.5_l0.01_nocv,age-specific,0.6262565093440098,2.024233171974844,1.5609028327535155,10,(SUM_PGS002313 + 4.2)*exp(0.59*y5_bmiz) + 14.48
+10,pysr_r2w1.5_l0.001_nocv,age-specific,0.6474507531155811,1.9660004570349936,1.5259168755456796,41,-1.0*m_vege*prepreg_alc + SUM_PGS002853 + SUM_PGS002313 + ethn3_m - 0.08*(-1.0*prepreg_smk + y1_a8 + 0.63)*exp(y5_bmiz - 1.0*death_p) + 43.997467 - 28.61304*exp(-0.0916296838775048*exp(y5_bmiz))
+14,srprn_r2w2_l0.005_nocv,age-specific,0.43056544051924006,3.005609169361895,2.241304791904759,7,(SUM_PGS002161 + 1.17)*(death_p + y5_a6)
+14,srprn_r2w1_l0.001_nocv,age-specific,0.4306459371436492,3.005396721821299,2.2428026305361977,11,1.59*SUM_PGS000921 + 1.59*death_p + 1.59*y5_a6
+14,fullsr_r2w1_l0.005_nocv,age-specific,0.5426660863174375,2.6935640075194502,1.9592674774442942,34,"SUM_PGS002313 + 0.65*y5_bmiz + asthma_m + 0.04*m_wt1 + 0.65*y5_a6 + 0.65*cond(exp(SUM_PGS002313 + y5_bmiz) - 1.62, 0.62*death_p*y5_a6 + 4.34) + 6.86"
+14,fullsr_r2w2_l0.001_nocv,age-specific,0.5406794762309641,2.699407946425151,1.9801669162163258,38,SUM_PGS002313 + SUM_PGS003884 + y5_bmiz*death_p + 1.31*y5_bmiz + sex - 1.0*mht_wt + log(exp(death_p)**3.51*exp(3.51*SUM_PGS002313 + 3.51*y5_bmiz) + exp(fam_splitup0)) + 21.91
+14,srpsm_r2w1.5_l0.01_nocv,age-specific,0.505594178402309,2.8006083818954783,2.1193925038260844,20,SUM_PGS002313 + exp((0.75 - 0.79*exp(-1.0*y5_bmiz))*(SUM_PGS002853 + death_p + 2.97)) + 19.98
+14,srprn_r2w1.5_l0.005_nocv,age-specific,0.43056544051924006,3.005609169361895,2.241304791904759,7,(SUM_PGS002161 + 1.17)*(death_p + y5_a6)
+14,stdsr_r2w2_l0.001_nocv,age-specific,0.44464542236442695,2.9682178625613176,2.202302124227792,7,SUM_PGS000921 + y5_bmiz + y5_a6 + 7.69
+14,srprn_r2w2_l0.001_nocv,age-specific,0.4327828877268499,2.9997513578032535,2.245046133305772,11,1.59*SUM_PGS000921 + 2.59*death_p + 1.59*y5_a6
+14,srprn_r2w1.5_l0.01_nocv,age-specific,0.4306459371436492,3.005396721821299,2.2428026305361977,11,1.59*SUM_PGS000921 + 1.59*death_p + 1.59*y5_a6
+14,srpsm_r2w1_l0.01_nocv,age-specific,0.49912457039061375,2.8188726783920774,2.0921934696662734,19,27857.95/(-157.08*SUM_PGS002313 - 157.08*y5_bmiz - 157.08*death_p + 1221.14)**1.0
+14,srprn_r2w2_l0.01_nocv,age-specific,0.43082424021699994,3.00492608898663,2.227571362991127,11,1.58*SUM_PGS000921 + 1.58*death_p + 1.58*y5_a6
+14,stdsr_r2w1_l0.005_nocv,age-specific,0.4265099318072312,3.016293143429246,2.2945090536736057,7,y5_bmiz + y5_a6*(SUM_PGS002161 + 1.17)
+14,fullsr_r2w1_l0.001_nocv,age-specific,0.5298923179319919,2.7309218382153526,2.017061405096992,29,"SUM_PGS003884 + 0.04*m_wt1 - 0.46*y1_a4 + y5_a6 + 2.15*(y5_bmiz + cond(y1_sm4, -0.64) + 1.35)*exp(SUM_PGS002313 + death_p) + 20.34"
+14,fullsr_r2w2_l0.005_nocv,age-specific,0.5210724653234371,2.756420679788855,2.0798523791643717,24,"(y5_bmiz + 0.89)*(death_p + 0.95)*log(SUM_PGS002313 + y5_a7) + (y5_bmiz + sibling_pos)*cond(SUM_PGS002853*SUM_PGS002161, SUM_PGS002853) + 18.31"
+14,srpsm_r2w2_l0.01_nocv,age-specific,0.5240015158575402,2.7479788204717,2.0563815018508023,25,SUM_PGS003884 + 46.33*SUM_PGS002161*(preeclam + 0.78)*(y5_bmiz*death_p + 0.22) + y5_bmiz + sex + 0.77*y5_a6 + 4.86
+14,srprn_r2w1_l0.005_nocv,age-specific,0.42641295037080795,3.016548171451506,2.2574521069667646,9,1.59*SUM_PGS000921 + asthma_m + 1.59*y5_a6
+14,stdsr_r2w1.5_l0.001_nocv,age-specific,0.43056544051924006,3.005609169361895,2.241304791904759,7,(SUM_PGS002161 + 1.17)*(death_p + y5_a6)
+14,srprn_r2w1.5_l0.001_nocv,age-specific,0.4431828860658499,2.972123720358654,2.2374198526336238,13,1.04*SUM_PGS000921 + 1.04*y5_bmiz + 1.04*y5_a6 + 7.31
+14,fullsr_r2w1.5_l0.01_nocv,age-specific,0.5090988263753009,2.790664524128099,2.141545647889236,16,SUM_PGS003884 + y5_bmiz + sex + sibling_pos*exp(SUM_PGS002853 + SUM_PGS002313 + death_p) + y5_a6
+14,srprn_r2w1_l0.01_nocv,age-specific,0.42276189063710723,3.0261335751730205,2.241281971495735,5,y5_a6*(SUM_PGS002161 + 1.17)
+14,srpsm_r2w2_l0.001_nocv,age-specific,0.5054078470359232,2.8011360779754817,2.049663224715262,31,"2.54*SUM_PGS002313 + y5_bmiz + sex + cond(-2.25*m_vege + y5_bmiz - 0.85, 2.58*y5_bmiz) + log(b_chest) + log(ga_wt2 + exp(mo_party)) + 14.02"
+14,srpsm_r2w1_l0.001_nocv,age-specific,0.5327957747792319,2.7224754813261325,2.010064706510752,32,"1.65*SUM_PGS002313 + y5_bmiz - 1.37*cond(-1.0*mode_delivery + cond(SUM_PGS002313 + 0.5, y5_bmiz) - 0.07, exp(y5_bmiz) - 8.23) + 0.78*exp(y5_bmiz) + 21.07"
+14,stdsr_r2w1.5_l0.01_nocv,age-specific,0.43056544051924006,3.005609169361895,2.241304791904759,7,(SUM_PGS002161 + 1.17)*(death_p + y5_a6)
+14,fullsr_r2w1.5_l0.001_nocv,age-specific,0.5498961010372015,2.6721878426641696,1.9782407776582467,39,sex + (-1.0*(sibling_pos - 1.0*(y5_bmiz + mode_delivery)*(-1.0*preeclam*sibling_pos - 0.82))*exp(SUM_PGS002161) - 60.09)/(SUM_PGS002313 + y5_bmiz + death_p - 5.02)**1.0 + 8.05
+14,stdsr_r2w1_l0.01_nocv,age-specific,0.42276189063710723,3.0261335751730205,2.241281971495735,5,y5_a6*(SUM_PGS002161 + 1.17)
+14,stdsr_r2w1_l0.001_nocv,age-specific,0.43537548632934364,2.9928879732191183,2.258760872578134,13,1.59*SUM_PGS000921 + asthma_m + 1.59*death_p + 1.59*y5_a6
+14,srpsm_r2w2_l0.005_nocv,age-specific,0.532662567718991,2.7228635633361833,2.071425497745419,36,"((exp(SUM_PGS002853 + cond(y5_bmiz - 0.91, 0.69)) - 2.46)/hhincome_1**1.0 + 2.25)*((-1.0*y5_bmiz - 0.2)*(-1.0*exp(death_p) - 0.1) + 0.98) + 18.49"
+14,fullsr_r2w1.5_l0.005_nocv,age-specific,0.5409030963302282,2.698750763335879,2.009167065565837,28,"1.24*y5_bmiz + sex + 1.24*sibling_pos*(SUM_PGS002161 + cond(SUM_PGS002161, cond(SUM_PGS002853, SUM_PGS002853))) + exp(y5_bmiz*(SUM_PGS002853*death_p + 0.83)) + 17.36"
+14,srpsm_r2w1.5_l0.005_nocv,age-specific,0.5007980307802704,2.814159711581676,2.062337346118699,18,y5_bmiz + 3.45*exp((0.75 - 1.0*preg_dia)*(1.32*SUM_PGS002313 + y5_bmiz)) + 18.84
+14,fullsr_r2w2_l0.01_nocv,age-specific,0.5221675600502605,2.7532675208821566,2.030738515953592,21,y5_bmiz + asthma_m + (sibling_pos + 2.02)*exp(SUM_PGS002313 + y5_bmiz*death_p) + exp(0.85*y5_bmiz) + 17.63
+14,stdsr_r2w2_l0.01_nocv,age-specific,0.43170408402257343,3.0026026519056264,2.2610953198190273,7,y5_bmiz + y5_a6*(SUM_PGS002161 + 1.16)
+14,fullsr_r2w1_l0.01_nocv,age-specific,0.4838070115056068,2.861650866605009,2.122295248835102,14,sex + y5_a6 + exp(SUM_PGS002853 + 0.56*y5_bmiz + 0.56*death_p)
+14,stdsr_r2w1.5_l0.005_nocv,age-specific,0.43056544051924006,3.005609169361895,2.241304791904759,7,(SUM_PGS002161 + 1.17)*(death_p + y5_a6)
+14,srpsm_r2w1_l0.005_nocv,age-specific,0.5184688938851618,2.763902825506148,2.0505743185087386,29,"4.66*cond(death_p, cond(y5_bmiz, exp(abroad_fa))) + 36.79*exp(SUM_PGS002313)/log(plac_weight)**1.0 + 4.66*log(exp(y5_bmiz) + 1.11) + 14.4"
+14,stdsr_r2w2_l0.005_nocv,age-specific,0.44464542236442695,2.9682178625613176,2.202302124227792,7,SUM_PGS000921 + y5_bmiz + y5_a6 + 7.69
+14,srpsm_r2w1.5_l0.001_nocv,age-specific,0.5338435280860585,2.7194210529026366,2.0274867016236193,39,5.13*SUM_PGS002853*y5_bmiz*death_p*(cob_p + 1.22) + 0.54*age + 0.54*(y5_bmiz + 4.56)*(y5_bmiz + log(m_wt1) - 4.76) + 0.54*log(exp(9.31*exp(SUM_PGS002313))) + 12.17
+14,pysr_r2w2_l0.01_nocv,age-specific,0.5371549676517233,2.709744851191206,2.0185916158195094,27,SUM_PGS002313 + SUM_PGS003884 + y5_bmiz + sex + (mo_party + 2*y5_bmiz + 0.19)*exp(SUM_PGS002313 + death_p + 0.25*exp(preeclam)) + 18.82
+14,pysr_r2w2_l0.001_nocv,age-specific,0.5311811271679782,2.727175831690849,2.067379139213104,49,asthma_m - 1.0*death_p + fam_splitup0 - 1.0*wtgain + (-1.0*SUM_PGS002161*(0.53 - 1.0*preg_dia)*(2.13 - 1.0*preg_cig)*(6.43 - 1.0*y5_a6) + 0.23*y5_a6)*exp(0.39*y5_bmiz + 0.39*death_p) + 16.53
+14,pysr_r2w1_l0.001_nocv,age-specific,0.5425584586502936,2.693880936734173,2.028541353268322,55,"-0.98*preg_dia + 0.98*y5_a6 + 0.98*(SUM_PGS002853 + SUM_PGS003884 + Piecewise((y5_bmiz, SUM_PGS003884 > 0), (0.0, True)))*exp(death_p + Piecewise((SUM_PGS002853, y1_sm4 - 1.0*mo_grav + ethn3_p + breastfed_ever < 0), (0.0, True))) + 0.98*Piecewise((0.95, SUM_PGS002313 + 0.87 > 0), (0.0, True)) + 0.98*log(m_educ)"
+14,pysr_r2w1.5_l0.005_nocv,age-specific,0.5366204692166106,2.7113090210307518,2.0129902698224593,26,"(Piecewise((4.38750812*death_p + 0.31*sibling_pos + 1.209235817, y5_bmiz - 0.9 > 0), (0.0, True)) + 1.6260526)*(SUM_PGS002313 + y5_bmiz + 0.75) + 20.6399213"
+14,pysr_r2w2_l0.005_nocv,age-specific,0.5279566426801121,2.736538367910371,2.1112870277247415,28,"sex + ethn3_m + y5_a6 + (y5_bmiz + (SUM_PGS002853 + SUM_PGS002161 + death_p)*Piecewise((mo_party + mode_delivery, SUM_PGS002161 > 0), (0.0, True)))*(y5_bmiz*death_p + 0.95)"
+14,pysr_r2w1_l0.01_nocv,age-specific,0.4926901493997867,2.8369210118390793,2.0728290726784255,15,0.588235294117647*sex + 0.588235294117647*(SUM_PGS002313 + y5_bmiz)*(y5_bmiz + 4.69) + 21.9211264705882
+14,pysr_r2w1_l0.005_nocv,age-specific,0.5151487097612548,2.7734150896751903,2.0846243200295014,25,"0.28169014084507*SUM_PGS004150 + 1.16*y5_a6 + Piecewise((SUM_PGS002853*(mo_party + sex), SUM_PGS002853 > 0), (0.0, True))*exp(y5_bmiz*(death_p + 0.45))"
+14,pysr_r2w1.5_l0.01_nocv,age-specific,0.4734668178351935,2.890170535115949,2.183133567225094,13,y5_bmiz + sibling_pos*(SUM_PGS002313 + exp(death_p)) + y5_a6 + log(y5_a6)
+14,pysr_r2w1.5_l0.001_nocv,age-specific,0.551332272305034,2.667921288197488,2.025134988770583,53,"SUM_PGS000921 + 0.83*SUM_PGS003884 + sex - 0.24*birth_head_circum - 1913.07/(-1.0*y5_bmiz*(-0.27*SUM_PGS002853*Piecewise((agebirth_p_y - 1.0*log(agebirth_p_y), y5_bmiz > 0), (0.0, True)) - 0.14*Piecewise((m_wt1, death_p > 0), (0.0, True)) - 7.99) - 91.08)**1.0 + 10.35"
+17,srprn_r2w2_l0.005_nocv,age-specific,0.3509145929180466,3.229017542421319,2.3475755304198245,7,SUM_PGS002313 + 2.52*y5_bmiz + 23.03
+17,srprn_r2w1_l0.001_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,fullsr_r2w1_l0.005_nocv,age-specific,0.4675161424668677,2.9246419497296654,2.1201756837344394,27,"SUM_PGS002853 + y5_bmiz*(cond(2.0*y5_bmiz - 1.76, 1.38*preeclam + cob_p + cats_quant_preg) + 0.4) + y5_bmiz - 1.0*mht_wt + 24.57"
+17,fullsr_r2w2_l0.001_nocv,age-specific,0.49862647764720336,2.8379202000706742,2.131661461376515,37,"preg_thyroid + 2.12*SUM_PGS002313 + y5_bmiz*(3.13*preeclam*exp(-1.0*y1_bmifa) + 3.13*ppd + cob_p + cats_preg)*cond(y5_bmiz, y5_bmiz) + y5_bmiz + age + preg_smk + 6.68"
+17,srpsm_r2w1.5_l0.01_nocv,age-specific,0.47303813818999796,2.9094377813912935,2.1895097374626853,50,"-1.26*SUM_PGS002161/(wtgain**1.0*((0.88 - 0.16*b_parasc)/birth_month**1.0 - 0.42)**1.0) + 1.26*cats_quant_preg*cond(SUM_PGS002161, wtgain) + 1.26*log(exp(y5_a6) + exp(0.14*m_wt1 + cond(preg_alc, y5_a8))) - 0.34"
+17,srprn_r2w1.5_l0.005_nocv,age-specific,0.37271805982419426,3.1743212310208393,2.3498022247708588,9,2.3*SUM_PGS002313 + 2.3*y5_bmiz + 24.57
+17,stdsr_r2w2_l0.001_nocv,age-specific,0.3368176258497667,3.263893424537163,2.3825846552534253,6,y5_bmiz + exp(y5_bmiz) + 20.93
+17,srprn_r2w2_l0.001_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,srprn_r2w1.5_l0.01_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,srpsm_r2w1_l0.01_nocv,age-specific,0.3729157566227117,3.173820975427617,2.361302781557676,9,2.33*SUM_PGS002313 + 2.33*y5_bmiz + 24.64
+17,srprn_r2w2_l0.01_nocv,age-specific,0.32778481471815357,3.2860460195694468,2.3956675074688456,5,SUM_PGS000921 + 1.53*y5_a6
+17,stdsr_r2w1_l0.005_nocv,age-specific,0.33256677998499007,3.2743371174025624,2.4573517646860115,5,y5_a6*(SUM_PGS002161 + 1.28)
+17,fullsr_r2w1_l0.001_nocv,age-specific,0.3538154943402999,3.2217938775679293,2.26945770815194,25,-1.0*SUM_PGS002161*y5_bmiz + (SUM_PGS002161 + 1.94)*(y5_bmiz - 1.0*preg_dia + 12.31) - 1.0*log(y1_a8) - 0.11
+17,fullsr_r2w2_l0.005_nocv,age-specific,0.45842389886788426,2.949505616350066,2.2145327840127154,23,"SUM_PGS002853 + SUM_PGS002161 + 2.0*y5_bmiz + cond(y5_bmiz - 0.91*ethn3_p, (SUM_PGS002853 + y5_bmiz)*(cats_quant_preg + abroad_fa)) + 21.88"
+17,srpsm_r2w2_l0.01_nocv,age-specific,0.4353524923148272,3.0116755940865243,2.210505592902642,32,2.21*SUM_PGS002313 + 1.57*y5_bmiz + age - 1.0*height_m/(m_wt1 + exp(0.46*exp(2.94*y5_bmiz - 1.0*y1_bmifa)))**1.0 + 9.8
+17,srprn_r2w1_l0.005_nocv,age-specific,0.36126018732654375,3.203180965549103,2.3791252201965127,7,SUM_PGS000921 + y5_bmiz + y5_a6 + 9.51
+17,stdsr_r2w1.5_l0.001_nocv,age-specific,0.34143694621691756,3.252506424505772,2.472288451730799,7,SUM_PGS002853 + y5_bmiz + y5_a6 + 4.97
+17,srprn_r2w1.5_l0.001_nocv,age-specific,0.34165822869460916,3.2519599444500673,2.3541622007665564,5,y5_a6*(SUM_PGS002161 + 1.25)
+17,fullsr_r2w1.5_l0.01_nocv,age-specific,0.4469793767544721,2.980506995114976,2.1879341679651096,20,(0.18*cats_quant_preg*(y5_bmiz + exp(cob_m)) + 0.18*y5_a7)*(SUM_PGS002853 + y5_bmiz + fam_splitup0) + 21.6
+17,srprn_r2w1_l0.01_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,srpsm_r2w2_l0.001_nocv,age-specific,0.38719317148619325,3.1374822663302564,2.207840218773238,32,0.03*exp(SUM_PGS002161 + (y5_bmiz + 22.52)/log(y1_a4 + 24.28/(cats_quant_preg + 3.13)**1.0 + 0.14*exp(mht_wt) - 3.3)**1.0) + 12.69
+17,srpsm_r2w1_l0.001_nocv,age-specific,0.4560006016916943,2.9560970732117955,2.2645635081872433,31,"2.0*SUM_PGS002313 + y5_bmiz*(cond(0.21, marry + 1.37*preeclam - 4.26) + 2.48) + y5_bmiz + 0.05*latepreg_weight + cond(y5_bmiz - 1.54, 3.3) + 20.71"
+17,stdsr_r2w1.5_l0.01_nocv,age-specific,0.32778481471815357,3.2860460195694468,2.3956675074688456,5,SUM_PGS000921 + 1.53*y5_a6
+17,fullsr_r2w1.5_l0.001_nocv,age-specific,0.4914398864043026,2.858186933649239,2.133844761543641,46,SUM_PGS002853*(mo_party + 0.49) + 2.92*SUM_PGS002161/wtgain**1.0 + 0.55*asthma_m + 0.55*smk_t2 - 1.0*childcarecentre_1 + 0.55*y5_a6 + 0.55*(y5_bmiz + 0.52)*(mode_delivery + death_p + cats_quant_preg + childcarecentre_1) + 11.46
+17,stdsr_r2w1_l0.01_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,stdsr_r2w1_l0.001_nocv,age-specific,0.3426292609518772,3.2495607929761197,2.377246313423375,5,y5_a6*(SUM_PGS002161 + 1.26)
+17,srpsm_r2w2_l0.005_nocv,age-specific,0.45979985979415183,2.945756387471555,2.211279560415287,46,y5_bmiz + 0.68*cob_m*parity_m + fam_splitup0 + 0.06*m_wt1 + 0.68*y5_a6 - 1.0*(SUM_PGS002853 - 0.64)*(-1.0*y1_bmifa - 1.0*y1_mon1 + (y5_a8 - 3.61)/(parity_m + exp(cob_m))**1.0) + 7.59
+17,fullsr_r2w1.5_l0.005_nocv,age-specific,0.4505658829503669,2.9708265292178875,2.2092520067330734,33,1.38*SUM_PGS002853 + 1.38*SUM_PGS004150*exp(-1.0*sex) + 0.48*y5_bmiz*(y5_bmiz*cats_quant_preg + mode_delivery) + 1.38*y5_bmiz - 3.5*preg_dia + 22.45
+17,srpsm_r2w1.5_l0.005_nocv,age-specific,0.4466022522048232,2.981523079098615,2.1742160615375474,27,"SUM_PGS000921 + 2.0*y5_bmiz + 0.06*m_wt1 + 119.63/y1_a6**1.0 + cond(1.23 - 1.0*y5_bmiz, -2.77) + 18.18"
+17,fullsr_r2w2_l0.01_nocv,age-specific,0.34877327952759574,3.234339373157327,2.3059019141784685,31,1.61*mo_party/preg_gain**1.0 + SUM_PGS000921 + 1.61*y5_bmiz*(cats_quant_preg + 3.9)/mht_wt**1.0 - 0.01*y1_a4*y1_a6 + 32.77
+17,stdsr_r2w2_l0.01_nocv,age-specific,0.34067999600613996,3.2543750977985075,2.413942238430741,7,SUM_PGS002853 + 2.0*y5_bmiz + 22.38
+17,fullsr_r2w1_l0.01_nocv,age-specific,0.4518731273754717,2.967290246097334,2.2011496253029135,20,"(SUM_PGS002161 + 1.84)*(y5_bmiz + age + cond(y5_bmiz*age - 2.98*y1_a10, exp(preeclam)) - 5.06)"
+17,stdsr_r2w1.5_l0.005_nocv,age-specific,0.35271052205381337,3.224547326717197,2.3976488734439934,9,SUM_PGS002313 + 2.0*y5_bmiz + asthma_m + 23.45
+17,srpsm_r2w1_l0.005_nocv,age-specific,0.4510002342266103,2.9696520140386067,2.193953791752488,29,11.24*SUM_PGS002161 + 1.77*y5_bmiz + ((edu_m_0 + cats_quant_preg)*(parity_m + y5_a8 - 3.76) + 0.89)/y1_a10**1.0 + log(m_wt1) + 16.62
+17,stdsr_r2w2_l0.005_nocv,age-specific,0.3518547156451768,3.226678271853871,2.4213604433375475,7,SUM_PGS002853 + 2.52*y5_bmiz + 22.28
+17,srpsm_r2w1.5_l0.001_nocv,age-specific,0.4569308848856092,2.9535684085425493,2.1817525478219384,35,0.47*SUM_PGS000027 - 0.74*y1_bmifa + smk_t2 + (y5_bmiz + 1.65)*(2.0*b_parasc*SUM_PGS002161*exp(-1.0*prepreg_cig) + 0.71*preeclam*y5_bmiz + fam_splitup0 + 2.29)
+17,pysr_r2w2_l0.01_nocv,age-specific,0.5063352948705615,2.8160186119180333,2.1139378242322726,40,"age + preg_smk + Piecewise((Piecewise((-0.70750238357553*y1_sm4 + y5_bmiz*region_fa - 1.0*y1_bmifa + exp(asthma_m), preg_alc > 0), (0.0, True)) + 1.3, SUM_PGS002313 + ethn3_m > 0), (0.0, True)) + 3.95545927248575*exp(0.49*y5_bmiz)"
+17,pysr_r2w2_l0.001_nocv,age-specific,0.4820354134042951,2.8844931751362957,2.1037194682460973,48,"childcarecentre_1*(y5_bmiz - 1.0*childcarecentre_1) + y5_a7*(SUM_PGS002161 + 0.16*y5_bmiz + 0.12*Piecewise((cats_preg, famsize_child0*(y5_bmiz*(-1.0*SUM_PGS002313 + log(occup_f1_1))*exp(dogs_preg) - 0.27) - 1.0*cats_preg > 0), (0.0, True))*exp(cob_p)) + 21.95"
+17,pysr_r2w1_l0.001_nocv,age-specific,0.48274362937190607,2.8825205085159107,2.1745288120303505,48,SUM_PGS002853 + 1.5*y5_bmiz + 0.75*sex - 1.0*wtgain + exp(-4.84/SUM_PGS000921**1.0 - 0.2731082*y5_bmiz*(cob_p + cats_quant_preg)/((0.61 - 1.0*ethn3_p)**1.0*(prepreg_cig + 2.8243706)**1.0)) + 18.50653485
+17,pysr_r2w1.5_l0.005_nocv,age-specific,0.46034496890943255,2.944269749621196,2.160009569617086,43,SUM_PGS002853 + 1.20481927710843*SUM_PGS002313 + 1.78571428571429*y5_bmiz - 0.51*y1_a6 + y5_a6/(-1.0*fam_splitup0 + height_m/(latepreg_weight*(cats_quant_preg + y5_a6)/y1_a4**1.0)**1.0 - 0.84)**1.0 + 27.75
+17,pysr_r2w2_l0.005_nocv,age-specific,0.48013997219057447,2.889766117219359,2.1559221189083257,39,"SUM_PGS000921 + y5_a6 + Piecewise(((cats_quant_preg + Piecewise((cats_quant_preg + 1.17, abroad_fa > 0), (0.0, True)))*exp(1.0*preeclam), y5_bmiz - 1.0*ethn3_p > 0), (0.0, True)) + 1.40305004573374*exp(0.19*mo_party + SUM_PGS002853) + 6.89"
+17,pysr_r2w1_l0.01_nocv,age-specific,0.4241173123399663,3.041490702439036,2.2464341963846146,18,"1.9970057*SUM_PGS002313 + 1.9970057*y5_bmiz + Piecewise((cats_quant_preg, y5_bmiz - 0.86 > 0), (0.0, True)) + 24.21"
+17,pysr_r2w1_l0.005_nocv,age-specific,0.4782778052351234,2.894937140508704,2.1523976720499487,47,"1.5*preg_thyroid + SUM_PGS002853*(sibling_pos + 0.36) + 1.5*y5_bmiz + Piecewise((marry - 1.0*Piecewise((-3.44, cats_preg > 0), (0.0, True)), ITE(cob_p > 0, cob_p + exp(y5_bmiz) - 3.85 > 0, SUM_PGS002853 + exp(y5_bmiz) - 3.85 > 0)), (0.0, True)) + 21.478144"
+17,pysr_r2w1.5_l0.01_nocv,age-specific,0.4447766964224735,2.9864367739046926,2.225012949176089,32,"y5_bmiz - 1.0*breastfed_ever + y5_a6 + (fam_splitup0 + 0.29)*(mo_grav + SUM_PGS004150 + cats_quant_preg) + Piecewise((mode_delivery - 1.0*smk_t3, SUM_PGS002853 - 0.3 > 0), (0.0, True)) + 4.51"
+17,pysr_r2w1.5_l0.001_nocv,age-specific,0.46184355288257783,2.9401788928866646,2.15109014796297,38,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 1.0*mht_wt + (y5_bmiz + fam_splitup0)/(0.29 + 6.25960760349767*exp(-1.0*exp(y5_bmiz*exp(-0.48*y1_bmifa)*exp(cats_preg))))**1.0 + 29.06
+8,srprn_r2w2_l0.005_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,srprn_r2w1_l0.001_nocv,age-specific,0.7750172771536139,1.1282250006869246,0.8338237297773736,6,SUM_PGS002313 + exp(y5_bmiz) + 15.99
+8,fullsr_r2w1_l0.005_nocv,age-specific,0.8029403476402984,1.055893195247212,0.7729881293874984,14,0.75*SUM_PGS002313 + 0.75*y5_bmiz + 0.75*exp(y5_bmiz) + 16.07
+8,fullsr_r2w2_l0.001_nocv,age-specific,0.8103381004614518,1.0358841376882975,0.7550076186683718,20,"(SUM_PGS002161*y1_mon1 + y5_bmiz + 0.65*death_p + 0.87)*exp(y5_bmiz*cond(y5_bmiz, 0.46)) + 15.07"
+8,srpsm_r2w1.5_l0.01_nocv,age-specific,0.7892457486464555,1.0919664795978796,0.8019218608790702,10,0.77*y5_bmiz + 0.77*exp(y5_bmiz) + 15.33
+8,srprn_r2w1.5_l0.005_nocv,age-specific,0.7529605260834183,1.1822363593098981,0.8685124553194176,12,-0.12/preg_plan**1.0 + exp(y5_bmiz) + 15.16
+8,stdsr_r2w2_l0.001_nocv,age-specific,0.6878746103509683,1.3288797504519367,0.9893460633457531,5,1.12*SUM_PGS002313 + y5_a6
+8,srprn_r2w2_l0.001_nocv,age-specific,0.6878746103509683,1.3288797504519367,0.9893460633457531,5,1.12*SUM_PGS002313 + y5_a6
+8,srprn_r2w1.5_l0.01_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,srpsm_r2w1_l0.01_nocv,age-specific,0.789335909094404,1.0917328835541429,0.8103732886979431,8,2.14*exp(0.71*y5_bmiz) + 13.89
+8,srprn_r2w2_l0.01_nocv,age-specific,0.7528157871858911,1.182582641076127,0.8703423995206767,4,exp(y5_bmiz) + 15.07
+8,stdsr_r2w1_l0.005_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,fullsr_r2w1_l0.001_nocv,age-specific,0.8010866789597124,1.0608477732092427,0.7758938157093469,16,"0.76*y5_bmiz + 0.76*cond(SUM_PGS002161, SUM_PGS002853) + 0.76*exp(y5_bmiz) + 15.19"
+8,fullsr_r2w2_l0.005_nocv,age-specific,0.7992478288814147,1.0657399853697611,0.7831337694610365,12,2.47*SUM_PGS002161 + 2.47*exp(0.65*y5_bmiz) + 13.51
+8,srpsm_r2w2_l0.01_nocv,age-specific,0.7892457486464555,1.0919664795978796,0.8019218608790702,10,0.77*y5_bmiz + 0.77*exp(y5_bmiz) + 15.33
+8,srprn_r2w1_l0.005_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,stdsr_r2w1.5_l0.001_nocv,age-specific,0.6974082883589034,1.3084274563992349,0.9829372217528791,9,1.14*SUM_PGS002313 + 1.14*y5_a6 - 2.55
+8,srprn_r2w1.5_l0.001_nocv,age-specific,0.7607847678917208,1.1633638108495787,0.8637315266623767,8,SUM_PGS002161 + death_p + exp(y5_bmiz) + 15.07
+8,fullsr_r2w1.5_l0.01_nocv,age-specific,0.8029403476402984,1.055893195247212,0.7729881293874984,14,0.75*SUM_PGS002313 + 0.75*y5_bmiz + 0.75*exp(y5_bmiz) + 16.07
+8,srprn_r2w1_l0.01_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,srpsm_r2w2_l0.001_nocv,age-specific,0.8127169383656364,1.029367340911482,0.7505197058039708,43,"0.77*y5_bmiz + 0.77*exp(y5_bmiz) + 0.82*exp(-0.18*y1_bmifa + 0.18*ethn3_m/occup_f1_1**1.0 + (-1.0*m_vege + cond(reledu_mo, SUM_PGS002313) + 0.9)/occup_f1_1**1.0) + 14.42"
+8,srpsm_r2w1_l0.001_nocv,age-specific,0.8032055383150799,1.0551824782255383,0.7817745229647038,19,0.75*SUM_PGS000027 + SUM_PGS002161 + 0.75*y5_bmiz*exp(death_p) + 0.75*exp(y5_bmiz) - 13.71
+8,stdsr_r2w1.5_l0.01_nocv,age-specific,0.7528157871858911,1.182582641076127,0.8703423995206767,4,exp(y5_bmiz) + 15.07
+8,fullsr_r2w1.5_l0.001_nocv,age-specific,0.8097006773672992,1.0376233974358668,0.7552819195830134,16,"(cond(cond(death_p, y5_bmiz), 0.28) + 0.74)*(SUM_PGS002313 + y5_bmiz + exp(y5_bmiz)) + 16.06"
+8,stdsr_r2w1_l0.01_nocv,age-specific,0.6855506624622407,1.3338177020927953,1.0104541274844476,3,SUM_PGS002313 + y5_a6
+8,stdsr_r2w1_l0.001_nocv,age-specific,0.7633750902295899,1.1570479723191534,0.8508283509113215,8,"SUM_PGS000027 + exp(cond(y5_a5, y5_bmiz)) - 23.77"
+8,srpsm_r2w2_l0.005_nocv,age-specific,0.801009461424436,1.0610536621400992,0.7773541014499574,13,0.76*y5_bmiz + exp(SUM_PGS002313) + 0.76*exp(y5_bmiz) + 14.94
+8,fullsr_r2w1.5_l0.005_nocv,age-specific,0.8029639924279677,1.0558298461063171,0.7727708390637044,14,0.77*SUM_PGS002313 + 0.77*y5_bmiz + 0.74*exp(y5_bmiz) + 16.1
+8,srpsm_r2w1.5_l0.005_nocv,age-specific,0.7974872314811023,1.070403056017828,0.775632962302306,10,2.44*exp(SUM_PGS002161 + 0.63*y5_bmiz) + 13.53
+8,fullsr_r2w2_l0.01_nocv,age-specific,0.7892457486464555,1.0919664795978796,0.8019218608790702,10,0.77*y5_bmiz + 0.77*exp(y5_bmiz) + 15.33
+8,stdsr_r2w2_l0.01_nocv,age-specific,0.7528157871858911,1.182582641076127,0.8703423995206767,4,exp(y5_bmiz) + 15.07
+8,fullsr_r2w1_l0.01_nocv,age-specific,0.7750172771536139,1.1282250006869246,0.8338237297773736,6,SUM_PGS002313 + exp(y5_bmiz) + 15.99
+8,stdsr_r2w1.5_l0.005_nocv,age-specific,0.7596638489124368,1.1660862807213936,0.8557113371819823,6,SUM_PGS002161 + exp(y5_bmiz) + 15.05
+8,srpsm_r2w1_l0.005_nocv,age-specific,0.7892116801965898,1.0920547342872553,0.8040970428522819,8,2.12*exp(0.71*y5_bmiz) + 13.88
+8,stdsr_r2w2_l0.005_nocv,age-specific,0.7646660296732604,1.1538874392934058,0.8524636489499641,8,2.0*SUM_PGS002161 + exp(y5_bmiz) + 15.07
+8,srpsm_r2w1.5_l0.001_nocv,age-specific,0.8048933222586724,1.0506479121786656,0.7763742766432521,17,"y5_bmiz + exp(-0.1*b_infrsc + SUM_PGS002161 + y5_bmiz + cond(death_p, 0.38)) + 15.46"
+8,pysr_r2w2_l0.01_nocv,age-specific,0.8028715765533488,1.05607742521914,0.7756529544127342,14,0.75*SUM_PGS002313 + 0.75*y5_bmiz + 0.75*exp(y5_bmiz) + 16.08947925
+8,pysr_r2w2_l0.001_nocv,age-specific,0.8138767539897943,1.0261750328779962,0.7609520658464498,37,"0.691757351443725*SUM_PGS002313 + 0.691757351443725*y5_bmiz*(Piecewise((y5_bmiz, death_p > 0), (0.0, True)) + 0.55) - 0.691757351443725*y1_bmifa*Piecewise((preg_smk, SUM_PGS004150 > 0), (0.0, True)) + 1.40610152616119*exp(exp(0.32*y5_bmiz)) + 12.9555886246314"
+8,pysr_r2w1_l0.001_nocv,age-specific,0.8099568261772563,1.0369248255911032,0.7625859348558498,27,"y5_bmiz + 0.31*Piecewise((exp(y5_bmiz + death_p), y5_bmiz - 0.94 > 0), (0.0, True)) + 0.31*exp(SUM_PGS002313) + 0.31*exp(y5_bmiz) + 15.68"
+8,pysr_r2w1.5_l0.005_nocv,age-specific,0.8006474768528374,1.0620183073540563,0.7793997458917898,12,SUM_PGS002313 - 27.64/(y5_bmiz - 4.18)**1.0 + 10.45
+8,pysr_r2w2_l0.005_nocv,age-specific,0.8029147935103105,1.0559616556269684,0.7714504381958398,14,0.75*SUM_PGS002313 + 0.75*y5_bmiz + 0.75*exp(y5_bmiz) + 16.05772575
+8,pysr_r2w1_l0.01_nocv,age-specific,0.7750172771536139,1.1282250006869246,0.8338237297773736,6,SUM_PGS002313 + exp(y5_bmiz) + 15.99
+8,pysr_r2w1_l0.005_nocv,age-specific,0.7903897334288194,1.0889988222085374,0.8039746860343867,8,2.47778867722445*exp(0.65*y5_bmiz) + 13.54
+8,pysr_r2w1.5_l0.01_nocv,age-specific,0.8020486966827687,1.0582793396557981,0.7758681340912215,12,SUM_PGS002313 + 0.74*y5_bmiz + 0.74*exp(y5_bmiz) + 16.32
+8,pysr_r2w1.5_l0.001_nocv,age-specific,0.813078658146754,1.0283727969146905,0.7615301079307953,32,"1.1*Piecewise((3*SUM_PGS002161 + y5_bmiz + (SUM_PGS002161 + y5_bmiz)*Piecewise((y5_bmiz, y5_bmiz > 0), (0.0, True)), -1.0*SUM_PGS002853 + asthma_m + 0.99 > 0), (0.0, True)) + 15.9718789340214"
+23,srprn_r2w2_l0.005_nocv,age-specific,0.28781662331717006,4.208179019701544,2.933745196963511,9,1.41*SUM_PGS002853 + 1.41*y5_a6 - 0.42
+23,srprn_r2w1_l0.001_nocv,age-specific,0.30746427948990784,4.1497256005069625,2.9517669100059023,7,3.15*SUM_PGS002313 + 1.57*y5_a6
+23,fullsr_r2w1_l0.005_nocv,age-specific,0.4043021867164287,3.848675485030426,2.7117908211941715,33,SUM_PGS002853 + 11.21/mht_wt**1.0 + y5_a6 + y5_a8*(-1.0*preg_dia + exp(SUM_PGS002313)) + log(SUM_PGS003884 + exp(preg_thyroid*exp(y5_a8*(SUM_PGS002313 + SUM_PGS003884))))
+23,fullsr_r2w2_l0.001_nocv,age-specific,0.41629457888694876,3.8097383878770574,2.7681079209664885,51,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz + asthma_m + 0.26/wtgain**1.0 + y5_a6 + exp(preg_thyroid + SUM_PGS002853 + childcareprof_1 + (region_fa + 5.88)/(plac_weight*(-1.0*preg_thyroid + childcareprof_1) - 1.0*ga_wt1 + y1_a5 - 1.0*y5_a6)**1.0) + 4.34
+23,srpsm_r2w1.5_l0.01_nocv,age-specific,0.4159887128347203,3.810736423004056,2.793133484885936,26,"4.1*SUM_PGS002853 + 0.25*mode_delivery*y5_a8*cond(0.1, preg_fever) + 1.34*y5_a6 + 0.22/(preg_gain - 2.79)**1.0"
+23,srprn_r2w1.5_l0.005_nocv,age-specific,0.31456098653409414,4.128408850940144,2.9922674096814337,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.39)
+23,stdsr_r2w2_l0.001_nocv,age-specific,0.30432573553213316,4.159118165394001,2.9486479476484044,9,2.41*SUM_PGS002853 + 1.41*y5_a6 - 0.41
+23,srprn_r2w2_l0.001_nocv,age-specific,0.3051115205223187,4.156768577238937,3.0198932720350937,7,(SUM_PGS002161 + 1.41)*(y5_a6 - 0.1)
+23,srprn_r2w1.5_l0.01_nocv,age-specific,0.296917910935676,4.181203524731517,2.9027443905912813,5,y5_a6*(SUM_PGS002161 + 1.36)
+23,srpsm_r2w1_l0.01_nocv,age-specific,0.3897141785178845,3.895515446379664,2.777352372656567,23,"(preg_fever + sex)*(2.0*SUM_PGS002853 + y5_bmiz - 1.0*cond(y5_bmiz + log(preg_thyroid + 0.44), -1.98)) + 23.36"
+23,srprn_r2w2_l0.01_nocv,age-specific,0.31456098653409414,4.128408850940144,2.9922674096814337,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.39)
+23,stdsr_r2w1_l0.005_nocv,age-specific,0.3157766426176226,4.124746269409177,2.9708344539815257,7,(SUM_PGS002161 + 1.38)*(asthma_m + y5_a6)
+23,fullsr_r2w1_l0.001_nocv,age-specific,0.4449524930746689,3.7150389269132904,2.604812057123858,45,"1.36*SUM_PGS002853 - 1.0*childcarecentre_1 + 1.36*y5_a6 + 1.36*cond(-1.4/SUM_PGS002313**1.0 - 1.0*mht_wt + 0.43, mode_delivery + (1.32*region_fa - 6.48*log(birth_month))/birth_month**1.0 + sibling_pos)"
+23,fullsr_r2w2_l0.005_nocv,age-specific,0.4361960877009621,3.7442284008594595,2.649370860572849,28,"SUM_PGS002853 + sex*(SUM_PGS002853 + y5_bmiz + cond(SUM_PGS002161 + 0.02, asthma_m + cond(y5_bmiz*hhincome_1 - 0.77*edu_m_0, exp(cats_preg) + 1.23))) + 23.4"
+23,srpsm_r2w2_l0.01_nocv,age-specific,0.40421349940757223,3.848961969184419,2.6748774957161405,33,preg_thyroid + age + (SUM_PGS002853 + SUM_PGS003884*hhincome_0/preg_gain**1.0 + y5_bmiz)*(0.65*y5_bmiz + 0.65*preg_plan - 3.01/sex**1.0 + 3.62)
+23,srprn_r2w1_l0.005_nocv,age-specific,0.29255796240359455,4.194147715787519,3.0343757029423015,10,SUM_PGS002853 + y5_bmiz + y5_a6 + log(plac_weight) + 0.78
+23,stdsr_r2w1.5_l0.001_nocv,age-specific,0.3069840800952046,4.151164046461411,2.981078228878131,7,y5_a6*(SUM_PGS002161 + 1.41) - 0.3
+23,srprn_r2w1.5_l0.001_nocv,age-specific,0.3157766426176226,4.124746269409177,2.9708344539815257,7,(SUM_PGS002161 + 1.38)*(asthma_m + y5_a6)
+23,fullsr_r2w1.5_l0.01_nocv,age-specific,0.3626869001513785,3.980839915269437,2.904223920212215,12,"(SUM_PGS002161 + 1.39)*(y5_a6 + cond(preg_fever, y5_bmiz)*exp(cats_quant_preg))"
+23,srprn_r2w1_l0.01_nocv,age-specific,0.31569174795404353,4.125002149365647,2.9560598386025347,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.38)
+23,srpsm_r2w2_l0.001_nocv,age-specific,0.41954615662388595,3.7991123426931113,2.7336943613255014,48,0.76*parity_m*(2.35*SUM_PGS002853 - 0.46) - 1.0*childcarecentre_1 + 1.33*y5_a6 + (1.26*preg_fever + 1.26*SUM_PGS002853)*(mode_delivery + (-1.0*childcareprof_1 - 0.32)/(-1.0*region_mo + preg_gain - 7.09)**1.0) + 0.74
+23,srpsm_r2w1_l0.001_nocv,age-specific,0.40650116555770166,3.8415653525833844,2.731309700308902,32,"cond(m_schyr - 8.13, (SUM_PGS002853 + sex)*(preg_thyroid + SUM_PGS002853 + SUM_PGS003884 + y5_bmiz*log(y5_a8)) + cond(y1_a4, 0.37*SUM_PGS002853 - 1.03*y5_bmiz - 0.05)) + 22.93"
+23,stdsr_r2w1.5_l0.01_nocv,age-specific,0.3157766426176226,4.124746269409177,2.9708344539815257,7,(SUM_PGS002161 + 1.38)*(asthma_m + y5_a6)
+23,fullsr_r2w1.5_l0.001_nocv,age-specific,0.40017619782521474,3.8619810486957684,2.7897299654332413,41,"cond(0.03, y5_bmiz + asthma_m + sex/birth_month**1.0 - 1.0*childcarecentre_1 + y5_a6 + log(agebirth_m_d*exp(SUM_PGS002853*(mo_party*SUM_PGS003884*exp(2.0*death_p + childcare_1) + mode_delivery + 0.74))) - 3.13)"
+23,stdsr_r2w1_l0.01_nocv,age-specific,0.31456098653409414,4.128408850940144,2.9922674096814337,7,asthma_m + y5_a6*(SUM_PGS002161 + 1.39)
+23,stdsr_r2w1_l0.001_nocv,age-specific,0.3167984833126689,4.121665105658499,2.9660060534832686,11,asthma_m + (SUM_PGS002161 + 1.39)*(death_p + y5_a6) - 0.17
+23,srpsm_r2w2_l0.005_nocv,age-specific,0.3830966801853768,3.9165785788909355,2.8080720228747076,27,2.55*SUM_PGS002853*exp(childcareprof_1) + 3.55*SUM_PGS000027 + y5_bmiz - 1.0*mht_wt + 0.14*exp(y5_bmiz + death_p + sex) - 111.78
+23,fullsr_r2w1.5_l0.005_nocv,age-specific,0.4366825497261767,3.7426127522698946,2.592267984286743,45,"2.15*SUM_PGS002853*cond(y1_bmifa, mode_delivery) + y5_bmiz + cond(y5_bmiz, preg_fever + y5_bmiz + cond(SUM_PGS002853 - 1.0*y1_bmifa, 1.87)*exp(preeclam) + 0.19)*cond(y1_a9, y5_bmiz + y1_bmifa/(smk_t2*region_mo - 3.85)**1.0) + 23.52"
+23,srpsm_r2w1.5_l0.005_nocv,age-specific,0.3994052580309072,3.864462109631755,2.739905863757893,35,"preg_thyroid + 3.07*SUM_PGS002313 + 0.69*y5_bmiz + 0.69*asthma_m + (dogs_quant_preg + cond(log(sex), y5_bmiz + 1.73*asthma_m))*cond(y5_bmiz, cats_quant_preg) + 0.69*exp(y5_bmiz) + 26.26"
+23,fullsr_r2w2_l0.01_nocv,age-specific,0.0,553001266.0876762,30581042.5512416,34,4.03*SUM_PGS002853 + y5_bmiz*(dogs_quant_preg + 0.59)*(mode_delivery*cats_preg - 0.08/(preg_gain - 2.8)**1.0) + 0.03*latepreg_weight + 0.22*ga_wt1 + y5_a6 + 0.18
+23,stdsr_r2w2_l0.01_nocv,age-specific,0.3067059770266012,4.151996881343764,2.9479522488732384,7,y5_a6*(SUM_PGS002161 + 1.41) - 0.48
+23,fullsr_r2w1_l0.01_nocv,age-specific,0.39502630235941893,3.8785244829384786,2.824538371265726,32,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz/(-1.0*SUM_PGS002313 + exp(0.46*asthma_m/SUM_PGS002313**1.0) - 1.38*log(sex))**1.0 + y5_bmiz + 25.51
+23,stdsr_r2w1.5_l0.005_nocv,age-specific,0.30165642058267184,4.167089832310207,3.059398730426999,5,y5_a6*(SUM_PGS002161 + 1.41)
+23,srpsm_r2w1_l0.005_nocv,age-specific,0.39364755584362554,3.882941583087081,2.743717752357868,30,SUM_PGS003884 + (2.24*y5_bmiz + 0.77)*(cats_quant_preg*dogs_preg + 0.43) + 0.65*exp(y5_bmiz) + 2.26*exp(preg_thyroid + SUM_PGS002853) + log(ga_wt1) + 16.59
+23,stdsr_r2w2_l0.005_nocv,age-specific,0.2919619531128571,4.195914097055181,3.0546256068586186,7,2.41*SUM_PGS002853 + 1.41*y5_a6
+23,srpsm_r2w1.5_l0.001_nocv,age-specific,0.3990080294053784,3.865739860773455,2.7468642289117584,41,"1.27*y5_a6 + (exp(cond(0.05, cond(asthma_m, preg_fever + cond(cond(asthma_m, cob_p), preg_fever)))) + 0.19)*(log(exp(SUM_PGS002853*(mode_delivery + sibling_pos) + 1.48*exp(-1.0*cond(log(mo_grav), 0.87)))) - 0.75) + 1.17"
+23,pysr_r2w2_l0.01_nocv,age-specific,0.4085370340422475,3.8349708658727315,2.7924902335937993,42,preeclam + (-1.0*SUM_PGS002853/(6.39*preg_thyroid - 0.12/birth_bmifa**1.0 - 1.0*preg_gain - 0.16)**1.0 + 1.33)*(-1.0*ppd - 1.0*childcarecentre_1 + y5_a6 + log(sex))
+23,pysr_r2w2_l0.001_nocv,age-specific,0.1700847433296816,4.542711588451743,3.167456954833781,32,preg_thyroid - 2.0*preg_fever + SUM_PGS003884 + asthma_m + 1.23*y5_a6 + 1.23*(preg_fever + SUM_PGS002853)*(mo_party - 1.0*ppd + mode_delivery) - 1.0*log(mo_grav)
+23,pysr_r2w1_l0.001_nocv,age-specific,0.37559587144352047,3.940317101469846,2.8068696721058948,48,"preg_fever + death_p + smk_exp1 + y5_a6 + exp(SUM_PGS002853 + SUM_PGS003884 - 1.0*edu_m_0*(SUM_PGS003884*Piecewise((alc_t2, smk_exp1 > 0), (0.0, True)) + 2.0*preg_dia) - 1.0*Piecewise((breastfed_ever, m_vege > 0), (0.0, True))) + log(y5_a6*(y5_a10 + exp(cats_quant_preg))) - 0.39"
+23,pysr_r2w1.5_l0.005_nocv,age-specific,0.4082095661268105,3.836032349186705,2.8257806441465023,37,SUM_PGS002853 + y5_bmiz + y5_a6 + exp(preg_fever/(occup_f1_1 - 0.42)**1.0 - 4.07*ppd + sex - 0.0610777736969928*exp(-1.0*b_infrsc*SUM_PGS002313 - 1.0*SUM_PGS002313)) + 6.16
+23,pysr_r2w2_l0.005_nocv,age-specific,0.41470709729571165,3.814915471100527,2.705063829026473,51,"2*SUM_PGS002853 + SUM_PGS002313 + y5_bmiz*exp(-1.0*smk_cig_p*Piecewise((20.0*alc_t2 - 0.91, y5_bmiz > 0), (0.0, True))) + age + hhincome_1/preg_gain**1.0 + childcareprof_1 + Piecewise((region_fa, asthma_m > 0), (0.0, True)) + exp(y5_bmiz - 1.0*preg_dia) - 0.08612056"
+23,pysr_r2w1_l0.01_nocv,age-specific,0.40166066036607895,3.8571992130916386,2.7046779986151432,34,"y5_bmiz + 0.5*y5_a8 + (y5_bmiz + sex)*(SUM_PGS002853 + 5.88235294117647*SUM_PGS002161 - 1.0*Piecewise((y1_sm4*(alc_t2 - 0.83), ITE(smk_p > 0, y5_bmiz > 0, False)), (0.0, True))) + 21.15"
+23,pysr_r2w1_l0.005_nocv,age-specific,0.40865121572721674,3.8346006782229356,2.687147791050344,28,(-5.77*preg_thyroid + SUM_PGS002853*mode_delivery)*(mo_party + y5_bmiz) + (preg_thyroid + sex)*(1.5625*preg_thyroid + SUM_PGS002853 + 1.5625*y5_bmiz) + 23.73
+23,pysr_r2w1.5_l0.01_nocv,age-specific,0.39546230035610286,3.877126625727791,2.777376282548093,33,-1.0*ppd - 1.0*sex - 1.0*childcarecentre_1 + y5_a6 + (SUM_PGS002853 + log(sex))*(preg_fever*exp(cats_quant_preg) + y5_bmiz + 2.97) + log(latepreg_weight) + 2.68
+23,pysr_r2w1.5_l0.001_nocv,age-specific,0.41572248254971955,3.811604914649711,2.664229426845084,52,"2.81*SUM_PGS002853 + 1.4*SUM_PGS003884 + 4.59*y5_bmiz*(Piecewise((preg_fever, solid_food > 0), (0.0, True)) + Piecewise((preeclam, preg_alc > 0), (0.0, True)))/birth_month**1.0 - 1.0*ppd - 1.0*childcarecentre_1 + 0.92*y5_a6 + 1.4*log(ga_wt1) + 1.4*log(y5_a7)"
+8,srprn_r2w2_l0.005_nocv,longitudinal,0.656309966014252,1.3944553229271708,1.0019488129513296,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+10,srprn_r2w2_l0.005_nocv,longitudinal,0.543461095142,2.2372402040954724,1.6893669202499548,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+14,srprn_r2w2_l0.005_nocv,longitudinal,0.44409650006428725,2.9696844198100147,2.1938510506677966,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+17,srprn_r2w2_l0.005_nocv,longitudinal,0.3707710876425532,3.179243680173008,2.3749494860817975,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+20,srprn_r2w2_l0.005_nocv,longitudinal,0.3102950517808394,4.0607797897130125,2.947200659678027,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+23,srprn_r2w2_l0.005_nocv,longitudinal,0.28989179796691467,4.202043607545482,3.0781662908284337,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+27,srprn_r2w2_l0.005_nocv,longitudinal,0.26940445467236374,4.72140568679726,3.5647406243041795,10,0.88*(SUM_PGS002313 + y5_bmiz + 9.91)*log(age)
+8,srprn_r2w1_l0.001_nocv,longitudinal,0.4434155277116719,1.7745436150050033,1.469776354063752,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+10,srprn_r2w1_l0.001_nocv,longitudinal,0.5772416316959894,2.152880010370444,1.721340542522613,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+14,srprn_r2w1_l0.001_nocv,longitudinal,0.44528930510481013,2.966496675223981,2.149149656998834,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+17,srprn_r2w1_l0.001_nocv,longitudinal,0.3794180940138031,3.1573231667620183,2.2624378096457205,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+20,srprn_r2w1_l0.001_nocv,longitudinal,0.32492802590062,4.017471525200967,2.832823363231299,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+23,srprn_r2w1_l0.001_nocv,longitudinal,0.3068217477762043,4.151650203135233,3.0064990793472766,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+27,srprn_r2w1_l0.001_nocv,longitudinal,0.19419694479357574,4.958465133031391,3.935596568858415,12,0.5*age + (SUM_PGS002853 + y5_bmiz)*log(y5_a9) + 12.94
+8,fullsr_r2w1_l0.005_nocv,longitudinal,0.636779865762405,1.4335277098478756,1.0664100152740603,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+10,fullsr_r2w1_l0.005_nocv,longitudinal,0.5371168803747945,2.252731285310315,1.732344553806445,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+14,fullsr_r2w1_l0.005_nocv,longitudinal,0.42421214730058066,3.02232974594751,2.28352511871669,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+17,fullsr_r2w1_l0.005_nocv,longitudinal,0.35102264510340153,3.2287487666025187,2.430021318535346,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+20,fullsr_r2w1_l0.005_nocv,longitudinal,0.30481101801414034,4.076892013518271,2.9810519647170923,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+23,fullsr_r2w1_l0.005_nocv,longitudinal,0.2777509038467805,4.23781305094033,3.0751251772548787,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+27,fullsr_r2w1_l0.005_nocv,longitudinal,0.2574583465767417,4.759849479179283,3.592948471718086,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+8,fullsr_r2w2_l0.001_nocv,longitudinal,0.6730227043855534,1.3601284774276114,1.0310800274262604,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+10,fullsr_r2w2_l0.001_nocv,longitudinal,0.5829078847141815,2.138403757285461,1.6509361518966792,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+14,fullsr_r2w2_l0.001_nocv,longitudinal,0.4873402194633192,2.8518404189871407,2.0799995508858817,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+17,fullsr_r2w2_l0.001_nocv,longitudinal,0.3882342462541848,3.1348160574028934,2.2700991581687204,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+20,fullsr_r2w2_l0.001_nocv,longitudinal,0.3555798206849875,3.925204913068062,2.764923950290166,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+23,fullsr_r2w2_l0.001_nocv,longitudinal,0.35050668766013093,4.018700421228287,2.8510839350591914,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+27,fullsr_r2w2_l0.001_nocv,longitudinal,0.3404892784552388,4.48583958432559,3.3223359402250248,33,y5_bmiz + asthma_m - 1.0*parity_m*(2.06 - 0.03*m_wt1) + y5_a6 - 1.0*(SUM_PGS002313 + 4.83)*(log(y5_a6/age**2.0) + 0.03) - 6.34
+8,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.6339954399610344,1.4390118922954298,1.0884770047887473,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+10,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.5518221202010025,2.216659200009244,1.7130951255800697,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+14,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.4240634273852981,3.0227200386580892,2.272623026055266,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+17,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.3420296971415099,3.251042358012551,2.388508124280451,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+20,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.32082412824786055,4.02966452911996,2.899462583889298,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+23,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.3074357697451189,4.149811015884638,2.948045035072989,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+27,srpsm_r2w1.5_l0.01_nocv,longitudinal,0.29764071381312573,4.629269591876595,3.366290809226091,19,(SUM_PGS002161 + 1.3)*(y5_a6 + 215.37/(-1.0*age - 8.36)**1.0 + 7.99)
+8,srprn_r2w1.5_l0.005_nocv,longitudinal,0.5515189564749824,1.5929171217213154,1.27723019109621,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+10,srprn_r2w1.5_l0.005_nocv,longitudinal,0.5737392426656549,2.1617795039076575,1.6869428662272874,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+14,srprn_r2w1.5_l0.005_nocv,longitudinal,0.4338165527702559,2.997016821069144,2.1555248323905674,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+17,srprn_r2w1.5_l0.005_nocv,longitudinal,0.34628042335941744,3.240523887255073,2.3028472007575473,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+20,srprn_r2w1.5_l0.005_nocv,longitudinal,0.3089043266844679,4.06487181802793,2.8760895196722998,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+23,srprn_r2w1.5_l0.005_nocv,longitudinal,0.2932733305687,4.192026610118248,3.036634708636845,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+27,srprn_r2w1.5_l0.005_nocv,longitudinal,0.1787813220862654,5.005670032826506,3.969597976120371,9,SUM_PGS000921 + y5_bmiz + 0.52*age + y5_a6
+8,stdsr_r2w2_l0.001_nocv,longitudinal,0.6496495632187289,1.407902131839267,1.045007667391178,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+10,stdsr_r2w2_l0.001_nocv,longitudinal,0.6122385937951917,2.061844979764619,1.5776422535051873,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+14,stdsr_r2w2_l0.001_nocv,longitudinal,0.46665325400119484,2.908810446238779,2.1143102484183465,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+17,stdsr_r2w2_l0.001_nocv,longitudinal,0.36788366016077156,3.1865298428875133,2.3117054063558493,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+20,stdsr_r2w2_l0.001_nocv,longitudinal,0.32768319000749535,4.009264911229049,2.838623271553552,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+23,stdsr_r2w2_l0.001_nocv,longitudinal,0.3145690842941048,4.128384464406709,2.904810343172135,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+27,stdsr_r2w2_l0.001_nocv,longitudinal,0.2881965476454057,4.660289046439594,3.391158444830907,15,y5_bmiz + death_p + (SUM_PGS002313 + 8.67)*log(age) + exp(y5_bmiz) - 1.12
+8,srprn_r2w2_l0.001_nocv,longitudinal,0.5404579199902155,1.6124407964571477,1.2385998310209128,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+10,srprn_r2w2_l0.001_nocv,longitudinal,0.5548565595958184,2.209142383207962,1.730527172693434,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+14,srprn_r2w2_l0.001_nocv,longitudinal,0.4188066283061055,3.036483479825419,2.3399446766689076,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+17,srprn_r2w2_l0.001_nocv,longitudinal,0.3473634420675603,3.2378384829212514,2.3909821107826206,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+20,srprn_r2w2_l0.001_nocv,longitudinal,0.33553157247494214,3.985794863110834,2.862731281545777,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+23,srprn_r2w2_l0.001_nocv,longitudinal,0.2990017678292244,4.175002616173725,2.8858655024615953,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+27,srprn_r2w2_l0.001_nocv,longitudinal,0.29616207262600225,4.634139912511751,3.260773753441913,19,-1.0*mht_wt + y5_a6*(0.86*SUM_PGS002161 - 5.78/age**1.0 + 1.77)
+8,srprn_r2w1.5_l0.01_nocv,longitudinal,0.5940454206289483,1.5155136673652756,1.1541398914250158,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+10,srprn_r2w1.5_l0.01_nocv,longitudinal,0.5841926827154983,2.1351076797493183,1.6812256719135077,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+14,srprn_r2w1.5_l0.01_nocv,longitudinal,0.4302830669938963,3.00635429384912,2.356021489127451,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+17,srprn_r2w1.5_l0.01_nocv,longitudinal,0.37976563597715574,3.1564389515164573,2.3764804837458255,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+20,srprn_r2w1.5_l0.01_nocv,longitudinal,0.32605780103742177,4.01410837266703,2.852319667534885,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+23,srprn_r2w1.5_l0.01_nocv,longitudinal,0.3046533525591244,4.158138713904099,2.858708723399518,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+27,srprn_r2w1.5_l0.01_nocv,longitudinal,0.28576379740174684,4.668246052567598,3.27759817249098,16,-105.52/age**1.0 + (SUM_PGS002853 + y5_bmiz)*log(y5_a7) + 28.26
+8,srpsm_r2w1_l0.01_nocv,longitudinal,0.636779865762405,1.4335277098478756,1.0664100152740603,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+10,srpsm_r2w1_l0.01_nocv,longitudinal,0.5371168803747945,2.252731285310315,1.732344553806445,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+14,srpsm_r2w1_l0.01_nocv,longitudinal,0.42421214730058066,3.02232974594751,2.28352511871669,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+17,srpsm_r2w1_l0.01_nocv,longitudinal,0.35102264510340153,3.2287487666025187,2.430021318535346,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+20,srpsm_r2w1_l0.01_nocv,longitudinal,0.30481101801414034,4.076892013518271,2.9810519647170923,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+23,srpsm_r2w1_l0.01_nocv,longitudinal,0.2777509038467805,4.23781305094033,3.0751251772548787,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+27,srpsm_r2w1_l0.01_nocv,longitudinal,0.2574583465767417,4.759849479179283,3.592948471718086,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+8,srprn_r2w2_l0.01_nocv,longitudinal,0.6861145614244468,1.332621204228935,0.9896977311832551,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+10,srprn_r2w2_l0.01_nocv,longitudinal,0.57968078751226,2.146660374644188,1.71242374120181,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+14,srprn_r2w2_l0.01_nocv,longitudinal,0.40021737871651997,3.084661658068808,2.3879878082867103,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+17,srprn_r2w2_l0.01_nocv,longitudinal,0.3498632234562077,3.231631618146284,2.4237594948472116,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+20,srprn_r2w2_l0.01_nocv,longitudinal,0.32116452494258674,4.028654587177366,2.8794747299474577,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+23,srprn_r2w2_l0.01_nocv,longitudinal,0.29058307729607435,4.199997797369566,2.8889442230531466,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+27,srprn_r2w2_l0.01_nocv,longitudinal,0.270579565281858,4.717607137308525,3.342256069391007,15,SUM_PGS000921 + y5_bmiz - 103.4/age**1.0 + exp(y5_bmiz) + 32.08
+8,stdsr_r2w1_l0.005_nocv,longitudinal,0.636779865762405,1.4335277098478756,1.0664100152740603,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+10,stdsr_r2w1_l0.005_nocv,longitudinal,0.5371168803747945,2.252731285310315,1.732344553806445,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+14,stdsr_r2w1_l0.005_nocv,longitudinal,0.42421214730058066,3.02232974594751,2.28352511871669,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+17,stdsr_r2w1_l0.005_nocv,longitudinal,0.35102264510340153,3.2287487666025187,2.430021318535346,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+20,stdsr_r2w1_l0.005_nocv,longitudinal,0.30481101801414034,4.076892013518271,2.9810519647170923,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+23,stdsr_r2w1_l0.005_nocv,longitudinal,0.2777509038467805,4.23781305094033,3.0751251772548787,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+27,stdsr_r2w1_l0.005_nocv,longitudinal,0.2574583465767417,4.759849479179283,3.592948471718086,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+8,fullsr_r2w1_l0.001_nocv,longitudinal,0.6889832053227563,1.3265177192123143,0.9963626225111064,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+10,fullsr_r2w1_l0.001_nocv,longitudinal,0.6181263386670917,2.0461316415943402,1.5214489508247773,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+14,fullsr_r2w1_l0.001_nocv,longitudinal,0.4362819134848782,2.990484672873019,2.0735415757677895,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+17,fullsr_r2w1_l0.001_nocv,longitudinal,0.27838945763547673,3.404637799107392,2.3519525360871882,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+20,fullsr_r2w1_l0.001_nocv,longitudinal,0.15306927727780606,4.499888074562254,3.0784135474376217,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+23,fullsr_r2w1_l0.001_nocv,longitudinal,0.09085964433776128,4.754597510162637,3.1998925691896556,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+27,fullsr_r2w1_l0.001_nocv,longitudinal,0.0037411754691258903,5.513392352262195,3.788532385260314,30,SUM_PGS002853 + 0.02*age*(-1.0*age + log(mode_delivery)) + age - 1.0*mht_wt + (SUM_PGS002313 + 4.48)*exp(0.53*y5_bmiz) + 8.28
+8,fullsr_r2w2_l0.005_nocv,longitudinal,0.7456980220336197,1.1994882663899398,0.9026900195427328,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+10,fullsr_r2w2_l0.005_nocv,longitudinal,0.6049225484839222,2.0812049043751073,1.6085328774838297,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+14,fullsr_r2w2_l0.005_nocv,longitudinal,0.46270445354676315,2.9195587350483003,2.1392392839875107,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+17,fullsr_r2w2_l0.005_nocv,longitudinal,0.3872717480171157,3.137281109649066,2.273613736628473,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+20,fullsr_r2w2_l0.005_nocv,longitudinal,0.32904798152600623,4.005193474662677,2.814894989015918,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+23,fullsr_r2w2_l0.005_nocv,longitudinal,0.3224464256354109,4.104593101923787,2.8581260988237416,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+27,fullsr_r2w2_l0.005_nocv,longitudinal,0.30452201822417246,4.606536338658291,3.3541483395212968,19,(SUM_PGS002853 + y5_bmiz + 14.57)*(0.51*SUM_PGS002161 + 0.03*exp(y5_bmiz) + 0.51*log(age))
+8,srpsm_r2w2_l0.01_nocv,longitudinal,0.5320990390952964,1.6270395259240371,1.287793080999329,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+10,srpsm_r2w2_l0.01_nocv,longitudinal,0.5892151691553156,2.122173649856488,1.6473269584370753,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+14,srpsm_r2w2_l0.01_nocv,longitudinal,0.43975682735386423,2.9812533383161566,2.1225632319743135,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+17,srpsm_r2w2_l0.01_nocv,longitudinal,0.3417636936935696,3.251699455366812,2.2883141154186704,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+20,srpsm_r2w2_l0.01_nocv,longitudinal,0.30397959176202927,4.0793292084851664,2.8450245336755806,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+23,srpsm_r2w2_l0.01_nocv,longitudinal,0.316002477407621,4.124065506268134,2.9182580411136323,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+27,srpsm_r2w2_l0.01_nocv,longitudinal,0.2429038459998002,4.806271820658251,3.7288072764134736,13,2.44*SUM_PGS002313 + y5_bmiz + 0.5*age + 0.88*y5_a6
+8,srprn_r2w1_l0.005_nocv,longitudinal,0.5744201390658052,1.5517139663795119,1.236767635803039,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+10,srprn_r2w1_l0.005_nocv,longitudinal,0.5732682823007429,2.162973410903179,1.6706062152079413,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+14,srprn_r2w1_l0.005_nocv,longitudinal,0.4252652279491018,3.019564653254868,2.153356984243642,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+17,srprn_r2w1_l0.005_nocv,longitudinal,0.3335898439467847,3.271826648279346,2.3080550262256754,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+20,srprn_r2w1_l0.005_nocv,longitudinal,0.2968930597808701,4.100043462206158,2.868993876574327,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+23,srprn_r2w1_l0.005_nocv,longitudinal,0.29605268080829517,4.183775479692545,2.983082341530474,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+27,srprn_r2w1_l0.005_nocv,longitudinal,0.20708127703145107,4.9186638743401705,3.8458782706004815,9,SUM_PGS000921 + y5_bmiz + 0.51*age + y5_a6
+8,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.6648371147436823,1.3770480517074912,1.031423208653265,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+10,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.5945914433128366,2.108240607817277,1.6851431261298329,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+14,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.41032229027548495,3.0585666730422068,2.374380183816737,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+17,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.358581086592063,3.2098915733087474,2.4082519215539677,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+20,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.3328225827152781,3.993911497599549,2.8549702136444606,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+23,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.30606523673693176,4.153915069881315,2.840107566992944,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+27,stdsr_r2w1.5_l0.001_nocv,longitudinal,0.2860599038874353,4.667278276623767,3.2910746574986245,17,SUM_PGS002853 + SUM_PGS002313 + y5_bmiz - 103.25/age**1.0 + exp(y5_bmiz) + 28.19
+8,srprn_r2w1.5_l0.001_nocv,longitudinal,0.5360568468324469,1.6201436382872734,1.3036649048579716,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+10,srprn_r2w1.5_l0.001_nocv,longitudinal,0.5736860053672774,2.161914496051902,1.6887225521725713,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+14,srprn_r2w1.5_l0.001_nocv,longitudinal,0.4298497597617724,3.007497341724311,2.1535062294709304,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+17,srprn_r2w1.5_l0.001_nocv,longitudinal,0.3368995787921363,3.2636917500473754,2.305821930282252,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+20,srprn_r2w1.5_l0.001_nocv,longitudinal,0.2975730921840086,4.098060238360383,2.869074887577915,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+23,srprn_r2w1.5_l0.001_nocv,longitudinal,0.2960932813327254,4.183654827249348,2.9787790341215095,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+27,srprn_r2w1.5_l0.001_nocv,longitudinal,0.2127212233373511,4.901139691054351,3.819069221030524,11,SUM_PGS000921 + y5_bmiz + 0.5*age + y5_a6 + 0.21
+8,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.6552478680342537,1.3966082886622802,1.029663280006184,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+10,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.597264672099095,2.1012783340137835,1.5948670649066472,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+14,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.5023988005683067,2.809644065330143,2.0660752230177306,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+17,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.4141933621859215,3.0675851448141276,2.2557449704078194,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+20,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.3899146178730104,3.8192059449915683,2.7579884173058637,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+23,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.35717570520247044,3.9980151143834646,2.865815397983378,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+27,fullsr_r2w1.5_l0.01_nocv,longitudinal,0.32461747892428716,4.539496831532167,3.401146801573405,19,(SUM_PGS002313 + (m_wt1 + y5_a6*(y5_bmiz + 12.75))/y1_a4**1.0 + 2.72)*log(age)
+8,srprn_r2w1_l0.01_nocv,longitudinal,0.5282495765983664,1.6337187153749968,1.3147385920786665,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+10,srprn_r2w1_l0.01_nocv,longitudinal,0.5764915875916568,2.154788948789373,1.6821693554813177,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+14,srprn_r2w1_l0.01_nocv,longitudinal,0.43584603357829266,2.9916406055420253,2.1606983761917777,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+17,srprn_r2w1_l0.01_nocv,longitudinal,0.3359581451984115,3.2660077335463717,2.3471727602740895,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+20,srprn_r2w1_l0.01_nocv,longitudinal,0.3091821627834105,4.064054650663887,2.906526670803819,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+23,srprn_r2w1_l0.01_nocv,longitudinal,0.30473511299650224,4.157894245022705,3.037674829141037,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+27,srprn_r2w1_l0.01_nocv,longitudinal,0.24053301942927752,4.813791295007683,3.738687614270279,11,y5_bmiz + age*(SUM_PGS002161 + 0.48) + y5_a6 - 4.33
+8,srpsm_r2w2_l0.001_nocv,longitudinal,0.6611730669362614,1.3845546332241856,1.053932322698424,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+10,srpsm_r2w2_l0.001_nocv,longitudinal,0.5884210698219356,2.1242238753101668,1.6230292253896217,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+14,srpsm_r2w2_l0.001_nocv,longitudinal,0.46128728356575255,2.9234065115125043,2.1734193691565076,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+17,srpsm_r2w2_l0.001_nocv,longitudinal,0.3865649751205654,3.1390899916451485,2.2974840306818716,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+20,srpsm_r2w2_l0.001_nocv,longitudinal,0.3484379489644124,3.9468957815327785,2.8489095603841963,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+23,srpsm_r2w2_l0.001_nocv,longitudinal,0.3398366079603914,4.051576182973108,2.842460666360898,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+27,srpsm_r2w2_l0.001_nocv,longitudinal,0.3195135379741233,4.556617288741561,3.1560813806258845,29,0.92*SUM_PGS002853*sibling_pos + 0.83*y5_bmiz + 1.04*age + y5_a6 - 1.74*exp(-1.0*SUM_PGS002161 + 0.08*age) - 6.65
+8,srpsm_r2w1_l0.001_nocv,longitudinal,0.7275588738351184,1.2415307150330985,0.9341667465834368,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+10,srpsm_r2w1_l0.001_nocv,longitudinal,0.6261126995773367,2.024622578760346,1.5750275534145743,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+14,srpsm_r2w1_l0.001_nocv,longitudinal,0.4772781090027929,2.879691340540232,2.1240451686456048,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+17,srpsm_r2w1_l0.001_nocv,longitudinal,0.39775860332083557,3.1103179309686815,2.241466883165792,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+20,srpsm_r2w1_l0.001_nocv,longitudinal,0.35727893012664946,3.920026804954596,2.7779801933262793,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+23,srpsm_r2w1_l0.001_nocv,longitudinal,0.33804801245079263,4.057060983651165,2.847108675166589,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+27,srpsm_r2w1_l0.001_nocv,longitudinal,0.31302647668246864,4.578284834410071,3.3406960709707416,31,"cond(1.59, (17.17*exp(y5_bmiz) - 177.58)/y5_a6**1.0 + (4.66*SUM_PGS002161 - 70.35/m_wt1**1.0 + 8.78)*log(age) + 9.21)"
+8,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.4979728934811134,1.6853290953837259,1.3467182369384854,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+10,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.5661337932996272,2.1809797397627393,1.7089456947895543,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+14,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.4122142232072862,3.053656150023143,2.1567755568946136,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+17,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.32483407022031263,3.2932503085045193,2.351486376958981,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+20,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.2803123437759403,4.1481055154606565,2.928527387927235,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+23,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.2591501390246965,4.292036360176494,3.050446461616634,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+27,stdsr_r2w1.5_l0.01_nocv,longitudinal,0.152822247692589,5.0841701909739525,3.9653085361480627,10,y5_bmiz + 0.5*age + exp(y5_bmiz) + 11.99
+8,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.6246834610533224,1.4572027638148934,1.0691445181690122,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+10,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.625728210555939,2.0256633270371602,1.5651409572857364,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+14,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.47784063090550066,2.878141448024169,2.102494283247683,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+17,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.4050347878374372,3.091471650923288,2.202750142082294,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+20,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.3549494323989122,3.9271243116543695,2.7741031016902866,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+23,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.33546142858650674,4.064979758253858,2.775705985812384,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+27,fullsr_r2w1.5_l0.001_nocv,longitudinal,0.30584648551803606,4.60214790765824,3.3277629642850988,32,mo_party*SUM_PGS002853 + 2.0*SUM_PGS002161 + (m_wt1 + y5_a7)/birth_head_circum**1.0 + log(exp(y5_bmiz + (SUM_PGS002161 + 7.72)*log(age) + exp(y5_bmiz))) - 3.57
+8,stdsr_r2w1_l0.01_nocv,longitudinal,0.636779865762405,1.4335277098478756,1.0664100152740603,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+10,stdsr_r2w1_l0.01_nocv,longitudinal,0.5371168803747945,2.252731285310315,1.732344553806445,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+14,stdsr_r2w1_l0.01_nocv,longitudinal,0.42421214730058066,3.02232974594751,2.28352511871669,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+17,stdsr_r2w1_l0.01_nocv,longitudinal,0.35102264510340153,3.2287487666025187,2.430021318535346,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+20,stdsr_r2w1_l0.01_nocv,longitudinal,0.30481101801414034,4.076892013518271,2.9810519647170923,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+23,stdsr_r2w1_l0.01_nocv,longitudinal,0.2777509038467805,4.23781305094033,3.0751251772548787,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+27,stdsr_r2w1_l0.01_nocv,longitudinal,0.2574583465767417,4.759849479179283,3.592948471718086,8,(SUM_PGS002853 + y5_bmiz + 7.62)*log(age)
+8,stdsr_r2w1_l0.001_nocv,longitudinal,0.6500798992984521,1.4070372017822275,1.0399012508863352,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+10,stdsr_r2w1_l0.001_nocv,longitudinal,0.5336767972550523,2.261086782994537,1.7205643278585663,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+14,stdsr_r2w1_l0.001_nocv,longitudinal,0.4179495713900042,3.03872153051441,2.2471568089801197,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+17,stdsr_r2w1_l0.001_nocv,longitudinal,0.3362734959872635,3.265232134527179,2.3724034860975993,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+20,stdsr_r2w1_l0.001_nocv,longitudinal,0.3202035486635427,4.03150511022662,2.8702415993415498,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+23,stdsr_r2w1_l0.001_nocv,longitudinal,0.31554013592444785,4.125459081829761,2.9134895803826577,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+27,stdsr_r2w1_l0.001_nocv,longitudinal,0.28755525291741657,4.662387902482902,3.455678381971763,12,(SUM_PGS002853 + SUM_PGS002161 + 0.5*y5_a6 - 1.21)*log(age)
+8,srpsm_r2w2_l0.005_nocv,longitudinal,0.7271442960787868,1.242474983916926,0.9571949097180961,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+10,srpsm_r2w2_l0.005_nocv,longitudinal,0.6065359054239805,2.076951103857094,1.6339093834187872,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+14,srpsm_r2w2_l0.005_nocv,longitudinal,0.4480396975874382,2.959133225228819,2.196626371858248,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+17,srpsm_r2w2_l0.005_nocv,longitudinal,0.3748478628476569,3.1689277812032537,2.3101060634041475,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+20,srpsm_r2w2_l0.005_nocv,longitudinal,0.323649296455673,4.021274696468169,2.827266755599918,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+23,srpsm_r2w2_l0.005_nocv,longitudinal,0.31753151749587327,4.119453362710406,2.8449075133634483,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+27,srpsm_r2w2_l0.005_nocv,longitudinal,0.2919794472022663,4.647888930401918,3.372823662461292,15,"y5_bmiz + cond(edu_m_0, (SUM_PGS002853 + 7.24)*log(age)) + 0.77*exp(y5_bmiz)"
+8,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.7555948719017459,1.175915979197479,0.879228426894813,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+10,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.6062624299701642,2.0776727662554864,1.5920691280604213,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+14,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.4712368614734981,2.8962842473525887,2.1261844591145804,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+17,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.38518010360150234,3.1426313492207596,2.30262921493094,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+20,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.33810740285041285,3.978061839085173,2.825073449307575,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+23,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.3229077886437799,4.103195404404974,2.903193321528332,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+27,fullsr_r2w1.5_l0.005_nocv,longitudinal,0.2885422725446144,4.659157151362762,3.414593357719433,11,(SUM_PGS002313 + exp(0.64*y5_bmiz) + 7.66)*log(age)
+8,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.6343946936064409,1.4382268098500104,1.0927359803721464,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+10,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.5719999277390818,2.1661854778415863,1.7176767787056466,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+14,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.42048148491352544,3.0321051232642224,2.36788029816623,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+17,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.3561509391958979,3.215966491736228,2.423334464818457,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+20,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.33270852257347283,3.9942528810394573,2.883078583698038,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+23,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.3066060693683913,4.152296033888202,2.8942424738429575,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+27,srpsm_r2w1.5_l0.005_nocv,longitudinal,0.300266368903765,4.6206086070109365,3.2661682520373505,15,(y5_bmiz - 101.1/age**1.0 + y5_a6)*exp(SUM_PGS002161) + 10.8
+8,fullsr_r2w2_l0.01_nocv,longitudinal,0.6423372148651421,1.4225187908835655,1.0987972209303989,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+10,fullsr_r2w2_l0.01_nocv,longitudinal,0.5672812371451466,2.1780938171509336,1.7410365086855581,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+14,fullsr_r2w2_l0.01_nocv,longitudinal,0.41308188540039636,3.0514014846314463,2.3925193823551547,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+17,fullsr_r2w2_l0.01_nocv,longitudinal,0.3550034978987169,3.2188308976585365,2.427675171520573,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+20,fullsr_r2w2_l0.01_nocv,longitudinal,0.318301852118949,4.037140138923268,2.8934394962679986,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+23,fullsr_r2w2_l0.01_nocv,longitudinal,0.28973842872874445,4.202497361938755,2.910756390286208,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+27,fullsr_r2w2_l0.01_nocv,longitudinal,0.2734986795919907,4.708157826950067,3.3542517028836762,14,SUM_PGS000921 + y5_bmiz - 103.57/age**1.0 + y5_a6 + 15.8
+8,stdsr_r2w2_l0.01_nocv,longitudinal,0.3182984920953543,1.9638949900148157,1.5885989690438438,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+10,stdsr_r2w2_l0.01_nocv,longitudinal,0.5112654443782747,2.3147827756782937,1.8521657878348765,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+14,stdsr_r2w2_l0.01_nocv,longitudinal,0.42276189063710723,3.0261335751730205,2.2412819714957353,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+17,stdsr_r2w2_l0.01_nocv,longitudinal,0.3426292609518772,3.2495607929761197,2.377246313423375,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+20,stdsr_r2w2_l0.01_nocv,longitudinal,0.3282952992756706,4.007439382688823,2.9523728118355534,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+23,stdsr_r2w2_l0.01_nocv,longitudinal,0.27344522957350503,4.250426101777138,3.2230115914520767,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+27,stdsr_r2w2_l0.01_nocv,longitudinal,0.09645699317766243,5.250579315366513,4.268336925949499,9,y5_a6*(SUM_PGS002161 + 0.03*age + 0.75)
+8,fullsr_r2w1_l0.01_nocv,longitudinal,0.7442737738489296,1.202842514150999,0.8458883615288019,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+10,fullsr_r2w1_l0.01_nocv,longitudinal,0.5899296921025633,2.120327182295138,1.6297914698259868,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+14,fullsr_r2w1_l0.01_nocv,longitudinal,0.45965499514502084,2.9278320924130568,2.157019977347962,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+17,fullsr_r2w1_l0.01_nocv,longitudinal,0.37457162608510797,3.1696278329344088,2.3064227431736155,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+20,fullsr_r2w1_l0.01_nocv,longitudinal,0.3359458403837001,3.984552182288244,2.8096092717418975,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+23,fullsr_r2w1_l0.01_nocv,longitudinal,0.3135041420937079,4.131590319564548,2.8516226023855826,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+27,fullsr_r2w1_l0.01_nocv,longitudinal,0.27850738450769363,4.691900073418474,3.445198179431413,13,(exp(0.57*SUM_PGS002853 + 0.57*y5_bmiz) + 6.54)*log(age)
+8,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.6628799112406556,1.381062875833607,1.0508399317810573,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+10,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.5919078916995807,2.1152067174989906,1.654245844308961,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+14,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.4186201348072903,3.0369706146033892,2.318241558048251,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+17,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.35962654119408555,3.2072745905745896,2.3731133905575734,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+20,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.3165264835217374,4.042393748114865,2.855674285429564,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+23,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.28676897958908965,4.211273062871502,2.8620562248573713,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+27,stdsr_r2w1.5_l0.005_nocv,longitudinal,0.2677703143873065,4.726682977205223,3.320274864668298,15,SUM_PGS000921 + y5_bmiz - 103.58/age**1.0 + exp(y5_bmiz) + 31.91
+8,srpsm_r2w1_l0.005_nocv,longitudinal,0.645201845054687,1.4168106451899976,1.1053723178833172,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+10,srpsm_r2w1_l0.005_nocv,longitudinal,0.5745527674648976,2.1597156250308087,1.6760105303515787,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+14,srpsm_r2w1_l0.005_nocv,longitudinal,0.44086107685464593,2.9783138368252007,2.253682260040536,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+17,srpsm_r2w1_l0.005_nocv,longitudinal,0.36147494989314255,3.202642419817034,2.3576606543216063,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+20,srpsm_r2w1_l0.005_nocv,longitudinal,0.3300274997497774,4.00226882969196,2.853902192779169,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+23,srpsm_r2w1_l0.005_nocv,longitudinal,0.3202719429349694,4.111174291530172,2.9004993718501453,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+27,srpsm_r2w1_l0.005_nocv,longitudinal,0.29383457274293123,4.64179583545866,3.443247218132981,12,y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.48)*log(age) - 17.19
+8,stdsr_r2w2_l0.005_nocv,longitudinal,0.6430391635954835,1.4211221881152905,1.023960517857249,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+10,stdsr_r2w2_l0.005_nocv,longitudinal,0.5414262625745765,2.2422204454668293,1.690484280943247,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+14,stdsr_r2w2_l0.005_nocv,longitudinal,0.4443548652891083,2.968994234954995,2.193274093357726,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+17,stdsr_r2w2_l0.005_nocv,longitudinal,0.3698872607524364,3.181475709710961,2.379004886334724,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+20,stdsr_r2w2_l0.005_nocv,longitudinal,0.31036060842552393,4.060586796009933,2.944278416570951,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+23,stdsr_r2w2_l0.005_nocv,longitudinal,0.2921336156993005,4.195405420203279,3.076006255746104,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+27,stdsr_r2w2_l0.005_nocv,longitudinal,0.27377451066929304,4.70726396791789,3.551015661957204,10,(SUM_PGS002313 + 0.86*y5_bmiz + 8.83)*log(age)
+8,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.6181227999436028,1.4698837874036665,1.1382923254986366,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+10,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.6200591086323571,2.0409470493448163,1.5999194881506245,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+14,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.4487444991221182,2.9572433539516902,2.324623219503778,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+17,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.3792469029124882,3.15775861964475,2.4044078066961436,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+20,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.3557852542471941,3.924579208652655,2.83373481634438,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+23,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.33268050052051046,4.073476341389905,2.8291437681626515,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+27,srpsm_r2w1.5_l0.001_nocv,longitudinal,0.3121401234916117,4.5812374003733884,3.266866610708337,26,SUM_PGS002313 - 103.26/age**1.0 + (SUM_PGS002853 + 0.6*y5_bmiz + 0.94)*(y5_bmiz + 0.03*age + 1.25) + 27.28
+8,pysr_r2w2_l0.01_nocv,longitudinal,0.6418011900649057,1.4235843474733698,1.0632824962958816,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+10,pysr_r2w2_l0.01_nocv,longitudinal,0.5533158795862063,2.2129620975544055,1.6900709803804232,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+14,pysr_r2w2_l0.01_nocv,longitudinal,0.44430604027512044,2.969124676122991,2.2265276407928893,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+17,pysr_r2w2_l0.01_nocv,longitudinal,0.3549087253656973,3.219067368361468,2.4461162439799,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+20,pysr_r2w2_l0.01_nocv,longitudinal,0.30383690796401097,4.079747317171927,3.008822247616594,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+23,pysr_r2w2_l0.01_nocv,longitudinal,0.2765130870514493,4.241442955485169,3.1440334767012303,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+27,pysr_r2w2_l0.01_nocv,longitudinal,0.2591393796910597,4.754458536933547,3.5976924594852164,8,(SUM_PGS002313 + y5_bmiz + 8.81)*log(age)
+8,pysr_r2w2_l0.001_nocv,longitudinal,0.7100892107534815,1.2807174415352363,0.9746612176349856,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+10,pysr_r2w2_l0.001_nocv,longitudinal,0.6118340173290425,2.0629203272191248,1.6087330836504925,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+14,pysr_r2w2_l0.001_nocv,longitudinal,0.4997649744486232,2.8170700396632626,2.1187462514072415,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+17,pysr_r2w2_l0.001_nocv,longitudinal,0.4214454971580682,3.048538055563481,2.2494931441131216,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+20,pysr_r2w2_l0.001_nocv,longitudinal,0.3560485774414618,3.923777039526711,2.8094595924560384,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+23,pysr_r2w2_l0.001_nocv,longitudinal,0.32259096048099245,4.104155285347969,2.931187964529089,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+27,pysr_r2w2_l0.001_nocv,longitudinal,0.2994172330397098,4.62341134130678,3.3799310039032426,56,"(SUM_PGS002313 + y5_bmiz + 7.54)*log(age + Piecewise((-1.91, -1.0*y5_bmiz + y1_bmifa + ethn3_m > 0), (0.0, True))) + Piecewise((-1.57, ITE((breastfed_ever > 0) & (exp(y5_bmiz) - 0.78 > 0), y5_bmiz*ethn3_m - 1.22 < 0, ITE(exp(y5_bmiz) - 0.78 > 0, y5_bmiz*ethn3_m < 0, False))), (0.0, True)) + 5.23"
+8,pysr_r2w1_l0.001_nocv,longitudinal,0.7018365337426243,1.2988181508278047,0.9932367474973862,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+10,pysr_r2w1_l0.001_nocv,longitudinal,0.6023245708431988,2.088036557367381,1.6216674739696608,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+14,pysr_r2w1_l0.001_nocv,longitudinal,0.4643319690776433,2.9151335811917414,2.2103738567489217,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+17,pysr_r2w1_l0.001_nocv,longitudinal,0.39698441031341625,3.11231647592506,2.2910131729886802,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+20,pysr_r2w1_l0.001_nocv,longitudinal,0.3547828854953634,3.9276312549969608,2.842254651422409,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+23,pysr_r2w1_l0.001_nocv,longitudinal,0.3455042446660991,4.034146891922331,2.857218557460542,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+27,pysr_r2w1_l0.001_nocv,longitudinal,0.3043999313152398,4.606940645565197,3.4346042664490524,23,0.9*y5_bmiz + 0.36*mode_delivery + 0.36*(SUM_PGS002853*sibling_pos + SUM_PGS003884 + y5_a6 + log(ga_wt1))*log(age)
+8,pysr_r2w1.5_l0.005_nocv,longitudinal,0.5762953642277846,1.5482915470083762,1.195612441985977,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+10,pysr_r2w1.5_l0.005_nocv,longitudinal,0.5584262034231262,2.200266901965359,1.780712141217053,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+14,pysr_r2w1.5_l0.005_nocv,longitudinal,0.41375274818628904,3.0496570700797183,2.4130205202969406,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+17,pysr_r2w1.5_l0.005_nocv,longitudinal,0.36437846760124704,3.1953525537709924,2.4134923249898623,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+20,pysr_r2w1.5_l0.005_nocv,longitudinal,0.34992972916369014,3.9423748959300187,2.851306671787171,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+23,pysr_r2w1.5_l0.005_nocv,longitudinal,0.31151345307805867,4.137576340843007,2.8800865031092946,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+27,pysr_r2w1.5_l0.005_nocv,longitudinal,0.30400190317901077,4.608258521916124,3.2621462606216247,20,11.1111111111111*SUM_PGS002161 + y5_bmiz - 101.9289/age**1.0 - 1.0*mht_wt + y5_a6 + 13.86
+8,pysr_r2w2_l0.005_nocv,longitudinal,0.6467033158896489,1.4138095652260139,1.0950484546606878,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+10,pysr_r2w2_l0.005_nocv,longitudinal,0.5922720225851535,2.1142628325686985,1.6607134768962266,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+14,pysr_r2w2_l0.005_nocv,longitudinal,0.465714945575192,2.9113680337708403,2.1951022201013273,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+17,pysr_r2w2_l0.005_nocv,longitudinal,0.384841973348063,3.1434954011812013,2.3098829926379025,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+20,pysr_r2w2_l0.005_nocv,longitudinal,0.35065852049401713,3.9401643853895956,2.8132781457972067,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+23,pysr_r2w2_l0.005_nocv,longitudinal,0.32982196531601604,4.082191606267535,2.8858185924689335,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+27,pysr_r2w2_l0.005_nocv,longitudinal,0.3034599485848437,4.6100523349311695,3.41443107732208,22,SUM_PGS000921 + y5_bmiz + y5_a6 + (SUM_PGS002853 + 7.54)*(-11.95/m_wt1**1.0 + log(age) - 1.45)
+8,pysr_r2w1_l0.01_nocv,longitudinal,0.6696581163160638,1.367108411295821,1.0186480586760283,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+10,pysr_r2w1_l0.01_nocv,longitudinal,0.5453128995396938,2.2326982681661347,1.7040280759072841,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+14,pysr_r2w1_l0.01_nocv,longitudinal,0.43287346804899784,2.999511829334181,2.231337087328014,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+17,pysr_r2w1_l0.01_nocv,longitudinal,0.3523195062146285,3.225521124967727,2.4208722318439775,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+20,pysr_r2w1_l0.01_nocv,longitudinal,0.2947140811401586,4.106391711398475,2.9970649554743565,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+23,pysr_r2w1_l0.01_nocv,longitudinal,0.2634156824887931,4.279662532998445,3.120441491747612,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+27,pysr_r2w1_l0.01_nocv,longitudinal,0.2439448987769508,4.802966227411864,3.6190639307144994,8,(SUM_PGS002161 + log(age))*(y5_bmiz + 7.81)
+8,pysr_r2w1_l0.005_nocv,longitudinal,0.6080317734395481,1.4891778465504373,1.1417921864990594,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+10,pysr_r2w1_l0.005_nocv,longitudinal,0.5767477792359446,2.1541371052618645,1.7179191318642133,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+14,pysr_r2w1_l0.005_nocv,longitudinal,0.4244532946713364,3.0216967843498663,2.3790082056021156,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+17,pysr_r2w1_l0.005_nocv,longitudinal,0.36595052489247826,3.1913986387142024,2.4123752204729727,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+20,pysr_r2w1_l0.005_nocv,longitudinal,0.3342065766459321,3.9897668587858073,2.8544894433541277,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+23,pysr_r2w1_l0.005_nocv,longitudinal,0.3084035591875878,4.146910528727637,2.8703457836031525,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+27,pysr_r2w1_l0.005_nocv,longitudinal,0.2926817391301887,4.64558321716551,3.2913790061296946,16,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz - 103.56/age**1.0 + y5_a6 + 15.55
+8,pysr_r2w1.5_l0.01_nocv,longitudinal,0.677650039318348,1.3504700145953874,1.0259602806724804,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+10,pysr_r2w1.5_l0.01_nocv,longitudinal,0.5970532739353351,2.101829748397178,1.6457022468456566,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+14,pysr_r2w1.5_l0.01_nocv,longitudinal,0.41634388727539773,3.0429100563206664,2.324523760991497,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+17,pysr_r2w1.5_l0.01_nocv,longitudinal,0.355472111196108,3.217661386638105,2.3868945922155826,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+20,pysr_r2w1.5_l0.01_nocv,longitudinal,0.313050690491263,4.052659475703682,2.872456250150916,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+23,pysr_r2w1.5_l0.01_nocv,longitudinal,0.284334756375352,4.21845337791326,2.8653434110369416,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+27,pysr_r2w1.5_l0.01_nocv,longitudinal,0.26485240053136516,4.736091460020919,3.3343555603851596,15,SUM_PGS002313 + y5_bmiz - 103.53/age**1.0 + exp(y5_bmiz) + 28.29
+8,pysr_r2w1.5_l0.001_nocv,longitudinal,0.6604397946759177,1.3860520153812128,1.0645035809117855,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+10,pysr_r2w1.5_l0.001_nocv,longitudinal,0.5924125505293425,2.1138984491672317,1.6330873686345557,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+14,pysr_r2w1.5_l0.001_nocv,longitudinal,0.45945025596401945,2.928386724330868,2.1848650491505137,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+17,pysr_r2w1.5_l0.001_nocv,longitudinal,0.3812469574759858,3.1526673965505925,2.295494241299094,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+20,pysr_r2w1.5_l0.001_nocv,longitudinal,0.3334452252675538,3.992047405942035,2.8249204205347196,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+23,pysr_r2w1.5_l0.001_nocv,longitudinal,0.3184514533670132,4.116676010393902,2.8915044420513314,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39
+27,pysr_r2w1.5_l0.001_nocv,longitudinal,0.2894990116511028,4.656023375957022,3.43799879733172,19,SUM_PGS002853 + SUM_PGS000921 + y5_bmiz + y5_a6 + 7.6*log(-0.51*y1_bmifa + age) - 12.39

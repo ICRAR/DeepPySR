@@ -10,5 +10,5 @@
 /**/predictions.csv
 /**/relationships.csv
 /test_data/
-/test/bmi/results_bmi/*/
-/test/cvd/results_cvd/*/
+/test/bmi/results_bmi_all/*/
+/test/bmi/results_bmi_nocv/*/

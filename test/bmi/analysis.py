@@ -1,1311 +1,690 @@
 import os
 import pandas as pd
-import re
 import numpy as np
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import glob
+import sys
+import re
 import sympy as sp
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
-from utils import load_agg_data
 
-sympy_cond = lambda x, y: sp.Piecewise((y, x > 0), (0, True))
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import seaborn as sns
+
+# Add test/ and test/bmi to path to import load_bmi_agg_data
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if not current_dir:
+    current_dir = "."
+sys.path.append(os.path.join(current_dir, ".."))
+sys.path.append(current_dir)
+
+from bmi_utils import load_bmi_agg_data
+
+def calculate_metrics(y_true, y_pred):
+    if len(y_true) == 0:
+        return np.nan, np.nan, np.nan
+    r2 = r2_score(y_true, y_pred)
+    # R2 should be no smaller than 0
+    r2 = max(0, r2)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    mae = mean_absolute_error(y_true, y_pred)
+    return r2, rmse, mae
 
 def calculate_complexity(formula_str):
-    if not formula_str or formula_str == "Failed to extract formula":
+    """
+    Calculate complexity as the number of operands and operators.
+    Operands: variables and constants.
+    Operators: +, -, *, /, sin, cos, exp, etc.
+    """
+    if not formula_str or pd.isna(formula_str):
         return 0
+    
+    # Tokenize formula
+    # Identify variables, operators, function names, and numbers
+    
+    # Operators and function names
+    tokens = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*|\d+\.?\d*|[\+\-\*\/\^]', str(formula_str))
+    
+    # Complexity is just the number of tokens found
+    return len(tokens)
+
+def map_variable_names(formula_str, feature_names):
+    """
+    Map x0, x1... or x_0, x_1... back to original feature names.
+    Use regex to avoid partial matches (e.g., x1 matching x10).
+    """
+    if not formula_str or pd.isna(formula_str):
+        return formula_str
+        
+    # Sort indices in descending order to avoid x10 being partially replaced by x1
+    indices = sorted(range(len(feature_names)), reverse=True)
+    
+    mapped_formula = str(formula_str)
+    for i in indices:
+        name = feature_names[i]
+        # Replace x_i and xi
+        mapped_formula = re.sub(rf'\bx_{i}\b', name, mapped_formula)
+        mapped_formula = re.sub(rf'\bx{i}\b', name, mapped_formula)
+        
+    return mapped_formula
+
+def evaluate_formula(formula_str, X):
+    """
+    Evaluate a symbolic formula (PySR, DeepPySR, or KAN) using SymPy.
+    Supports both indexed variables (x0, x1...) and raw feature names.
+    """
+    if not formula_str or pd.isna(formula_str):
+        return np.zeros(len(X))
+    
+    # Identify variables in formula
     try:
-        # Standardize the formula for sympy parsing
-        # KAN formulas might have some peculiarities, but sympy.parse_expr is generally robust
-        # We need to handle potential custom functions if they appear in KAN
-        from sympy.parsing.sympy_parser import parse_expr
-        # Involved variables are usually x_0, x_1, ... in KAN symbolic formulas
-        expr = parse_expr(formula_str)
+        # Pre-process some KAN-style or other common functional names to be SymPy compatible if needed
+        # For now, let's try standard sp.sympify
         
-        def count_nodes(e):
-            return 1 + sum(count_nodes(arg) for arg in e.args)
+        # local_dict for sympify to handle some common functions if they are not standard
+        # PySR sometimes uses 'inv(x)', 'neg(x)', 'square(x)', 'cube(x)'
+        custom_functions = {
+            'log': lambda x: sp.log(x),
+            'inv': lambda x: 1/x,
+            'neg': lambda x: -x,
+            'square': lambda x: x**2,
+            'cube': lambda x: x**3,
+            'add': lambda x, y: x + y,
+            'sub': lambda x, y: x - y,
+            'mul': lambda x, y: x * y,
+            'div': lambda x, y: x / y,
+            'power': lambda x, y: x**y,
+            'cond': lambda x, y: sp.Piecewise((y, x > 0), (0, True))
+        }
+        
+        expr = sp.sympify(str(formula_str), locals=custom_functions)
+        
+        # Feature names from X
+        feature_names = list(X.columns) if hasattr(X, 'columns') else []
+        
+        # Mapping for indexed variables if they exist in formula
+        # We replace x0, x1... and x_0, x_1... with the actual column names
+        subs_dict = {}
+        for i, name in enumerate(feature_names):
+            subs_dict[sp.Symbol(f"x{i}")] = sp.Symbol(name)
+            subs_dict[sp.Symbol(f"x_{i}")] = sp.Symbol(name)
             
-        return count_nodes(expr)
+        expr = expr.xreplace(subs_dict)
+        
+        # Now evaluate the expression with X's data
+        # We use lambdify for performance
+        variables = sorted([str(s) for s in expr.free_symbols])
+        
+        # Prepare input data for lambdify
+        input_data = []
+        for var in variables:
+            if var in X.columns:
+                input_data.append(X[var].values)
+            else:
+                # If variable is not in X, it might be an indexed variable that wasn't replaced (shouldn't happen with raw names requirement)
+                # or it's a constant that was parsed as a symbol
+                input_data.append(np.zeros(len(X)))
+        
+        f_lambdified = sp.lambdify(variables, expr, modules=['numpy'])
+        
+        if not variables:
+            # Constant formula
+            y_pred = float(expr)
+        else:
+            with np.errstate(all='ignore'):
+                y_pred = f_lambdified(*input_data)
+            
+        # Ensure it's a numpy array of correct length
+        if np.isscalar(y_pred):
+            y_pred = np.full(len(X), y_pred)
+            
+        return np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
+        
     except Exception as e:
-        print(f"Warning: Could not calculate complexity for formula '{formula_str}': {e}")
-        # Fallback: count words/operators as a very rough estimate
-        return len(re.findall(r'\w+|[+\-*/()^]', formula_str))
+        # print(f"Error evaluating formula {formula_str}: {e}")
+        return np.zeros(len(X))
 
-def truncate_formula(formula, max_length=50):
-    if not isinstance(formula, str):
-        return formula
-    if len(formula) <= max_length:
-        return formula
-    return formula[:max_length] + "..."
-
-def parse_folder_name(folder_name):
-    # Example: yr8_single_pypysr_r2w1.5_lambda0.001
-    year_match = re.search(r'yr(\d+)', folder_name)
-    model_provider_match = re.search(r'single_([^_]+)', folder_name)
-    r2_weight_match = re.search(r'r2w([\d.]+)', folder_name)
-    lambda_match = re.search(r'lambda([\d.]+)', folder_name)
+def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold'):
+    """
+    Find the best formula by evaluating all fold-specific formulas on raw data.
+    Works for DeepPySR, PySR (prefix='relationships_fold') and KAN (prefix='formulas_fold').
+    """
+    best_r2 = -float('inf')
+    best_formula = ""
+    best_complexity = np.nan
+    best_metrics = (np.nan, np.nan, np.nan)
     
-    year = int(year_match.group(1)) if year_match else None
-    model_provider = model_provider_match.group(1) if model_provider_match else None
-    r2_weight = float(r2_weight_match.group(1)) if r2_weight_match else None
-    complexity_lambda = float(lambda_match.group(1)) if lambda_match else None
+    feature_names = list(X.columns) if hasattr(X, 'columns') else []
     
-    return year, model_provider, r2_weight, complexity_lambda
-
-def parse_agg_folder_name(folder_name):
-    # Example: cfgstdsr_par0.001_pop15_popsz100_scl50.0_prnst50_ramp150_max0.7_r2w1_lambda0.005
-    patterns = {
-        'cfg': r'cfg([A-Za-z0-9_]+)',
-        'parsimony': r'par([\d.]+)',
-        'population': r'pop(\d+)',
-        'pop_size': r'popsz(\d+)',
-        'parsimony_scaling': r'scl([\d.]+)',
-        'prune_start': r'prnst(\d+)',
-        'prune_ramp': r'ramp(\d+)',
-        'prune_max': r'max([\d.]+)',
-        'r2_weight': r'r2w([\d.]+)',
-        'complexity_lambda': r'lambda([\d.]+)'
-    }
-    results = {}
-    for key, pattern in patterns.items():
-        match = re.search(pattern, folder_name)
-        if match:
-            # Try to convert to int if possible, otherwise float
-            val = match.group(1)
-            try:
-                if '.' in val:
-                    results[key] = float(val)
-                else:
-                    results[key] = int(val)
-            except ValueError:
-                results[key] = val
+    pattern = os.path.join(folder_path, f"{prefix}*.csv")
+    files = glob.glob(pattern)
+    
+    # Also check for non-prefixed relationships.csv or formulas.csv if no folds found
+    if not files:
+        if 'relationships' in prefix:
+            alt = os.path.join(folder_path, "relationships.csv")
         else:
-            results[key] = None
-    return results
+            alt = os.path.join(folder_path, "formulas.csv")
+        if os.path.exists(alt):
+            files = [alt]
 
-def aggregate_agg_results(base_dir):
+    for f in files:
+        try:
+            df = pd.read_csv(f)
+            if 'formula' in df.columns:
+                # Use a different loop to avoid potential confusion with row/Series
+                for idx in range(len(df)):
+                    formula = str(df.loc[idx, 'formula'])
+                    complexity = calculate_complexity(formula)
+                    
+                    y_pred = evaluate_formula(formula, X)
+                    r2, rmse, mae = calculate_metrics(y_true, y_pred)
+                    
+                    if not np.isnan(r2) and r2 > best_r2:
+                        best_r2 = r2
+                        best_formula = map_variable_names(formula, feature_names)
+                        best_complexity = complexity
+                        best_metrics = (r2, rmse, mae)
+                # print(f"Evaluated {f}, best_r2 so far: {best_r2}")
+        except Exception as e:
+            # print(f"Error processing file {f}: {e}")
+            continue
+            
+    if best_formula == "":
+        # print(f"Warning: No formula found in {folder_path} with prefix {prefix}")
+        pass
+    return best_formula, best_complexity, best_metrics
+
+def process_results():
+    base_dir = os.path.join(current_dir, "results_bmi_all")
     all_data = []
     
-    for root, dirs, files in os.walk(base_dir):
-        if 'relationships.csv' in files:
-            folder_name = os.path.basename(root)
-            params = parse_agg_folder_name(folder_name)
-            
-            file_path = os.path.join(root, 'relationships.csv')
-            df = pd.read_csv(file_path)
-
-            # Filter for target 'y' or 'target_bmi'
-            df_y = df[df['target'].isin(['y', 'target_bmi'])].copy()
-
-            if not df_y.empty:
-                # Add metadata columns
-                for i, (key, value) in enumerate(params.items()):
-                    df_y.insert(i, key, value)
-                
-                all_data.append(df_y)
+    # Ages to look for
+    ages = [8, 10, 14, 17, 20, 23, 27]
     
-    if not all_data:
-        print(f"No data found in {base_dir}.")
-        return
-    
-    aggregated_df = pd.concat(all_data, ignore_index=True)
-    
-    # Sort by r2, complexity order
-    # Note: 'complexity' is a column in the original CSV
-    sort_cols = ['r2_weight', 'complexity_lambda', 'r2', 'complexity']
-    # Filter only columns that exist in the dataframe
-    sort_cols = [c for c in sort_cols if c in aggregated_df.columns]
-    
-    ascending = [True] * len(sort_cols)
-    if 'r2' in sort_cols:
-        r2_idx = sort_cols.index('r2')
-        ascending[r2_idx] = False
-    
-    aggregated_df = aggregated_df.sort_values(by=sort_cols, ascending=ascending)
-    
-    # Rename columns to match requested names if necessary
-    aggregated_df = aggregated_df.rename(columns={
-        'r2_weight': 'pareto r2 weight',
-        'complexity_lambda': 'lambda for complexity'
-    })
-    
-    output_path = os.path.join(base_dir, 'aggregated_agg_results_bmi.csv')
-    aggregated_df.to_csv(output_path, index=False)
-    print(f"Aggregated results saved to {output_path}")
-
-
-def calculate_performance_metrics(base_dir):
-    _, X, y_target = load_agg_data()
-    y_target = y_target.values.flatten()
-    
-    # We need 'age' to calculate metrics per age
-    if 'age' not in X.columns:
-        print("Error: 'age' column not found in data.")
-        return
-
-    ages = X['age'].unique()
-    all_metrics = []
-
-    for root, dirs, files in os.walk(base_dir):
-        if 'relationships.csv' in files:
-            folder_name = os.path.basename(root)
-            params = parse_agg_folder_name(folder_name)
-            
-            file_path = os.path.join(root, 'relationships.csv')
-            rel_df = pd.read_csv(file_path)
-            
-            # Find formula for 'y' or 'target_bmi'
-            y_rel = rel_df[rel_df['target'].isin(['y', 'target_bmi'])]
-            if y_rel.empty:
+    # 1. Process age-specific
+    age_spec_dir = os.path.join(base_dir, "age_specific")
+    if os.path.exists(age_spec_dir):
+        for age_folder in os.listdir(age_spec_dir):
+            if not age_folder.startswith("age_"):
                 continue
+            age = int(age_folder.split("_")[1])
+            age_path = os.path.join(age_spec_dir, age_folder)
             
-            formula_str = y_rel.iloc[0]['formula']
-            involved = [s.strip() for s in y_rel.iloc[0]['involved'].split(',')]
-            
-            try:
-                # Use sympy to evaluate the formula
-                # Custom mapping for 'cond'
-                extra_mappings = {'cond': sympy_cond}
-                modules = [extra_mappings, 'numpy']
-                
-                # Parse formula to sympy
-                # Note: sympy.sympify might not handle custom 'cond' directly if it's not defined
-                # But DeepPySRRegressor uses sp.lambdify with custom mappings.
-                # We need to ensure all variables are symbols
-                symbols = {s: sp.Symbol(s) for s in involved}
-                # Replace 'cond' in string to something sympy understands or use parse_expr
-                from sympy.parsing.sympy_parser import parse_expr
-                expr = parse_expr(formula_str, local_dict=symbols)
-                
-                # Handle Piecewise/cond if necessary. 
-                # If formula_str has 'cond(a, b)', parse_expr might create a Function('cond')(a, b)
-                # We need to map it to our sympy_cond
-                if 'cond' in formula_str:
-                    f_cond = sp.Function('cond')
-                    expr = expr.replace(f_cond, sympy_cond)
-
-                func = sp.lambdify([symbols[s] for s in involved], expr, modules=modules)
-                
-                # Prepare arguments from X
-                args = [X[s].values for s in involved]
-                y_pred = func(*args)
-                
-                # Handle NaNs and Infs
-                y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-                
-                # Calculate overall R2
-                overall_r2 = max(0, min(1, r2_score(y_target, y_pred)))
-                
-                # Calculate metrics per age
-                for age in sorted(ages):
-                    mask = (X['age'] == age)
-                    if not mask.any():
+            # Baselines (including KAN/KANSym)
+            baselines_dir = os.path.join(age_path, "baselines")
+            if os.path.exists(baselines_dir):
+                for model_name in os.listdir(baselines_dir):
+                    model_path = os.path.join(baselines_dir, model_name)
+                    if not os.path.isdir(model_path):
                         continue
+                    
+                    pred_file = os.path.join(model_path, "predictions.csv")
+                    if os.path.exists(pred_file):
+                        df_pred = pd.read_csv(pred_file)
+                        if model_name.lower() == 'kan':
+                            # KAN
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
+                            all_data.append([age, 'KAN', 'age-specific', r2, rmse, mae, np.nan, ""])
+                            
+                            # KANSym
+                            if 'y_pred_kansym' in df_pred.columns:
+                                # For KANSym, we need formula and complexity
+                                # The user wants us to check all formulas and pick the best one
+                                _, X_age, y_age = load_bmi_agg_data(age=age)
+                                formula, complexity, metrics = get_best_formula_from_raw(model_path, X_age, y_age, prefix='formulas_fold')
+                                r2, rmse, mae = metrics
+                                
+                                if not formula:
+                                    r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred_kansym'])
+
+                                all_data.append([age, 'KANSym', 'age-specific', r2, rmse, mae, complexity, formula])
+                        else:
+                            # Other baselines
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
+                            all_data.append([age, model_name, 'age-specific', r2, rmse, mae, np.nan, ""])
+            
+            # DeepPySR
+            deeppysr_dir = os.path.join(age_path, "deeppysr")
+            if os.path.exists(deeppysr_dir):
+                for variant in os.listdir(deeppysr_dir):
+                    v_path = os.path.join(deeppysr_dir, variant)
+                    if not os.path.isdir(v_path): continue
+                    pred_file = os.path.join(v_path, "predictions.csv")
+                    if os.path.exists(pred_file):
+                        _, X_age, y_age = load_bmi_agg_data(age=age)
+                        formula, complexity, metrics = get_best_formula_from_raw(v_path, X_age, y_age)
+                        r2, rmse, mae = metrics
                         
-                    y_true_age = y_target[mask]
-                    y_pred_age = y_pred[mask]
-                    
-                    r2 = max(0, min(1, r2_score(y_true_age, y_pred_age)))
-                    mae = mean_absolute_error(y_true_age, y_pred_age)
-                    rmse = np.sqrt(mean_squared_error(y_true_age, y_pred_age))
-                    
-                    metric_row = params.copy()
-                    metric_row.update({
-                        'age': age,
-                        'r2': r2,
-                        'mae': mae,
-                        'rmse': rmse,
-                        'overall_r2': overall_r2,
-                        'complexity': y_rel.iloc[0]['complexity'],
-                        'formula': formula_str
-                    })
-                    all_metrics.append(metric_row)
-                    
-            except Exception as e:
-                print(f"Error evaluating formula in {folder_name}: {e}")
-
-    if not all_metrics:
-        print("No metrics calculated.")
-        return
-
-    metrics_df = pd.DataFrame(all_metrics)
-    
-    # Rename columns for consistency
-    metrics_df = metrics_df.rename(columns={
-        'r2_weight': 'pareto r2 weight',
-        'complexity_lambda': 'lambda for complexity'
-    })
-    
-    # Sort by metrics
-    sort_cols = ['pareto r2 weight', 'lambda for complexity', 'age']
-    sort_cols = [c for c in sort_cols if c in metrics_df.columns]
-    metrics_df = metrics_df.sort_values(by=sort_cols)
-    
-    output_path = os.path.join(base_dir, 'performance_metrics_bmi.csv')
-    metrics_df.to_csv(output_path, index=False)
-    print(f"Performance metrics saved to {output_path}")
-
-def plot_performance_metrics_interactive(base_dir):
-    csv_path = os.path.join(base_dir, 'performance_metrics_bmi.csv')
-    if not os.path.exists(csv_path):
-        print(f"Error: {csv_path} not found.")
-        return
-
-    df = pd.read_csv(csv_path)
-    
-    # Columns that define a combination
-    param_cols = [
-        'cfg', 'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
-        'prune_start', 'prune_ramp', 'prune_max', 
-        'pareto r2 weight', 'lambda for complexity'
-    ]
-    
-    # Filter only columns that exist
-    param_cols = [c for c in param_cols if c in df.columns]
-    
-    # Group by parameter combinations
-    grouped = df.groupby(param_cols)
-    
-    # Sort by parameter combinations
-    # Sorting group members by age is already done later
-    
-    metrics = ['r2', 'mae', 'rmse', 'complexity']
-    titles = ['R2 Score', 'MAE', 'Formula Complexity', 'RMSE']
-    
-    # R2 (top left, 1,1), MAE (top right, 1,2), Complexity (bottom left, 2,1), RMSE (bottom right, 2,2)
-    fig = make_subplots(rows=2, cols=2, 
-                        shared_xaxes=False, 
-                        subplot_titles=titles,
-                        vertical_spacing=0.15,
-                        horizontal_spacing=0.1)
-    
-    # Mapping metrics to grid positions
-    # R2: (1,1), MAE: (1,2), Complexity: (2,1), RMSE: (2,2)
-    metric_pos = {
-        'r2': (1, 1),
-        'mae': (1, 2),
-        'complexity': (2, 1),
-        'rmse': (2, 2)
-    }
-    
-    # Color palette
-    colors = [
-        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-    ]
-    
-    # Track traces for spikelines and unified hover
-    for color_idx, (params, group) in enumerate(grouped):
-        # Create label from params
-        label_parts = []
-        if isinstance(params, (list, tuple)):
-            for col, val in zip(param_cols, params):
-                label_parts.append(f"{col}={val}")
-        else:
-            label_parts.append(f"{param_cols[0]}={params}")
-        
-        label = ", ".join(label_parts)
-        group = group.sort_values('age')
-        
-        color = colors[color_idx % len(colors)]
-        
-        for i, metric in enumerate(metrics):
-            show_legend = (i == 0) # Only show legend once per group
-            row, col = metric_pos[metric]
-            fig.add_trace(
-                go.Scatter(
-                    x=group['age'], 
-                    y=group[metric], 
-                    mode='lines+markers',
-                    name=label,
-                    line=dict(color=color, width=2.5),
-                    legendgroup=label,
-                    showlegend=show_legend,
-                    # Ensure hover is shared across the group
-                    hoverinfo='all',
-                    hovertemplate=f"Age: %{{x}}<br>{metric.upper()}: %{{y:.4f}}<br>Model: {label}<br>Formula: {group.iloc[0]['formula']}<extra></extra>"
-                ),
-                row=row, col=col
-            )
-            
-    fig.update_layout(
-        height=900,
-        width=1800,
-        title_text="Performance Metrics by Age (Interactive)",
-        showlegend=True,
-        # Sync hover across subplots
-        hovermode="closest",
-        legend=dict(
-            orientation="v",
-            yanchor="bottom",
-            y=-0.05,
-            xanchor="left",
-            x=-0.03,
-            # Limit the width of the legend to prevent it from squashing the plot
-            entrywidth=350,
-            # Sync entire group toggle
-            groupclick="togglegroup",
-            # Make the legend scrollable
-            traceorder="normal",
-            itemsizing="constant",
-            # Add a background to the legend for better readability
-            bgcolor="rgba(255, 255, 255, 0.8)",
-            bordercolor="Black",
-            borderwidth=1
-        ),
-        # Adjust margins
-        margin=dict(r=80, l=80, t=100, b=50),
-        # Reduce font size to fit more in the legend
-        legend_font_size=10
-    )
-    
-    # Constrain legend height to make it scrollable
-    fig.update_layout(legend=dict(
-        maxheight=400
-    ))
-    
-    for r, c in [(1,1), (1,2), (2,1), (2,2)]:
-        # Sync x-axes and add spikelines for highlighting across plots
-        fig.update_xaxes(
-            title_text="Age", 
-            row=r, col=c,
-            matches='x', # Link all x-axes
-            showspikes=True, 
-            spikemode='across', 
-            spikesnap='cursor',
-            spikedash='dot',
-            spikethickness=1
-        )
-    
-    fig.update_yaxes(title_text="R2 Score", row=1, col=1)
-    fig.update_yaxes(title_text="MAE", row=1, col=2)
-    fig.update_yaxes(title_text="Complexity", row=2, col=1)
-    fig.update_yaxes(title_text="RMSE", row=2, col=2)
-
-    output_html = os.path.join(base_dir, 'performance_metrics_plot.html')
-    fig.write_html(output_html)
-    print(f"Interactive plot saved to {output_html}")
-
-def parse_age_folder_name(folder_name):
-    # Example: age10_cfgstdsr_par0.01_pop20_popsz100_scl100.0_prnst50_ramp150_max0.6_r2w1.5_lambda0.001
-    patterns = {
-        'age': r'age(\d+)',
-        'cfg': r'cfg([A-Za-z0-9_]+)',
-        'parsimony': r'par([\d.]+)',
-        'population': r'pop(\d+)',
-        'pop_size': r'popsz(\d+)',
-        'parsimony_scaling': r'scl([\d.]+)',
-        'prune_start': r'prnst(\d+)',
-        'prune_ramp': r'ramp(\d+)',
-        'prune_max': r'max([\d.]+)',
-        'r2_weight': r'r2w([\d.]+)',
-        'complexity_lambda': r'lambda([\d.]+)'
-    }
-    results = {}
-    for key, pattern in patterns.items():
-        match = re.search(pattern, folder_name)
-        if match:
-            # Try to convert to int if possible, otherwise float
-            val = match.group(1)
-            try:
-                if '.' in val:
-                    results[key] = float(val)
-                else:
-                    results[key] = int(val)
-            except ValueError:
-                results[key] = val
-        else:
-            results[key] = None
-    return results
-
-def aggregate_age_results(base_dir):
-    all_data = []
-    
-    for root, dirs, files in os.walk(base_dir):
-        if 'relationships.csv' in files:
-            folder_name = os.path.basename(root)
-            params = parse_age_folder_name(folder_name)
-            
-            file_path = os.path.join(root, 'relationships.csv')
-            df = pd.read_csv(file_path)
-
-            # Filter for target 'y' or 'target_bmi'
-            df_y = df[df['target'].isin(['y', 'target_bmi'])].copy()
-
-            if not df_y.empty:
-                # Add metadata columns
-                # Filter out None values to keep DataFrame clean
-                params = {k: v for k, v in params.items() if v is not None}
-                for i, (key, value) in enumerate(params.items()):
-                    df_y.insert(i, key, value)
-                
-                all_data.append(df_y)
-    
-    if not all_data:
-        print(f"No data found in {base_dir}.")
-        return
-    
-    aggregated_df = pd.concat(all_data, ignore_index=True)
-    
-    # Sort by age, cfg, r2, complexity
-    sort_cols = ['age', 'cfg', 'r2_weight', 'complexity_lambda', 'r2', 'complexity']
-    sort_cols = [c for c in sort_cols if c in aggregated_df.columns]
-    
-    ascending = [True] * len(sort_cols)
-    if 'r2' in sort_cols:
-        r2_idx = sort_cols.index('r2')
-        ascending[r2_idx] = False
-    
-    aggregated_df = aggregated_df.sort_values(by=sort_cols, ascending=ascending)
-    
-    # Rename columns
-    aggregated_df = aggregated_df.rename(columns={
-        'r2_weight': 'pareto r2 weight',
-        'complexity_lambda': 'lambda for complexity'
-    })
-    
-    output_path = os.path.join(base_dir, 'aggregated_age_results_bmi.csv')
-    aggregated_df.to_csv(output_path, index=False)
-    print(f"Aggregated results saved to {output_path}")
-
-def calculate_age_performance_metrics(base_dir):
-    all_metrics = []
-
-    for root, dirs, files in os.walk(base_dir):
-        if 'relationships.csv' in files:
-            folder_name = os.path.basename(root)
-            params = parse_age_folder_name(folder_name)
-            age = params.get('age')
-            if age is None:
-                continue
-                
-            # Load data for this specific age
-            _, X, y_target = load_agg_data(age=age)
-            y_target = y_target.values.flatten()
-            
-            file_path = os.path.join(root, 'relationships.csv')
-            rel_df = pd.read_csv(file_path)
-            
-            # Find formula for 'y' or 'target_bmi'
-            y_rel = rel_df[rel_df['target'].isin(['y', 'target_bmi'])]
-            if y_rel.empty:
-                continue
-            
-            formula_str = y_rel.iloc[0]['formula']
-            involved = [s.strip() for s in y_rel.iloc[0]['involved'].split(',')]
-            
-            try:
-                extra_mappings = {'cond': sympy_cond}
-                modules = [extra_mappings, 'numpy']
-                
-                symbols = {s: sp.Symbol(s) for s in involved}
-                from sympy.parsing.sympy_parser import parse_expr
-                expr = parse_expr(formula_str, local_dict=symbols)
-                
-                if 'cond' in formula_str:
-                    f_cond = sp.Function('cond')
-                    expr = expr.replace(f_cond, sympy_cond)
-
-                func = sp.lambdify([symbols[s] for s in involved], expr, modules=modules)
-                
-                args = [X[s].values for s in involved]
-                y_pred = func(*args)
-                
-                y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-                
-                r2 = max(0, min(1, r2_score(y_target, y_pred)))
-                mae = mean_absolute_error(y_target, y_pred)
-                rmse = np.sqrt(mean_squared_error(y_target, y_pred))
-                
-                metric_row = params.copy()
-                metric_row.update({
-                    'r2': r2,
-                    'mae': mae,
-                    'rmse': rmse,
-                    'complexity': y_rel.iloc[0]['complexity'],
-                    'formula': formula_str
-                })
-                all_metrics.append(metric_row)
-                    
-            except Exception as e:
-                print(f"Error evaluating formula in {folder_name}: {e}")
-
-    if not all_metrics:
-        print("No metrics calculated.")
-        return
-
-    metrics_df = pd.DataFrame(all_metrics)
-    
-    metrics_df = metrics_df.rename(columns={
-        'r2_weight': 'pareto r2 weight',
-        'complexity_lambda': 'lambda for complexity'
-    })
-    
-    sort_cols = ['pareto r2 weight', 'lambda for complexity', 'age']
-    sort_cols = [c for c in sort_cols if c in metrics_df.columns]
-    metrics_df = metrics_df.sort_values(by=sort_cols)
-    
-    output_path = os.path.join(base_dir, 'performance_metrics_age_bmi.csv')
-    metrics_df.to_csv(output_path, index=False)
-    print(f"Performance metrics saved to {output_path}")
-
-def plot_age_performance_metrics_interactive(base_dir):
-    csv_path = os.path.join(base_dir, 'performance_metrics_age_bmi.csv')
-    if not os.path.exists(csv_path):
-        print(f"Error: {csv_path} not found.")
-        return
-
-    df = pd.read_csv(csv_path)
-    
-    param_cols = [
-        'cfg', 'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
-        'prune_start', 'prune_ramp', 'prune_max', 
-        'pareto r2 weight', 'lambda for complexity'
-    ]
-    
-    param_cols = [c for c in param_cols if c in df.columns]
-    grouped = df.groupby(param_cols)
-    
-    metrics = ['r2', 'mae', 'rmse', 'complexity']
-    fig = make_subplots(rows=2, cols=2, 
-                        subplot_titles=['R2 Score', 'MAE', 'Formula Complexity', 'RMSE'],
-                        vertical_spacing=0.15,
-                        horizontal_spacing=0.1)
-    
-    metric_pos = {
-        'r2': (1, 1),
-        'mae': (1, 2),
-        'complexity': (2, 1),
-        'rmse': (2, 2)
-    }
-    
-    colors = [
-        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-    ]
-    
-    for color_idx, (params, group) in enumerate(grouped):
-        label_parts = []
-        if isinstance(params, (list, tuple)):
-            for col, val in zip(param_cols, params):
-                label_parts.append(f"{col}={val}")
-        else:
-            label_parts.append(f"{param_cols[0]}={params}")
-        
-        label = ", ".join(label_parts)
-        group = group.sort_values('age')
-        
-        color = colors[color_idx % len(colors)]
-        
-        for i, metric in enumerate(metrics):
-            show_legend = (i == 0)
-            row, col = metric_pos[metric]
-            fig.add_trace(
-                go.Scatter(
-                    x=group['age'], 
-                    y=group[metric], 
-                    mode='lines+markers',
-                    name=label,
-                    line=dict(color=color, width=2.5),
-                    legendgroup=label,
-                    showlegend=show_legend,
-                    hovertemplate=f"Age: %{{x}}<br>{metric.upper()}: %{{y:.4f}}<br>Model: {label}<br>Formula: {group.iloc[0]['formula']}<extra></extra>"
-                ),
-                row=row, col=col
-            )
-            
-    for r, c in [(1,1), (1,2), (2,1), (2,2)]:
-        # Sync x-axes
-        fig.update_xaxes(
-            title_text="Age", 
-            row=r, col=c,
-            matches='x'
-        )
-    
-    fig.update_yaxes(title_text="R2 Score", row=1, col=1)
-    fig.update_yaxes(title_text="MAE", row=1, col=2)
-    fig.update_yaxes(title_text="Complexity", row=2, col=1)
-    fig.update_yaxes(title_text="RMSE", row=2, col=2)
-
-    fig.update_layout(
-        height=900,
-        width=1800,
-        title_text="Age-Specific Models: Performance Metrics by Age",
-        showlegend=True,
-    )
-    
-    output_html = os.path.join(base_dir, 'performance_metrics_age_plot.html')
-    fig.write_html(output_html)
-    print(f"Interactive plot saved to {output_html}")
-
-def calculate_baseline_longitudinal_metrics(base_dir):
-    all_metrics = []
-    for root, dirs, files in os.walk(base_dir):
-        if 'predictions.csv' in files:
-            model_name = os.path.basename(root)
-            file_path = os.path.join(root, 'predictions.csv')
-            df = pd.read_csv(file_path)
-            
-            # Load formula if it exists (for KAN)
-            kan_formula = ""
-            if model_name.lower() == 'kan':
-                formula_files = [f for f in files if f.startswith('formula_fold')]
-                if formula_files:
-                    # Just use the first one or combine them if needed. For now, take first.
-                    with open(os.path.join(root, sorted(formula_files)[0]), 'r') as f:
-                        kan_formula = f.read().strip()
-
-            # Calculate metrics per age
-            ages = df['age'].unique()
-            for age in sorted(ages):
-                mask = (df['age'] == age)
-                df_age = df[mask]
-                
-                y_true = df_age['target_bmi']
-                
-                # Standard prediction
-                y_pred = df_age['pred_bmi']
-                r2 = max(0, min(1, r2_score(y_true, y_pred)))
-                mae = mean_absolute_error(y_true, y_pred)
-                rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-                
-                all_metrics.append({
-                    'model': model_name,
-                    'age': age,
-                    'r2': r2,
-                    'mae': mae,
-                    'rmse': rmse,
-                    'formula': kan_formula if model_name.lower() == 'kan' else "",
-                    'complexity': calculate_complexity(kan_formula) if model_name.lower() == 'kan' else 0
-                })
-
-                # KAN Symbolic prediction
-                if model_name.lower() == 'kan' and 'pred_bmi_sym' in df_age.columns:
-                    y_pred_sym = df_age['pred_bmi_sym']
-                    r2_sym = max(0, min(1, r2_score(y_true, y_pred_sym)))
-                    mae_sym = mean_absolute_error(y_true, y_pred_sym)
-                    rmse_sym = np.sqrt(mean_squared_error(y_true, y_pred_sym))
-                    all_metrics.append({
-                        'model': 'KANsym',
-                        'age': age,
-                        'r2': r2_sym,
-                        'mae': mae_sym,
-                        'rmse': rmse_sym,
-                        'formula': kan_formula,
-                        'complexity': calculate_complexity(kan_formula)
-                    })
-    
-    if not all_metrics:
-        print(f"No baseline longitudinal metrics found in {base_dir}")
-        return
-    
-    metrics_df = pd.DataFrame(all_metrics)
-    output_path = os.path.join(base_dir, 'baseline_longitudinal_metrics.csv')
-    metrics_df.to_csv(output_path, index=False)
-    print(f"Baseline longitudinal metrics saved to {output_path}")
-
-def calculate_baseline_age_metrics(base_dir):
-    all_metrics = []
-    for root, dirs, files in os.walk(base_dir):
-        if 'predictions.csv' in files:
-            folder_name = os.path.basename(root)
-            # Example folder name: yr10_elasticnet
-            match = re.search(r'yr(\d+)_([^_]+)', folder_name)
-            if match:
-                age = int(match.group(1))
-                model_name = match.group(2)
-            else:
-                continue
-                
-            file_path = os.path.join(root, 'predictions.csv')
-            df = pd.read_csv(file_path)
-            
-            # Load formula if it exists (for KAN)
-            kan_formula = ""
-            if model_name.lower() == 'kan':
-                formula_files = [f for f in files if f.startswith('formula_fold')]
-                if formula_files:
-                    with open(os.path.join(root, sorted(formula_files)[0]), 'r') as f:
-                        kan_formula = f.read().strip()
-
-            y_true = df['target_bmi']
-            
-            # Standard prediction
-            y_pred = df['pred_bmi']
-            r2 = max(0, min(1, r2_score(y_true, y_pred)))
-            mae = mean_absolute_error(y_true, y_pred)
-            rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-            
-            all_metrics.append({
-                'model': model_name,
-                'age': age,
-                'r2': r2,
-                'mae': mae,
-                'rmse': rmse,
-                'formula': kan_formula if model_name.lower() == 'kan' else "",
-                'complexity': calculate_complexity(kan_formula) if model_name.lower() == 'kan' else 0
-            })
-
-            # KAN Symbolic prediction
-            if model_name.lower() == 'kan' and 'pred_bmi_sym' in df.columns:
-                y_pred_sym = df['pred_bmi_sym']
-                r2_sym = max(0, min(1, r2_score(y_true, y_pred_sym)))
-                mae_sym = mean_absolute_error(y_true, y_pred_sym)
-                rmse_sym = np.sqrt(mean_squared_error(y_true, y_pred_sym))
-                all_metrics.append({
-                    'model': 'KANsym',
-                    'age': age,
-                    'r2': r2_sym,
-                    'mae': mae_sym,
-                    'rmse': rmse_sym,
-                    'formula': kan_formula,
-                    'complexity': calculate_complexity(kan_formula)
-                })
-            
-    if not all_metrics:
-        print(f"No baseline age metrics found in {base_dir}")
-        return
-    
-    metrics_df = pd.DataFrame(all_metrics)
-    output_path = os.path.join(base_dir, 'baseline_age_metrics.csv')
-    metrics_df.to_csv(output_path, index=False)
-    print(f"Baseline age metrics saved to {output_path}")
-
-def compare_longitudinal_vs_age(long_dir, age_dir, baseline_long_dir=None, baseline_age_dir=None):
-    long_csv = os.path.join(long_dir, 'performance_metrics_bmi.csv')
-    age_csv = os.path.join(age_dir, 'performance_metrics_age_bmi.csv')
-    
-    if not os.path.exists(long_csv) or not os.path.exists(age_csv):
-        print(f"Required CSVs for comparison not found in {long_dir} or {age_dir}.")
-        return
-
-    df_long = pd.read_csv(long_csv)
-    df_age = pd.read_csv(age_csv)
-    
-    # 1. Best longitudinal model (highest overall_r2)
-    best_long_model_idx = df_long['overall_r2'].idxmax()
-    # Identify the best model parameters
-    param_cols = [
-        'parsimony', 'population', 'pop_size', 'parsimony_scaling', 
-        'prune_start', 'prune_ramp', 'prune_max', 'pareto r2 weight', 'lambda for complexity'
-    ]
-    best_params_series = df_long.loc[best_long_model_idx, [c for c in param_cols if c in df_long.columns]]
-    
-    # Filter df_long to get all age metrics for this specific best model
-    query_parts = []
-    for col, val in best_params_series.items():
-        if isinstance(val, str):
-            query_parts.append(f"`{col}` == '{val}'")
-        else:
-            query_parts.append(f"`{col}` == {val}")
-    
-    best_long_metrics = df_long.query(" & ".join(query_parts)).sort_values('age')
-
-    # 1.5 Most Interpretable Longitudinal Model (Complexity < 13, highest overall_r2)
-    interpretable_long_df = df_long[df_long['complexity'] < 13]
-    best_interp_long_metrics = pd.DataFrame()
-    if not interpretable_long_df.empty:
-        best_interp_long_idx = interpretable_long_df['overall_r2'].idxmax()
-        interp_long_params_series = df_long.loc[best_interp_long_idx, [c for c in param_cols if c in df_long.columns]]
-        query_parts_interp = []
-        for col, val in interp_long_params_series.items():
-            if isinstance(val, str):
-                query_parts_interp.append(f"`{col}` == '{val}'")
-            else:
-                query_parts_interp.append(f"`{col}` == {val}")
-        best_interp_long_metrics = df_long.query(" & ".join(query_parts_interp)).sort_values('age')
-
-    # 2. Best age model for EACH age (highest r2 for that age)
-    best_age_metrics = df_age.loc[df_age.groupby('age')['r2'].idxmax()].sort_values('age')
-
-    # 2.5 Most Interpretable Age-Specific Model (Complexity < 13, highest overall_r2 among those, OR just best per age among <13?)
-    # Usually we want the best per age that is also interpretable.
-    interpretable_age_df = df_age[df_age['complexity'] < 13]
-    best_interp_age_metrics = pd.DataFrame()
-    if not interpretable_age_df.empty:
-        # Pick the best interpretable model for each age
-        best_interp_age_metrics = interpretable_age_df.loc[interpretable_age_df.groupby('age')['r2'].idxmax()].sort_values('age')
-
-    # Plot comparison
-    titles = ['R2 Score', 'Formula Complexity', 'MAE', 'RMSE', 'Feature Importance (Baseline Models)']
-    fig = make_subplots(
-        rows=3, cols=2, 
-        subplot_titles=titles,
-        specs=[[{}, {}], [{}, {}], [{"colspan": 2}, None]],
-        vertical_spacing=0.08
-    )
-    
-    # Grid positions: R2 (1,1), Complexity (1,2), MAE (2,1), RMSE (2,2)
-    metric_pos = {
-        'r2': (1, 1),
-        'complexity': (1, 2),
-        'mae': (2, 1),
-        'rmse': (2, 2)
-    }
-    
-    metrics = ['r2', 'complexity', 'mae', 'rmse']
-    
-    # Define colors for baselines
-    baseline_colors = {
-        'elasticnet': 'coral',
-        'xgboost': 'orange',
-        'kan': 'magenta',
-        'kansym': 'purple',
-        'mlp': 'green',
-        'erf': 'blue',
-    }
-
-    for i, metric in enumerate(metrics):
-        row, col = metric_pos[metric]
-        # 1. Add Longitudinal Models first
-        # Best DeepPySR Longitudinal
-        fig.add_trace(go.Scatter(
-            x=best_long_metrics['age'], 
-            y=best_long_metrics[metric],
-            mode='lines+markers',
-            name='Best DeepPySR Longitudinal',
-            line=dict(color='red', width=3),
-            showlegend=(i == 0),
-            hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Best DeepPySR Longitudinal<br>Formula: %{text}<extra></extra>",
-            text=best_long_metrics['formula'].apply(lambda x: truncate_formula(x, 50))
-        ), row=row, col=col)
-
-        # Most Interpretable DeepPySR Longitudinal
-        if not best_interp_long_metrics.empty:
-            fig.add_trace(go.Scatter(
-                x=best_interp_long_metrics['age'], 
-                y=best_interp_long_metrics[metric],
-                mode='lines+markers',
-                name='Most Interpretable DeepPySR Longitudinal',
-                line=dict(color='black', width=2),
-                showlegend=(i == 0),
-                hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Most Interp DeepPySR Longitudinal<br>Formula: %{text}<extra></extra>",
-                text=best_interp_long_metrics['formula'].apply(lambda x: truncate_formula(x, 50))
-            ), row=row, col=col)
-
-        # Baseline Longitudinal Models
-        if baseline_long_dir:
-            bl_long_csv = os.path.join(baseline_long_dir, 'baseline_longitudinal_metrics.csv')
-            if os.path.exists(bl_long_csv):
-                df_bl_long = pd.read_csv(bl_long_csv)
-                for model in df_bl_long['model'].unique():
-                    # For complexity plot, only show models that have complexity (KAN, KANsym)
-                    if metric == 'complexity' and model.lower() not in ['kan', 'kansym']:
-                        continue
+                        if not formula:
+                            df_pred = pd.read_csv(pred_file)
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
                         
-                    model_df = df_bl_long[df_bl_long['model'] == model].sort_values('age')
-                    fig.add_trace(go.Scatter(
-                        x=model_df['age'],
-                        y=model_df[metric],
-                        mode='lines+markers',
-                        name=f'Longitudinal {model.upper()}',
-                        line=dict(color=baseline_colors.get(model.lower(), 'grey'), width=1.5),
-                        showlegend=(i == 0),
-                        legendgroup=f'bl_long_{model}',
-                        opacity=0.7,
-                        hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Longitudinal " + model.upper() + "<br>Formula: %{text}<extra></extra>",
-                        text=model_df['formula'].apply(lambda x: truncate_formula(x, 75)) if 'formula' in model_df.columns else [""] * len(model_df)
-                    ), row=row, col=col)
+                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
 
-        # 2. Add Age-Specific Models
-        # Best DeepPySR Age-Specific
-        fig.add_trace(go.Scatter(
-            x=best_age_metrics['age'], 
-            y=best_age_metrics[metric],
-            mode='lines+markers',
-            name='Best DeepPySR Age-Specific',
-            line=dict(color='red', width=3, dash='dash'),
-            showlegend=(i == 0),
-            hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Best DeepPySR Age-Specific<br>Formula: %{text}<extra></extra>",
-            text=best_age_metrics['formula'].apply(lambda x: truncate_formula(x, 75))
-        ), row=row, col=col)
-
-        # Most Interpretable DeepPySR Age-Specific
-        if not best_interp_age_metrics.empty:
-            fig.add_trace(go.Scatter(
-                x=best_interp_age_metrics['age'], 
-                y=best_interp_age_metrics[metric],
-                mode='lines+markers',
-                name='Most Interpretable DeepPySR Age-Specific',
-                line=dict(color='black', width=2, dash='dash'),
-                showlegend=(i == 0),
-                hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Most Interp DeepPySR Age-Specific<br>Formula: %{text}<extra></extra>",
-                text=best_interp_age_metrics['formula'].apply(lambda x: truncate_formula(x, 75))
-            ), row=row, col=col)
-
-        # Baseline Age-Specific Models
-        if baseline_age_dir:
-            bl_age_csv = os.path.join(baseline_age_dir, 'baseline_age_metrics.csv')
-            if os.path.exists(bl_age_csv):
-                df_bl_age = pd.read_csv(bl_age_csv)
-                for model in df_bl_age['model'].unique():
-                    # For complexity plot, only show models that have complexity (KAN, KANsym)
-                    if metric == 'complexity' and model.lower() not in ['kan', 'kansym']:
-                        continue
+            # PySR
+            pysr_dir = os.path.join(age_path, "pysr")
+            if os.path.exists(pysr_dir):
+                for variant in os.listdir(pysr_dir):
+                    v_path = os.path.join(pysr_dir, variant)
+                    if not os.path.isdir(v_path): continue
+                    pred_file = os.path.join(v_path, "predictions.csv")
+                    if os.path.exists(pred_file):
+                        _, X_age, y_age = load_bmi_agg_data(age=age)
+                        formula, complexity, metrics = get_best_formula_from_raw(v_path, X_age, y_age)
+                        r2, rmse, mae = metrics
                         
-                    model_df = df_bl_age[df_bl_age['model'] == model].sort_values('age')
-                    fig.add_trace(go.Scatter(
-                        x=model_df['age'],
-                        y=model_df[metric],
-                        mode='lines+markers',
-                        name=f'Age-Specific {model.upper()}',
-                        line=dict(color=baseline_colors.get(model.lower(), 'grey'), width=1.5, dash='dash'),
-                        showlegend=(i == 0),
-                        legendgroup=f'bl_age_{model}',
-                        opacity=0.7,
-                        hovertemplate="Age: %{x}<br>" + metric.upper() + ": %{y:.4f}<br>Model: Age-Specific " + model.upper() + "<br>Formula: %{text}<extra></extra>",
-                        text=model_df['formula'].apply(lambda x: truncate_formula(x, 75)) if 'formula' in model_df.columns else [""] * len(model_df)
-                    ), row=row, col=col)
-        
-        fig.update_xaxes(title_text="Age", row=row, col=col)
-        y_title = metric.upper() if metric != 'complexity' else 'Complexity'
-        
-        # For complexity, make y-axis log scale
-        if metric == 'complexity':
-            fig.update_yaxes(title_text=y_title, row=row, col=col, type='log')
-        else:
-            fig.update_yaxes(title_text=y_title, row=row, col=col)
+                        if not formula:
+                            df_pred = pd.read_csv(pred_file)
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
 
-    # Add Feature Importance Plot at the bottom
-    all_importances = []
-    
-    # 1. Load Longitudinal Baseline Importances
-    if baseline_long_dir and os.path.exists(baseline_long_dir):
-        for model_folder in os.listdir(baseline_long_dir):
-            imp_path = os.path.join(baseline_long_dir, model_folder, 'feature_importances.csv')
-            if os.path.exists(imp_path):
-                imp_df = pd.read_csv(imp_path)
-                # Take absolute value for feature importance
-                imp_df['importance'] = imp_df['importance'].abs()
-                # Normalize to percentage
-                total_imp = imp_df['importance'].sum()
-                if total_imp > 0:
-                    imp_df['importance'] = (imp_df['importance'] / total_imp) * 100
-                imp_df['model'] = f"Longitudinal {model_folder.upper()}"
-                all_importances.append(imp_df)
-    
-    # 2. Load Age-Specific Baseline Importances
-    if baseline_age_dir and os.path.exists(baseline_age_dir):
-        age_imps = []
-        for folder in os.listdir(baseline_age_dir):
-            if folder.startswith('yr') and '_' in folder:
-                imp_path = os.path.join(baseline_age_dir, folder, 'feature_importances.csv')
-                if os.path.exists(imp_path):
-                    parts = folder.split('_')
-                    model_name = parts[1].upper()
-                    imp_df = pd.read_csv(imp_path)
-                    # Take absolute value for feature importance
-                    imp_df['importance'] = imp_df['importance'].abs()
-                    # Normalize to percentage for this specific age model
-                    total_imp = imp_df['importance'].sum()
-                    if total_imp > 0:
-                        imp_df['importance'] = (imp_df['importance'] / total_imp) * 100
-                    imp_df['model_type'] = model_name
-                    age_imps.append(imp_df)
-        
-        if age_imps:
-            df_age_imps = pd.concat(age_imps)
-            # Average across ages for each model type
-            avg_age_imps = df_age_imps.groupby(['model_type', 'feature'])['importance'].mean().reset_index()
-            # Normalize the average again just in case, though it should already be close to 100
-            for model_type in avg_age_imps['model_type'].unique():
-                model_df = avg_age_imps[avg_age_imps['model_type'] == model_type]
-                total_imp = model_df['importance'].sum()
-                if total_imp > 0:
-                    avg_age_imps.loc[avg_age_imps['model_type'] == model_type, 'importance'] = (model_df['importance'] / total_imp) * 100
+                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
+
+    # 2. Process longitudinal
+    long_dir = os.path.join(base_dir, "longitudinal")
+    if os.path.exists(long_dir):
+        # We need to iterate over models here
+        sub_dirs = ['baselines', 'deeppysr', 'pysr']
+        for sd in sub_dirs:
+            sd_path = os.path.join(long_dir, sd)
+            if not os.path.exists(sd_path): continue
+            
+            for model_folder in os.listdir(sd_path):
+                m_path = os.path.join(sd_path, model_folder)
+                if not os.path.isdir(m_path): continue
                 
-            avg_age_imps['model'] = "Age-Specific " + avg_age_imps['model_type']
-            all_importances.append(avg_age_imps[['feature', 'importance', 'model']])
-    
-    if all_importances:
-        combined_imp = pd.concat(all_importances)
-        # Find the most important features based on the average across models
-        avg_imp = combined_imp.groupby('feature')['importance'].mean().sort_values(ascending=False).index.tolist()
-        
-        for model in combined_imp['model'].unique():
-            model_imp = combined_imp[combined_imp['model'] == model].set_index('feature').reindex(avg_imp).reset_index()
-            
-            # Use same colors but different patterns or dash for age-specific if needed, 
-            # but for now let's just use the colors.
-            base_model_name = model.replace("Longitudinal ", "").replace("Age-Specific ", "").lower()
-            color = baseline_colors.get(base_model_name, 'grey')
-            
-            # Distinguish between Longitudinal and Age-Specific using opacity or pattern
-            is_age_specific = "Age-Specific" in model
-            
-            fig.add_trace(go.Bar(
-                x=model_imp['feature'],
-                y=model_imp['importance'],
-                name=model,
-                marker_color=color,
-                marker_pattern_shape="x" if is_age_specific else "",
-                showlegend=True,
-                legendgroup=f'imp_{model}',
-                hovertemplate="Feature: %{x}<br>Importance: %{y:.2f}%<br>Model: " + model + "<extra></extra>"
-            ), row=3, col=1)
-        
-        fig.update_xaxes(
-            title_text="Features", 
-            row=3, col=1,
-            range=[-0.5, 14.5]
-        )
-        fig.update_yaxes(title_text="Importance (%)", row=3, col=1)
+                pred_file = os.path.join(m_path, "predictions.csv")
+                if os.path.exists(pred_file):
+                    df_pred = pd.read_csv(pred_file)
+                    # For longitudinal, get metrics PER age
+                    for age in ages:
+                        age_df = df_pred[df_pred['age'] == age]
+                        if age_df.empty: continue
+                        
+                        if sd == 'baselines' and model_folder.lower() == 'kan':
+                            # KAN
+                            r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
+                            all_data.append([age, 'KAN', 'longitudinal', r2, rmse, mae, np.nan, ""])
+                            
+                            # KANSym
+                            if 'y_pred_kansym' in age_df.columns:
+                                # For longitudinal, we should also check all formulas
+                                # Load all longitudinal data
+                                _, X_long, y_long = load_bmi_agg_data()
+                                formula, complexity, metrics = get_best_formula_from_raw(m_path, X_long, y_long, prefix='formulas_fold')
+                                
+                                if formula:
+                                    # Predict for THIS age using the best formula
+                                    X_age_data = X_long[X_long['age'] == age]
+                                    y_age_data = y_long[X_long['age'] == age]
+                                    y_pred_best = evaluate_formula(formula, X_age_data)
+                                    r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
+                                else:
+                                    r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred_kansym'])
+                                
+                                all_data.append([age, 'KANSym', 'longitudinal', r2, rmse, mae, complexity, formula])
+                        else:
+                            # For DeepPySR and PySR in longitudinal
+                            if sd in ['deeppysr', 'pysr']:
+                                _, X_long, y_long = load_bmi_agg_data()
+                                formula, complexity, _ = get_best_formula_from_raw(m_path, X_long, y_long)
+                                
+                                if formula:
+                                    X_age_data = X_long[X_long['age'] == age]
+                                    y_age_data = y_long[X_long['age'] == age]
+                                    y_pred_best = evaluate_formula(formula, X_age_data)
+                                    r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
+                                else:
+                                    r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
+                                
+                                model_name = model_folder
+                            else:
+                                r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
+                                formula, complexity = "", np.nan
+                                model_name = model_folder
+                                
+                            all_data.append([age, model_name, 'longitudinal', r2, rmse, mae, complexity, formula])
 
-    fig.update_layout(
-        height=1400,
-        width=2000,
-        title_text="Comparison: Best Longitudinal vs Best Age-Specific Models",
+    # Create DataFrame and save
+    result_df = pd.DataFrame(all_data, columns=['age', 'model', 'type', 'r2', 'rmse', 'mae', 'complexity', 'formula'])
+    # Clip r2 to 0
+    result_df['r2'] = result_df['r2'].clip(lower=0)
+    result_df.to_csv(os.path.join(base_dir, "bmi_aggregated_results.csv"), index=False)
+    print(f"Results saved to {os.path.join(base_dir, 'bmi_aggregated_results.csv')}")
+    return result_df
 
-        legend=dict(
-            orientation="v",
-            yanchor="middle",
-            y=0.5,
-            xanchor="left",
-            x=1.02,
-
-        ),
-        xaxis5=dict(
-            rangeslider=dict(visible=True),
-            rangeslider_thickness=0.05
-        )
-    )
-    
-    output_path = os.path.join(os.path.dirname(long_dir), 'longitudinal_vs_age_comparison.html')
-    fig.write_html(output_path)
-    print(f"Comparison plot saved to {output_path}")
-
-
-
-
-def compare_arg_configs_best(base_dir):
+def plot_results(df):
     """
-    Compare the four SR argument configurations by selecting the best performance
-    (highest R2) for each configuration at each age.
+    1. Plot r2, rmse, mae for the models, along the age.
     """
-    import matplotlib.pyplot as plt
-
-    # Check for both possible performance metric filenames
-    csv_paths = [
-        os.path.join(base_dir, 'performance_metrics_bmi.csv'),
-        os.path.join(base_dir, 'performance_metrics_age_bmi.csv')
-    ]
+    # Clip r2 to 0 for plotting
+    df = df.copy()
+    df['r2'] = df['r2'].clip(lower=0)
     
-    csv_path = None
-    for path in csv_paths:
+    # Select best models
+    # Best DeepPySR: Highest R2 among fullsr, stdsr, srpsm, srprn
+    # Interpretable DeepPySR: Highest R2 with complexity < 30
+    # KAN and KANSym independent
+    # Best PySR: Highest R2
+
+    metrics = ['r2', 'rmse', 'mae']
+    types = ['longitudinal', 'age-specific']
+    
+    # Identify unique models
+    all_models = df['model'].unique()
+    
+    selected_data = []
+    interpretable_formulas = []
+
+    for t in types:
+        type_df = df[df['type'] == t]
+        ages = sorted(type_df['age'].unique())
+        
+        for age in ages:
+            age_df = type_df[type_df['age'] == age]
+            
+            # DeepPySR variants
+            deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+            if not deeppysr_df.empty:
+                # Best DeepPySR
+                best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
+                best_deeppysr['display_model'] = 'Best DeepPySR'
+                selected_data.append(best_deeppysr)
+                
+                # Interpretable DeepPySR (complexity < 30)
+                interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 30]
+                if not interp_deeppysr_df.empty:
+                    interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
+                    interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
+                    selected_data.append(interp_deeppysr)
+                    interpretable_formulas.append({
+                        'age': age,
+                        'type': t,
+                        'model': interp_deeppysr['model'],
+                        'formula': interp_deeppysr['formula'],
+                        'r2': interp_deeppysr['r2'],
+                        'complexity': interp_deeppysr['complexity']
+                    })
+
+            # PySR variants
+            pysr_df = age_df[age_df['model'].str.contains('pysr_', na=False)]
+            if not pysr_df.empty:
+                best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
+                best_pysr['display_model'] = 'Best PySR'
+                selected_data.append(best_pysr)
+            
+            # KAN and KANSym
+            for m in ['KAN', 'KANSym']:
+                m_df = age_df[age_df['model'] == m]
+                if not m_df.empty:
+                    m_row = m_df.iloc[0].copy()
+                    m_row['display_model'] = m
+                    selected_data.append(m_row)
+            
+            # Other baselines (ElasticNet, ExtraTrees, MLP, RandomForest, XGBoost)
+            baselines = ['ElasticNet', 'ExtraTrees', 'MLP', 'RandomForest', 'XGBoost']
+            for b in baselines:
+                b_df = age_df[age_df['model'] == b]
+                if not b_df.empty:
+                    b_row = b_df.iloc[0].copy()
+                    b_row['display_model'] = b
+                    selected_data.append(b_row)
+
+    plot_df = pd.DataFrame(selected_data)
+    
+    # Create one figure with subplots for R2, RMSE, MAE
+    # Row 0: age-specific, Row 1: longitudinal
+    fig, axes = plt.subplots(2, 3, figsize=(22, 14))
+    plt.rcParams.update({'font.size': 14})
+    
+    palette = sns.color_palette("tab10", n_colors=len(plot_df['display_model'].unique()))
+    models = sorted(plot_df['display_model'].unique())
+    model_colors = dict(zip(models, palette))
+    
+    for row, t in enumerate(types): # types = ['longitudinal', 'age-specific']
+        # The prompt asks for Row 0: age-specific, Row 1: longitudinal
+        # types list is ['longitudinal', 'age-specific']
+        # Let's adjust row mapping: age-specific -> row 0, longitudinal -> row 1
+        current_row = 0 if t == 'age-specific' else 1
+        linestyle = '--' if t == 'age-specific' else '-'
+        
+        for col, metric in enumerate(metrics):
+            ax = axes[current_row, col]
+            
+            sns.lineplot(data=plot_df[plot_df['type'] == t], 
+                         x='age', y=metric, hue='display_model', ax=ax, 
+                         linestyle=linestyle, linewidth=3.0, palette=model_colors,
+                         marker='o', markersize=8)
+            
+            type_label = "Age-specific" if t == 'age-specific' else "Longitudinal"
+            ax.set_title(f'{type_label}: {metric.upper()} vs Age', fontsize=20, fontweight='bold', pad=15)
+            ax.set_ylabel(metric.upper(), fontsize=16)
+            ax.set_xlabel('Age', fontsize=16)
+            ax.tick_params(axis='both', which='major', labelsize=12)
+            
+            # Remove default legends
+            if ax.get_legend():
+                ax.get_legend().remove()
+    
+    # Create unified legend
+    legend_elements = []
+    # Add model colors
+    for model_name in models:
+        legend_elements.append(Line2D([0], [0], color=model_colors[model_name], lw=3, label=model_name))
+    
+    # Add spacers
+    legend_elements.append(Line2D([0], [0], color='white', label=''))
+    
+    # Add line types - remove markers from line style indicator to see the style more clearly
+    legend_elements.append(Line2D([0], [0], color='black', lw=3, ls='--', label='Age-specific'))
+    legend_elements.append(Line2D([0], [0], color='black', lw=3, ls='-', label='Longitudinal'))
+    
+    fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.91, 0.5), 
+               fontsize=14, frameon=True, title='Models & Types', title_fontsize=16,
+               handlelength=4.0) # Increase handlelength to show dashes more clearly
+    
+    plt.suptitle('BMI Prediction Performance: Best Models Comparison', fontsize=26, fontweight='bold', y=0.99)
+    plt.tight_layout(rect=[0, 0, 0.9, 0.96])
+    plot_path = os.path.join(current_dir, 'results_bmi_all', 'bmi_metrics_vs_age.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Combined metrics plot saved to {plot_path}")
+    
+    # Save the plot data for the best models to CSV
+    plot_csv_path = os.path.join(current_dir, 'results_bmi_all', 'bmi_best_models_metrics.csv')
+    plot_df.to_csv(plot_csv_path, index=False)
+    print(f"Best models plot data saved to {plot_csv_path}")
+    
+    # Print interpretable DeepPySR formulas
+    print("\n--- Interpretable DeepPySR Formulas (Complexity < 30) ---")
+    interp_df = pd.DataFrame(interpretable_formulas)
+    print(interp_df.to_string(index=False))
+    interp_csv_path = os.path.join(current_dir, 'results_bmi_all', 'interpretable_deeppysr_formulas.csv')
+    interp_df.to_csv(interp_csv_path, index=False)
+
+def plot_settings_comparison(df):
+    """
+    Plot performance (r2, mse, mae, complexity) for 4 settings of DeepPySR (fullsr, stdsr, srpsm, srprn) 
+    and PySR variants using r2w=1 and lambda=0.0001 (or l0.001 as found in folders).
+    """
+    # Filter for r2w1 and l0.001 (assuming 0.001 based on folder names)
+    # The user said 0.0001, but the folders say 0.001. I'll search for 'r2w1_' and 'l0.00'
+    target_settings = ['fullsr_r2w1_l0.001', 'stdsr_r2w1_l0.001', 'srpsm_r2w1_l0.001', 'srprn_r2w1_l0.001', 'pysr_r2w1_l0.001']
+    
+    # If no 0.001 but 0.0001 is found
+    if df[df['model'].str.contains('r2w1_l0.001', na=False)].empty and not df[df['model'].str.contains('r2w1_l0.0001', na=False)].empty:
+        target_settings = [s.replace('0.001', '0.0001') for s in target_settings]
+
+    plot_df = df[df['model'].isin(target_settings)].copy()
+    if plot_df.empty:
+        print(f"Warning: No data found for settings: {target_settings}")
+        return
+
+    # Calculate MSE from RMSE if not present (though prompt asks for MSE)
+    plot_df['mse'] = plot_df['rmse']**2
+    
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    types = ['age-specific', 'longitudinal']
+    
+    # Create one figure with subplots (2x4)
+    fig, axes = plt.subplots(2, 4, figsize=(26, 14))
+    plt.rcParams.update({'font.size': 16})
+    
+    palette = sns.color_palette("tab10", n_colors=len(plot_df['model'].unique()))
+    models = sorted(plot_df['model'].unique())
+    model_colors = dict(zip(models, palette))
+    
+    for row, t in enumerate(types):
+        linestyle = '--' if t == 'age-specific' else '-'
+        
+        for col, metric in enumerate(metrics):
+            ax = axes[row, col]
+            
+            sns.lineplot(data=plot_df[plot_df['type'] == t], 
+                         x='age', y=metric, hue='model', ax=ax, 
+                         linestyle=linestyle, linewidth=3.0, palette=model_colors,
+                         marker='o', markersize=8)
+            
+            lambda_val = "0.001" if "l0.001" in target_settings[0] else "0.0001"
+            type_label = "Age-specific" if t == 'age-specific' else "Longitudinal"
+            ax.set_title(f'{type_label}: {metric.upper()} vs Age', fontsize=20, fontweight='bold', pad=15)
+            ax.set_ylabel(metric.upper(), fontsize=16)
+            ax.set_xlabel('Age', fontsize=16)
+            ax.tick_params(axis='both', which='major', labelsize=12)
+            
+            # Remove default legends
+            if ax.get_legend():
+                ax.get_legend().remove()
+    
+    # Create unified legend
+    legend_elements = []
+    # Add model colors
+    for model_name in models:
+        legend_elements.append(Line2D([0], [0], color=model_colors[model_name], lw=3, label=model_name))
+    
+    # Add spacers
+    legend_elements.append(Line2D([0], [0], color='white', label=''))
+    
+    # Add line types - remove markers from line style indicator to see the style more clearly
+    legend_elements.append(Line2D([0], [0], color='black', lw=3, ls='--', label='Age-specific'))
+    legend_elements.append(Line2D([0], [0], color='black', lw=3, ls='-', label='Longitudinal'))
+    
+    fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.91, 0.5), 
+               fontsize=14, frameon=True, title='Settings & Types', title_fontsize=16,
+               handlelength=4.0) # Increase handlelength to show dashes more clearly
+    
+    plt.suptitle(f'DeepPySR vs PySR Settings Comparison (r2w=1, lambda={lambda_val})', fontsize=26, fontweight='bold', y=0.99)
+    plt.tight_layout(rect=[0, 0, 0.9, 0.96])
+    plot_path = os.path.join(current_dir, 'results_bmi_all', 'bmi_settings_comparison.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Combined settings comparison plot saved to {plot_path}")
+
+def aggregate_feature_importance():
+    """
+    Aggregate feature importance for ElasticNet, ExtraTrees, RandomForest, XGBoost, KAN.
+    Exclude DeepPySR, PySR, MLP.
+    Average across folds, percentage it.
+    """
+    base_dir = os.path.join(current_dir, "results_bmi_all")
+    ages = [8, 10, 14, 17, 20, 23, 27]
+    importance_data = []
+
+    # Helper to process importance file
+    def process_importance(path, model_name, age, type_str):
         if os.path.exists(path):
-            csv_path = path
-            break
-            
-    if csv_path is None:
-        print(f"Error: performance metrics CSV not found in {base_dir}. Skipping arg-config comparison.")
-        return
+            df_imp = pd.read_csv(path)
+            # Ensure it has 'feature' and 'importance' columns
+            if 'feature' in df_imp.columns and 'importance' in df_imp.columns:
+                # Percentage it
+                total = df_imp['importance'].sum()
+                if total > 0:
+                    df_imp['importance_pct'] = (df_imp['importance'] / total) * 100
+                else:
+                    df_imp['importance_pct'] = 0
+                
+                for _, row in df_imp.iterrows():
+                    importance_data.append({
+                        'age': age,
+                        'model': model_name,
+                        'type': type_str,
+                        'variable': row['feature'],
+                        'weight': row['importance_pct']
+                    })
 
-    df = pd.read_csv(csv_path)
+    # Age-specific
+    age_spec_dir = os.path.join(base_dir, "age_specific")
+    if os.path.exists(age_spec_dir):
+        for age_folder in os.listdir(age_spec_dir):
+            if not age_folder.startswith("age_"): continue
+            age = int(age_folder.split("_")[1])
+            baselines_dir = os.path.join(age_spec_dir, age_folder, "baselines")
+            if os.path.exists(baselines_dir):
+                for m in os.listdir(baselines_dir):
+                    if m in ['ElasticNet', 'ExtraTrees', 'RandomForest', 'XGBoost', 'KAN']:
+                        imp_file = os.path.join(baselines_dir, m, "feature_importance.csv")
+                        process_importance(imp_file, m, age, 'age-specific')
 
-    if 'cfg' not in df.columns:
-        print("Warning: 'cfg' column not found in metrics. Skipping plot.")
-        return
-    
-    if 'age' not in df.columns:
-        print("Warning: 'age' column not found in metrics. Skipping plot.")
-        return
+    # Longitudinal
+    long_baselines_dir = os.path.join(base_dir, "longitudinal", "baselines")
+    if os.path.exists(long_baselines_dir):
+        for m in os.listdir(long_baselines_dir):
+            if m in ['ElasticNet', 'ExtraTrees', 'RandomForest', 'XGBoost', 'KAN']:
+                imp_file = os.path.join(long_baselines_dir, m, "feature_importance.csv")
+                # For longitudinal, we record it for all ages (since it's a single model for all ages)
+                # Or maybe we just record it once with age=0 or 'all'
+                # The user says "do this for age-specific and longitudinal"
+                # For longitudinal, feature importance is global.
+                if os.path.exists(imp_file):
+                    df_imp = pd.read_csv(imp_file)
+                    total = df_imp['importance'].sum()
+                    pct = (df_imp['importance'] / total * 100) if total > 0 else 0
+                    for i, row in df_imp.iterrows():
+                        importance_data.append({
+                            'age': 'all',
+                            'model': m,
+                            'type': 'longitudinal',
+                            'variable': row['feature'],
+                            'weight': pct[i]
+                        })
 
-    # Determine if this is longitudinal or age-specific
-    is_longitudinal = 'longitudinal' in base_dir.lower()
-
-    # Filter for consistent r2w of 1 and lambda of 0.001
-    df = df[
-        (df['pareto r2 weight'] == 1) & 
-        (df['lambda for complexity'] == 0.001)
-    ]
+    imp_df = pd.DataFrame(importance_data)
+    imp_df.to_csv(os.path.join(base_dir,"feature_importance_aggregated.csv"), index=False)
+    print("Feature importance aggregated to results_bmi_all/feature_importance_aggregated.csv")
     
-    # Define the config requirements
-    arg_configs = {
-        "stdsr": {
-            "parsimony_scaling": 0.0,
-            "prune_max": 0.0,
-            "prune_start": 0,
-            "prune_ramp": 0,
-        },
-        "srprn": {
-            "parsimony_scaling": 0.0,
-            "prune_start": 50,
-            "prune_ramp": 150,
-            "prune_max": 0.7,
-        },
-        "srpsm": {
-            "parsimony_scaling": 1040.0,
-            "prune_max": 0.0,
-            "prune_start": 0,
-            "prune_ramp": 0,
-        },
-        "fullsr": {
-            "parsimony_scaling": 1040.0,
-            "prune_start": 50,
-            "prune_ramp": 150,
-            "prune_max": 0.7,
-        },
-    }
-
-    # Clean up cfg names (sometimes they have suffixes like _par0)
-    def clean_cfg(name):
-        if not isinstance(name, str): return name
-        name = name.lower()
-        for target in ['stdsr', 'srpsm', 'srprn', 'fullsr']:
-            if target in name:
-                return target
-        return name
-
-    df['cfg_clean'] = df['cfg'].apply(clean_cfg)
-
-    # Filter df to only include rows that match the arg_configs requirements for each cfg_clean
-    filtered_rows = []
-    for cfg_name, requirements in arg_configs.items():
-        cfg_df = df[df['cfg_clean'] == cfg_name]
-        for col, val in requirements.items():
-            cfg_df = cfg_df[cfg_df[col] == val]
-        filtered_rows.append(cfg_df)
-    
-    df = pd.concat(filtered_rows) if filtered_rows else pd.DataFrame(columns=df.columns)
-
-    # For each configuration and age, find the row with the best R2
-    # We dropna on cfg to avoid issues with baseline or other non-SR folders if any
-    df = df.dropna(subset=['cfg_clean'])
-    
-    best_models = []
-    
-    # Handle fullsr in longitudinal setting separately
-    if is_longitudinal:
-        # Find the fullsr model with the highest overall_r2
-        fullsr_df = df[df['cfg_clean'] == 'fullsr']
-        if not fullsr_df.empty:
-            # overall_r2 should be the same for all rows of the same model (same hyperparameters)
-            # but we want the highest across all models
-            best_overall_r2 = fullsr_df['overall_r2'].max()
-            # Select all rows for the model(s) that achieved this best overall_r2
-            # Since multiple models might have same overall_r2, we pick one (the first one's parameters)
-            best_model_params = fullsr_df[fullsr_df['overall_r2'] == best_overall_r2].iloc[0]
-            
-            # Now get all rows (for all ages) for this specific model configuration
-            # A model is defined by its hyperparameters in the df
-            param_cols = ['parsimony', 'population', 'pop_size', 'parsimony_scaling', 
-                          'prune_start', 'prune_ramp', 'prune_max', 'pareto r2 weight', 'lambda for complexity']
-            
-            query = " & ".join([f"`{col}` == {best_model_params[col]}" for col in param_cols])
-            best_fullsr_rows = fullsr_df.query(query)
-            best_models.append(best_fullsr_rows)
-            
-        # For other configs in longitudinal, or all in age-specific, use the per-age best
-        other_configs = [c for c in df['cfg_clean'].unique() if c != 'fullsr']
-        for cfg in other_configs:
-            for age, group in df[df['cfg_clean'] == cfg].groupby('age'):
-                best_row = group.loc[group['r2'].idxmax()]
-                best_models.append(pd.DataFrame([best_row]))
-    else:
-        # Age-specific: Best R2 for each age for all configs
-        for (cfg, age), group in df.groupby(['cfg_clean', 'age']):
-            best_row = group.loc[group['r2'].idxmax()]
-            best_models.append(pd.DataFrame([best_row]))
-    
-    if not best_models:
-        print("No data found for comparison.")
-        return
-
-    best_df = pd.concat(best_models)
-    best_df['cfg'] = best_df['cfg_clean']
-    
-    if best_df.empty:
-        print("No data found for comparison.")
-        return
-
-    # Plotting with matplotlib
-    metrics = ['r2', 'mae', 'complexity', 'rmse']
-    titles = ['Best R2 Score', 'Best MAE', 'Complexity of Best R2 Model', 'Best RMSE']
-    ylabel = ['R2 Score', 'MAE', 'Complexity', 'RMSE']
-    
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    axes = axes.flatten()
-
-    # Add a super title to indicate the model type
-    model_type = "Longitudinal Model" if is_longitudinal else "Age-specific Model"
-    fig.suptitle(f"Comparison of Configurations: {model_type} (r2w=1, lambda=0.001)", fontsize=16)
-    
-    configs = sorted(best_df['cfg'].unique())
-    colors = {
-        'stdsr': '#1f77b4',
-        'srprn': '#ff7f0e',
-        'srpsm': '#2ca02c',
-        'fullsr': '#d62728',
-    }
-    
-    # Label mapping for the plot
-    labels = {
-        "stdsr": "stdsr (scl=0, prn_max=0)",
-        "srprn": "srprn (scl=0, prn=50/150/0.7)",
-        "srpsm": "srpsm (scl=1040, prn_max=0)",
-        "fullsr": "fullsr (scl=1040, prn=50/150/0.7)",
-    }
-    
-    for cfg in configs:
-        cfg_data = best_df[best_df['cfg'] == cfg].sort_values('age')
-        color = colors.get(cfg.lower(), None)
-        label = labels.get(cfg.lower(), cfg)
+    # Grouped bar plot for all models comparison
+    if not imp_df.empty:
+        # Average importance across ages and types per model/variable
+        agg_imp = imp_df.groupby(['model', 'variable'])['weight'].mean().reset_index()
         
-        for i, metric in enumerate(metrics):
-            axes[i].plot(cfg_data['age'], cfg_data[metric], marker='o', label=label, color=color, linewidth=2)
-            axes[i].set_title(titles[i])
-            axes[i].set_xlabel('Age')
-            axes[i].set_ylabel(ylabel[i])
-            axes[i].grid(True, linestyle='--', alpha=0.7)
-
-    axes[0].legend()
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    output_png = os.path.join(base_dir, 'argconfigs_best_comparison.png')
-    plt.savefig(output_png)
-    print(f"Arg-config best performance comparison plot saved to {output_png}")
-    plt.close()
-
+        # Find top 15 features based on average across all models
+        top_features = agg_imp.groupby('variable')['weight'].mean().sort_values(ascending=False).head(15).index
+        
+        plot_df = agg_imp[agg_imp['variable'].isin(top_features)].copy()
+        plot_df['variable'] = pd.Categorical(plot_df['variable'], categories=top_features, ordered=True)
+        
+        plt.figure(figsize=(14, 10))
+        sns.barplot(data=plot_df, x='weight', y='variable', hue='model', palette="bright")
+        
+        plt.title('Top 15 Feature Importance Comparison across Models', fontsize=22, fontweight='bold', pad=20)
+        plt.xlabel('Average Percentage Importance (%)', fontsize=18)
+        plt.ylabel('Feature', fontsize=18)
+        plt.legend(title='Model', bbox_to_anchor=(1.02, 1), loc='upper left', fontsize=12)
+        plt.tick_params(labelsize=14)
+        
+        plt.tight_layout()
+        plot_path = os.path.join(base_dir, "feature_importance_by_model.png")
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Combined feature importance plot saved to {plot_path}")
 
 if __name__ == "__main__":
-    base_directory = os.path.dirname(os.path.abspath(__file__))
-    
-    # Process results_bmi/deeppysr_old
-    # deeppysr_old_dir = os.path.join(base_directory, 'results_bmi', 'deeppysr_old')
-    # if os.path.exists(deeppysr_old_dir):
-    #     aggregate_results_bmi(deeppysr_old_dir)
-        
-    # Process results_bmi/deeppysr_longitudinal
-    deeppysr_longitudinal_dir = os.path.join(base_directory, 'results_bmi', 'deeppysr_longitudinal')
-    if os.path.exists(deeppysr_longitudinal_dir):
-        aggregate_agg_results(deeppysr_longitudinal_dir)
-        calculate_performance_metrics(deeppysr_longitudinal_dir)
-        plot_performance_metrics_interactive(deeppysr_longitudinal_dir)
-        # Compare four settings and plot the best ones
-        compare_arg_configs_best(deeppysr_longitudinal_dir)
+    base_results_path = os.path.join(current_dir, "results_bmi_all", "bmi_aggregated_results.csv")
+    if not os.path.exists(base_results_path):
+        df = process_results()
+    else:
+        df = pd.read_csv(base_results_path)
 
-    # Process results_bmi/deeppysr_age
-    deeppysr_age_dir = os.path.join(base_directory, 'results_bmi', 'deeppysr_age')
-    if os.path.exists(deeppysr_age_dir):
-        aggregate_age_results(deeppysr_age_dir)
-        calculate_age_performance_metrics(deeppysr_age_dir)
-        plot_age_performance_metrics_interactive(deeppysr_age_dir)
-        # Compare four settings and plot the best ones for age-specific models
-        compare_arg_configs_best(deeppysr_age_dir)
-
-    # Process baseline models
-    baseline_longitudinal_dir = os.path.join(base_directory, 'results_bmi', 'baseline_longitudinal')
-    if os.path.exists(baseline_longitudinal_dir):
-        calculate_baseline_longitudinal_metrics(baseline_longitudinal_dir)
-    
-    baseline_age_dir = os.path.join(base_directory, 'results_bmi', 'baseline_age')
-    if os.path.exists(baseline_age_dir):
-        calculate_baseline_age_metrics(baseline_age_dir)
-
-    # Comparison
-    if os.path.exists(deeppysr_longitudinal_dir) and os.path.exists(deeppysr_age_dir):
-        compare_longitudinal_vs_age(deeppysr_longitudinal_dir, deeppysr_age_dir, 
-                                    baseline_longitudinal_dir, baseline_age_dir)
-
-
-
+    plot_results(df)
+    plot_settings_comparison(df)
+    aggregate_feature_importance()
