@@ -12,8 +12,8 @@ from DeepPySR.regressor import DeepPySRRegressor
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
-    vps_list = [25, 50, 75]
-    vpr_list = [50, 100, 150]
+    vps_list = [25, 50]
+    vpr_list = [50, 100]
     aps_list = [0.1, 1.0, 10.0, 50.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
@@ -54,6 +54,16 @@ def get_deeppysr_configs():
                     "variable_prune_ramp": vpr,
                     "variable_prune_max": vpm,
                 }
+    return configs
+
+# --- PySR Configs ---
+def get_pysr_configs():
+    configs = {}
+    aps_list = [0.1, 1.0, 10.0, 50.0]
+    for aps in aps_list:
+        configs[f"pysr_aps{aps}"] = {
+            "adaptive_parsimony_scaling": aps,
+        }
     return configs
 
 # --- KAN Wrapper ---

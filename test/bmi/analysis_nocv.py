@@ -379,59 +379,145 @@ def plot_results(df):
     selected_data = []
     interpretable_formulas = []
 
+    # Load data once for longitudinal assessment
+    ids_all, X_all, y_all = load_bmi_agg_data()
+
     for t in types:
         type_df = df[df['type'] == t]
+        if type_df.empty:
+            continue
         ages = sorted(type_df['age'].unique())
         
-        for age in ages:
-            age_df = type_df[type_df['age'] == age]
+        if t == 'longitudinal':
+            # For longitudinal models, we find the best formula across all ages
             
-            # DeepPySR variants
-            deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
-            if not deeppysr_df.empty:
-                # Best DeepPySR
-                best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
-                best_deeppysr['display_model'] = 'Best DeepPySR'
-                selected_data.append(best_deeppysr)
+            # 1. Best DeepPySR (highest overall R2 among fullsr, stdsr, srpsm, srprn)
+            deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+            if not deeppysr_long.empty:
+                model_variants = deeppysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
+                best_model_name = None
+                best_r2 = -np.inf
+                for _, row in model_variants.iterrows():
+                    y_pred = evaluate_formula(row['formula'], X_all)
+                    r2, _, _ = calculate_metrics(y_all, y_pred)
+                    if r2 > best_r2:
+                        best_r2 = r2
+                        best_model_name = row['model']
                 
-                # Interpretable DeepPySR (complexity < 30)
-                interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 30]
-                if not interp_deeppysr_df.empty:
-                    interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
-                    interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
-                    selected_data.append(interp_deeppysr)
-                    interpretable_formulas.append({
-                        'age': age,
-                        'type': t,
-                        'model': interp_deeppysr['model'],
-                        'formula': interp_deeppysr['formula'],
-                        'r2': interp_deeppysr['r2'],
-                        'complexity': interp_deeppysr['complexity']
-                    })
+                if best_model_name:
+                    for age in ages:
+                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_model_name)].iloc[0].copy()
+                        row['display_model'] = 'Best DeepPySR'
+                        selected_data.append(row)
 
-            # PySR variants
-            pysr_df = age_df[age_df['model'].str.contains('pysr_', na=False)]
-            if not pysr_df.empty:
-                best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
-                best_pysr['display_model'] = 'Best PySR'
-                selected_data.append(best_pysr)
-            
-            # KAN and KANSym
-            for m in ['KAN', 'KANSym']:
-                m_df = age_df[age_df['model'] == m]
+            # 2. Interpretable DeepPySR (highest overall R2 with complexity < 25)
+            if not deeppysr_long.empty:
+                interp_candidates = deeppysr_long[deeppysr_long['complexity'] < 25].groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
+                best_interp_name = None
+                best_interp_r2 = -np.inf
+                for _, row in interp_candidates.iterrows():
+                    y_pred = evaluate_formula(row['formula'], X_all)
+                    r2, _, _ = calculate_metrics(y_all, y_pred)
+                    if r2 > best_interp_r2:
+                        best_interp_r2 = r2
+                        best_interp_name = row['model']
+                
+                if best_interp_name:
+                    formula_info = interp_candidates[interp_candidates['model'] == best_interp_name].iloc[0]
+                    for age in ages:
+                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_interp_name)].iloc[0].copy()
+                        row['display_model'] = 'Interpretable DeepPySR'
+                        selected_data.append(row)
+                        interpretable_formulas.append({
+                            'age': age, 'type': t, 'model': best_interp_name,
+                            'formula': formula_info['formula'], 'r2': row['r2'], 'complexity': formula_info['complexity']
+                        })
+
+            # 3. Best PySR (highest overall R2 among pysr_ variants)
+            pysr_long = type_df[type_df['model'].str.contains('pysr_', na=False)]
+            if not pysr_long.empty:
+                model_variants = pysr_long.groupby('model').agg({'formula': 'first'}).reset_index()
+                best_pysr_name = None
+                best_pysr_r2 = -np.inf
+                for _, row in model_variants.iterrows():
+                    y_pred = evaluate_formula(row['formula'], X_all)
+                    r2, _, _ = calculate_metrics(y_all, y_pred)
+                    if r2 > best_pysr_r2:
+                        best_pysr_r2 = r2
+                        best_pysr_name = row['model']
+                
+                if best_pysr_name:
+                    for age in ages:
+                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_pysr_name)].iloc[0].copy()
+                        row['display_model'] = 'Best PySR'
+                        selected_data.append(row)
+
+            # 4. KANSym (highest overall R2)
+            kansym_long = type_df[type_df['model'] == 'KANSym']
+            if not kansym_long.empty:
+                model_variants = kansym_long.groupby('model').agg({'formula': 'first'}).reset_index()
+                best_kansym_name = None
+                best_kansym_r2 = -np.inf
+                for _, row in model_variants.iterrows():
+                    y_pred = evaluate_formula(row['formula'], X_all)
+                    r2, _, _ = calculate_metrics(y_all, y_pred)
+                    if r2 > best_kansym_r2:
+                        best_kansym_r2 = r2
+                        best_kansym_name = row['model']
+                
+                if best_kansym_name:
+                    for age in ages:
+                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_kansym_name)].iloc[0].copy()
+                        row['display_model'] = 'KANSym'
+                        selected_data.append(row)
+
+            # 5. KAN and other models (take metrics directly from df)
+            other_models = ['KAN']
+            for m in other_models:
+                m_df = type_df[type_df['model'] == m]
                 if not m_df.empty:
-                    m_row = m_df.iloc[0].copy()
-                    m_row['display_model'] = m
-                    selected_data.append(m_row)
-            
-            # Other baselines (ElasticNet, ExtraTrees, MLP, RandomForest, XGBoost)
-            baselines = ['ElasticNet', 'ExtraTrees', 'MLP', 'RandomForest', 'XGBoost']
-            for b in baselines:
-                b_df = age_df[age_df['model'] == b]
-                if not b_df.empty:
-                    b_row = b_df.iloc[0].copy()
-                    b_row['display_model'] = b
-                    selected_data.append(b_row)
+                    for age in ages:
+                        age_row = m_df[m_df['age'] == age]
+                        if not age_row.empty:
+                            row = age_row.iloc[0].copy()
+                            row['display_model'] = m
+                            selected_data.append(row)
+        
+        else: # age-specific
+            for age in ages:
+                age_df = type_df[type_df['age'] == age]
+                
+                # DeepPySR variants
+                deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+                if not deeppysr_df.empty:
+                    best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
+                    best_deeppysr['display_model'] = 'Best DeepPySR'
+                    selected_data.append(best_deeppysr)
+                    
+                    interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 25]
+                    if not interp_deeppysr_df.empty:
+                        interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
+                        interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
+                        selected_data.append(interp_deeppysr)
+                        interpretable_formulas.append({
+                            'age': age, 'type': t, 'model': interp_deeppysr['model'],
+                            'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
+                        })
+
+                # PySR variants
+                pysr_df = age_df[age_df['model'].str.contains('pysr_', na=False)]
+                if not pysr_df.empty:
+                    best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
+                    best_pysr['display_model'] = 'Best PySR'
+                    selected_data.append(best_pysr)
+                
+                # KAN and KANSym
+                for m in ['KAN', 'KANSym']:
+                    m_df = age_df[age_df['model'] == m]
+                    if not m_df.empty:
+                        m_row = m_df.iloc[0].copy()
+                        m_row['display_model'] = m
+                        selected_data.append(m_row)
 
     plot_df = pd.DataFrame(selected_data)
     
