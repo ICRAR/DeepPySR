@@ -10,4 +10,5 @@ cd /home/fchen/DeepPySR
 . /home/fchen/DeepPySR/.venv/bin/activate
 
 # Run the python script
+export PYTHONPATH=$PYTHONPATH:.
 python -u test/bmi/test_all_models_bmi.py
