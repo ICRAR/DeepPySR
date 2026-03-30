@@ -101,35 +101,59 @@ def evaluate_formula(formula_str, X):
         return np.zeros(len(X))
 
 def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold'):
-    best_acc = -float('inf')
-    best_formula = ""
-    best_complexity = np.nan
-    best_metrics = (np.nan, np.nan, np.nan)
+    """
+    Find the best formula by evaluating all fold-specific formulas on raw data.
+    Returns a dictionary of (r2w, lambda): (formula, complexity, metrics) for DeepPySR grid search,
+    or just a single (formula, complexity, metrics) if no grid search info is found.
+    """
+    results = {} # {(r2w, lambda): (best_acc, best_formula, best_complexity, best_metrics)}
+    overall_best = (-float('inf'), "", np.nan, (np.nan, np.nan, np.nan))
+    
     feature_names = list(X.columns)
     pattern = os.path.join(folder_path, f"{prefix}*.csv")
     files = glob.glob(pattern)
     if not files:
         alt = os.path.join(folder_path, "relationships.csv" if 'relationships' in prefix else "formulas.csv")
         if os.path.exists(alt): files = [alt]
+        
     for f in files:
         try:
             df = pd.read_csv(f)
             if 'formula' in df.columns:
-                for idx in range(len(df)):
-                    formula = str(df.loc[idx, 'formula'])
+                for _, row in df.iterrows():
+                    formula = str(row['formula'])
                     complexity = calculate_complexity(formula)
+                    
+                    # Identify grid search parameters
+                    r2w = row.get('pareto_r2_weight', 1.0)
+                    lamb = row.get('pareto_lambda', 0.001)
+                    key = (r2w, lamb)
+                    
                     y_pred_raw = evaluate_formula(formula, X)
                     y_pred = np.round(y_pred_raw).astype(int)
                     y_pred = np.clip(y_pred, 0, 2)
                     acc, f1, auc = calculate_metrics(y_true, y_pred)
-                    if not np.isnan(acc) and acc > best_acc:
-                        best_acc = acc
-                        best_formula = map_variable_names(formula, feature_names)
-                        best_complexity = complexity
-                        best_metrics = (acc, f1, auc)
+                    
+                    if not np.isnan(acc):
+                        # Update per-parameter best
+                        if key not in results or acc > results[key][0]:
+                            results[key] = (acc, map_variable_names(formula, feature_names), complexity, (acc, f1, auc))
+                        
+                        # Update overall best
+                        if acc > overall_best[0]:
+                            overall_best = (acc, map_variable_names(formula, feature_names), complexity, (acc, f1, auc))
         except Exception:
             continue
-    return best_formula, best_complexity, best_metrics
+            
+    if not results:
+        return overall_best[1], overall_best[2], overall_best[3]
+    
+    if len(results) == 1:
+        key = list(results.keys())[0]
+        if key == (1.0, 0.001) and 'pareto_r2_weight' not in pd.read_csv(files[0]).columns:
+             return results[key][1], results[key][2], results[key][3]
+
+    return {k: (v[1], v[2], v[3]) for k, v in results.items()}
 
 def process_results():
     base_dir = os.path.join(current_dir, "results_diab130_nocv")
@@ -170,11 +194,18 @@ def process_results():
                             acc, f1, auc = calculate_metrics(df_pred['y_true'], np.clip(np.round(df_pred['y_pred_sym']), 0, 2))
                         all_data.append(['KANSym', acc, f1, auc, complexity, formula])
                 elif sd in ['deeppysr', 'pysr']:
-                    formula, complexity, metrics = get_best_formula_from_raw(m_path, X_full, y_full)
-                    acc, f1, auc = metrics
-                    if not formula:
-                        acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                    all_data.append([model_folder, acc, f1, auc, complexity, formula])
+                    res = get_best_formula_from_raw(m_path, X_full, y_full)
+                    if isinstance(res, dict):
+                        for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                            acc, f1, auc = metrics
+                            model_name = f"{model_folder}_r2w{r2w}_L{lamb}"
+                            all_data.append([model_name, acc, f1, auc, complexity, formula])
+                    else:
+                        formula, complexity, metrics = res
+                        acc, f1, auc = metrics
+                        if not formula:
+                            acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
+                        all_data.append([model_folder, acc, f1, auc, complexity, formula])
                 else:
                     acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], y_prob)
                     all_data.append([model_folder, acc, f1, auc, np.nan, ""])
