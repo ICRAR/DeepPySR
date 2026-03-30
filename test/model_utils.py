@@ -12,12 +12,12 @@ from DeepPySR.regressor import DeepPySRRegressor
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
-    # vps_list = [25, 50]
-    # vpr_list = [50, 100]
-    # aps_list = [0.1, 1.0, 10.0, 50.0]
-    vps_list = [25]
-    vpr_list = [50]
-    aps_list = [10.0]
+    vps_list = [25, 50]
+    vpr_list = [50, 100]
+    aps_list = [0.1, 1.0, 10.0, 50.0]
+    # vps_list = [25]
+    # vpr_list = [50]
+    # aps_list = [10.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # 1. stdsr: All parameters set to 0
