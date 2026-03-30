@@ -13,7 +13,11 @@ def save_predictions(outdir, y_true, y_pred, y_prob=None, ids=None, fold=None, y
     if y_pred_sym is not None:
         data['y_pred_kansym'] = y_pred_sym
     if y_prob is not None:
-        data['y_prob'] = y_prob
+        if y_prob.ndim > 1:
+            for i in range(y_prob.shape[1]):
+                data[f'y_prob_{i}'] = y_prob[:, i]
+        else:
+            data['y_prob'] = y_prob
     if ids is not None:
         data['id'] = ids
     
@@ -43,15 +47,24 @@ def calculate_metrics(y_true, y_pred, y_prob=None, task='regression'):
             'rmse': np.sqrt(mean_squared_error(y_true, y_pred))
         }
     else:
+        # Check if multiclass
+        unique_y = np.unique(y_true)
+        is_multiclass = len(unique_y) > 2
+        avg = 'macro' if is_multiclass else 'binary'
+        
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),
-            'precision': precision_score(y_true, y_pred, zero_division=0),
-            'recall': recall_score(y_true, y_pred, zero_division=0),
-            'f1': f1_score(y_true, y_pred, zero_division=0)
+            'precision': precision_score(y_true, y_pred, average=avg, zero_division=0),
+            'recall': recall_score(y_true, y_pred, average=avg, zero_division=0),
+            'f1': f1_score(y_true, y_pred, average=avg, zero_division=0)
         }
         if y_prob is not None:
             try:
-                metrics['auc'] = roc_auc_score(y_true, y_prob)
+                if is_multiclass:
+                    # For multiclass, y_prob should be (n_samples, n_classes)
+                    metrics['auc'] = roc_auc_score(y_true, y_prob, multi_class='ovr', average='macro')
+                else:
+                    metrics['auc'] = roc_auc_score(y_true, y_prob)
             except:
                 metrics['auc'] = 0.5
         return metrics
@@ -99,8 +112,13 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
         y_prob = None
         if task == 'classification' and hasattr(model, 'predict_proba'):
             y_prob = model.predict_proba(X_test)
-            if y_prob.ndim > 1 and y_prob.shape[1] == 2:
-                y_prob = y_prob[:, 1]
+            if y_prob.ndim > 1:
+                if y_prob.shape[1] == 2:
+                    y_prob = y_prob[:, 1]
+                # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
+            elif y_prob.ndim == 1:
+                # If already 1D, assume it is probabilities of the positive class
+                pass
     
         all_y_true.extend(y_test)
         all_y_pred.extend(y_pred)
@@ -187,8 +205,13 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
     y_prob = None
     if task == 'classification' and hasattr(model, 'predict_proba'):
         y_prob = model.predict_proba(X_train)
-        if y_prob.ndim > 1 and y_prob.shape[1] == 2:
-            y_prob = y_prob[:, 1]
+        if y_prob.ndim > 1:
+            if y_prob.shape[1] == 2:
+                y_prob = y_prob[:, 1]
+            # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
+        elif y_prob.ndim == 1:
+            # If already 1D, assume it is probabilities of the positive class
+            pass
 
     y_pred_sym = None
     if hasattr(model, 'symbolize'):
@@ -200,10 +223,10 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         save_predictions(outdir, y_values, y_pred, 
-                         y_prob=y_prob, ids=ids.values if hasattr(ids, 'values') else ids,
+                         y_prob=y_prob, ids=ids,
                          fold='nocv',
                          y_pred_sym=y_pred_sym,
-                         extra_data={k: v.values if hasattr(v, 'values') else v for k, v in extra_data.items()} if extra_data is not None else None)
+                         extra_data=extra_data)
         
         pd.DataFrame([metrics]).to_csv(os.path.join(outdir, "overall_metrics.csv"), index=False)
         

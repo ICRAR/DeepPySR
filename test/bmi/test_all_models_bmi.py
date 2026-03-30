@@ -92,57 +92,53 @@ def main():
             # 2. DeepPySR Models (pypysr - Grid Search)
             print(f"Evaluating DeepPySR (pypysr) Models...")
             for cfg_name, cfg_overrides in deeppysr_configs.items():
-                for r2w in r2w_list:
-                    for l in lambda_list:
-                        parts = cfg_name.split('_', 1)
-                        setting_prefix = parts[0]
-                        params_part = parts[1] if len(parts) > 1 else ""
-                        
-                        full_cfg_name = f"{setting_prefix}_{param_suffix}_{params_part}_r2w{r2w}_l{l}"
-                        deeppysr_out = os.path.join(run_out_root, "deeppysr", full_cfg_name)
-                        if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
-                            continue
-                        
-                        print(f"  {full_cfg_name}...")
-                        def deeppysr_factory():
-                            kwargs = pysr_base_kwargs.copy()
-                            kwargs.update(cfg_overrides)
-                            return DeepPySRRegressor(
-                                max_layers=1,
-                                output_dir=deeppysr_out,
-                                model_provider='pypysr',
-                                pareto_r2_weight=r2w,
-                                pareto_lambda=l,
-                                **kwargs
-                            )
-                        
-                        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
+                parts = cfg_name.split('_', 1)
+                setting_prefix = parts[0]
+                params_part = parts[1] if len(parts) > 1 else ""
+                
+                full_cfg_name = f"{setting_prefix}_{param_suffix}_{params_part}_grid"
+                deeppysr_out = os.path.join(run_out_root, "deeppysr", full_cfg_name)
+                if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+                    continue
+                
+                print(f"  {full_cfg_name}...")
+                def deeppysr_factory():
+                    kwargs = pysr_base_kwargs.copy()
+                    kwargs.update(cfg_overrides)
+                    return DeepPySRRegressor(
+                        max_layers=1,
+                        output_dir=deeppysr_out,
+                        model_provider='pypysr',
+                        pareto_r2_weight=r2w_list,
+                        pareto_lambda=lambda_list,
+                        **kwargs
+                    )
+                
+                run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
 
             # 3. DeepPySR (pysr) Model (Requested)
             print(f"Evaluating DeepPySR (pysr) Model...")
             for cfg_name, cfg_overrides in pysr_configs.items():
-                for r2w in r2w_list:
-                    for l in lambda_list:
-                        aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
-                        full_name = f"pysr_{param_suffix}_aps{aps}_r2w{r2w}_l{l}"
-                        deeppysr_pysr_out = os.path.join(run_out_root, "pysr", full_name)
-                        if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
-                            continue
-                        
-                        print(f"  {full_name}...")
-                        def deeppysr_pysr_factory(co=cfg_overrides):
-                            kwargs = pysr_base_kwargs.copy()
-                            kwargs.update(co)
-                            return DeepPySRRegressor(
-                                max_layers=1,
-                                output_dir=deeppysr_pysr_out,
-                                model_provider='pysr',
-                                pareto_r2_weight=r2w,
-                                pareto_lambda=l,
-                                **kwargs
-                            )
-                        
-                        run_cv(deeppysr_pysr_factory, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_kwargs)
+                aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
+                full_name = f"pysr_{param_suffix}_aps{aps}_grid"
+                deeppysr_pysr_out = os.path.join(run_out_root, "pysr", full_name)
+                if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
+                    continue
+                
+                print(f"  {full_name}...")
+                def deeppysr_pysr_factory(co=cfg_overrides):
+                    kwargs = pysr_base_kwargs.copy()
+                    kwargs.update(co)
+                    return DeepPySRRegressor(
+                        max_layers=1,
+                        output_dir=deeppysr_pysr_out,
+                        model_provider='pysr',
+                        pareto_r2_weight=r2w_list,
+                        pareto_lambda=lambda_list,
+                        **kwargs
+                    )
+                
+                run_cv(deeppysr_pysr_factory, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_kwargs)
 
             # 4. No-CV runs for DeepPySR (4 settings) and PySR (Requested)
             print(f"Evaluating No-CV Models...")
@@ -157,48 +153,42 @@ def main():
 
             # 4.1 DeepPySR No-CV
             for cfg_name, cfg_overrides in deeppysr_configs.items():
-                # For no-CV, we use a single representative setting for r2w and lambda to avoid 36 runs per run_name
-                # or as the user says "4 settings", maybe they mean the 4 cfg_names with default r2w/l
-                for r2w in r2w_list:
-                    for l in lambda_list:
-                        full_cfg_name = f"{cfg_name}_{param_suffix}_r2w{r2w}_l{l}_nocv"
-                        deeppysr_out = os.path.join(run_out_root_nocv, "deeppysr", full_cfg_name)
-                        if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
-                            print(f"  {full_cfg_name}...")
-                            def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out, r=r2w, lam=l):
-                                kwargs = pysr_base_kwargs.copy()
-                                kwargs.update(co)
-                                return DeepPySRRegressor(
-                                    max_layers=1,
-                                    output_dir=d_out,
-                                    model_provider='pypysr',
-                                    pareto_r2_weight=r,
-                                    pareto_lambda=lam,
-                                    **kwargs
-                                )
-                            run_nocv(deeppysr_factory_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_kwargs)
+                full_cfg_name = f"{cfg_name}_{param_suffix}_grid_nocv"
+                deeppysr_out = os.path.join(run_out_root_nocv, "deeppysr", full_cfg_name)
+                if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+                    print(f"  {full_cfg_name}...")
+                    def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
+                        kwargs = pysr_base_kwargs.copy()
+                        kwargs.update(co)
+                        return DeepPySRRegressor(
+                            max_layers=1,
+                            output_dir=d_out,
+                            model_provider='pypysr',
+                            pareto_r2_weight=r2w_list,
+                            pareto_lambda=lambda_list,
+                            **kwargs
+                        )
+                    run_nocv(deeppysr_factory_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_kwargs)
 
             # 4.2 DeepPySR (pysr) No-CV
             for cfg_name, cfg_overrides in pysr_configs.items():
-                for r2w in r2w_list:
-                    for l in lambda_list:
-                        aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
-                        full_name = f"pysr_{param_suffix}_aps{aps}_r2w{r2w}_l{l}_nocv"
-                        deeppysr_pysr_out = os.path.join(run_out_root_nocv, "pysr", full_name)
-                        if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
-                            print(f"  {full_name}...")
-                            def deeppysr_pysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_pysr_out, r=r2w, lam=l):
-                                kwargs = pysr_base_kwargs.copy()
-                                kwargs.update(co)
-                                return DeepPySRRegressor(
-                                    max_layers=1,
-                                    output_dir=d_out,
-                                    model_provider='pysr',
-                                    pareto_r2_weight=r,
-                                    pareto_lambda=lam,
-                                    **kwargs
-                                )
-                            run_nocv(deeppysr_pysr_factory_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_kwargs)
+                aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
+                full_name = f"pysr_{param_suffix}_aps{aps}_grid_nocv"
+                deeppysr_pysr_out = os.path.join(run_out_root_nocv, "pysr", full_name)
+                if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
+                    print(f"  {full_name}...")
+                    def deeppysr_pysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_pysr_out):
+                        kwargs = pysr_base_kwargs.copy()
+                        kwargs.update(co)
+                        return DeepPySRRegressor(
+                            max_layers=1,
+                            output_dir=d_out,
+                            model_provider='pysr',
+                            pareto_r2_weight=r2w_list,
+                            pareto_lambda=lambda_list,
+                            **kwargs
+                        )
+                    run_nocv(deeppysr_pysr_factory_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_kwargs)
 
             # Aggregate results for this run
             print(f"Aggregating results for {run_name}...")

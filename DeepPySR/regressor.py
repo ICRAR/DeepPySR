@@ -19,7 +19,7 @@ class DeepPySRRegressor:
         stopping_score = 2,
         model_provider = "pysr",
         pypysr_path = None,
-        pareto_lambda = 0.01,
+        pareto_lambda = 0.001,
         pareto_r2_weight = 1.0,
         **pysr_kwargs
     ):
@@ -292,64 +292,83 @@ class DeepPySRRegressor:
         if eqs is None or len(eqs) == 0:
             raise ValueError(f"No equations found for target {target_name}")
 
-        # Manually iterate through the equations and select the one with the highest Pareto Score
-        # Score = R^2 * exp(-lambda * (complexity - 1))
-        best_score = -np.inf
-        best_idx = 0
-        best_r2 = -np.inf
-        
-        for idx in range(len(eqs)):
-            try:
-                # Use model.predict to get predictions for this equation
-                # Passing the index allows getting predictions for specific equations in Hall of Fame
-                # If a worker process has died, this might throw Distributed.ProcessExitedException
-                y_pred = model.predict(X, index=idx)
-                # Handle NaNs and Infs in predictions
-                y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-                r2 = r2_score(y_fit, y_pred)
-                complexity = eqs.iloc[idx].get("complexity", 1)
-                
-                # Calculate Pareto Score
-                # Using the weight as a power for r2
-                # Ensure r2 is positive to avoid issues with non-integer powers
-                safe_r2 = max(0.0001, r2)
-                score = (safe_r2 ** self.pareto_r2_weight) * np.exp(-self.pareto_lambda * (complexity - 1))
-                
-                if score > best_score:
-                    best_score = score
-                    best_r2 = r2
-                    best_idx = idx
-            except Exception as e:
-                # Catching Distributed.ProcessExitedException or other Julia/PySR errors
-                print(f"[DeepPySR] Warning: Error calculating Score for equation {idx} (possibly dead worker): {e}")
-                # Forcing a small delay to let things settle, and potentially a worker restart if PySR handles it, 
-                # but mostly we just want to avoid crashing.
-                if "ProcessExitedException" in str(e):
-                    # If a worker died, try to avoid calling predict(index=...) again immediately
-                    print("[DeepPySR] Worker process died. Aborting Pareto score optimization for this target.")
-                    break
-                continue
-        
-        # If all equation evaluations failed, best_idx might be 0 but best_score still -inf
-        if best_score == -np.inf:
-            print("[DeepPySR] Warning: All equation evaluations failed. Using default first equation.")
-            best_idx = 0
-            best_r2 = 0.0
-            best_score = 0.0
-            
-        best = eqs.iloc[best_idx]
-        formula = str(best["equation"]) if "equation" in best else str(best.get("sympy_format", ""))
-        
-        try:
-            sym_expr = model.sympy(best_idx)
-        except Exception:
-            sym_expr = sp.sympify(formula)
+        # Prepare parameters for grid search
+        r2w_list = self.pareto_r2_weight if isinstance(self.pareto_r2_weight, (list, np.ndarray)) else [self.pareto_r2_weight]
+        lambda_list = self.pareto_lambda if isinstance(self.pareto_lambda, (list, np.ndarray)) else [self.pareto_lambda]
 
-        loss = float(best.get("loss", np.nan))
-        # Use the calculated Pareto score as the score
-        score = best_score
+        all_results = []
         
-        return sym_expr, score, loss, int(best.get("complexity", -1)), best_r2
+        # Dictionary to cache predictions to avoid redundant model.predict calls
+        prediction_cache = {}
+
+        for r2w in r2w_list:
+            for lam in lambda_list:
+                # Manually iterate through the equations and select the one with the highest Pareto Score
+                # Score = R^2 * exp(-lambda * (complexity - 1))
+                best_score = -np.inf
+                best_idx = 0
+                best_r2 = -np.inf
+                
+                for idx in range(len(eqs)):
+                    try:
+                        # Use model.predict to get predictions for this equation
+                        if idx not in prediction_cache:
+                            y_pred = model.predict(X, index=idx)
+                            # Handle NaNs and Infs in predictions
+                            y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
+                            prediction_cache[idx] = y_pred
+                        else:
+                            y_pred = prediction_cache[idx]
+                        
+                        r2 = r2_score(y_fit, y_pred)
+                        complexity = eqs.iloc[idx].get("complexity", 1)
+                        
+                        # Calculate Pareto Score
+                        # Using the weight as a power for r2
+                        # Ensure r2 is positive to avoid issues with non-integer powers
+                        safe_r2 = max(0.0001, r2)
+                        score = (safe_r2 ** r2w) * np.exp(-lam * (complexity - 1))
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_r2 = r2
+                            best_idx = idx
+                    except Exception as e:
+                        # Catching Distributed.ProcessExitedException or other Julia/PySR errors
+                        print(f"[DeepPySR] Warning: Error calculating Score for equation {idx} (possibly dead worker): {e}")
+                        if "ProcessExitedException" in str(e):
+                            print("[DeepPySR] Worker process died. Aborting Pareto score optimization for this target.")
+                            break
+                        continue
+                
+                # If all equation evaluations failed for this combination, best_idx might be 0 but best_score still -inf
+                if best_score == -np.inf:
+                    print(f"[DeepPySR] Warning: All equation evaluations failed for r2w={r2w}, lambda={lam}. Using default first equation.")
+                    best_idx = 0
+                    best_r2 = 0.0
+                    best_score = 0.0
+                    
+                best = eqs.iloc[best_idx]
+                formula = str(best["equation"]) if "equation" in best else str(best.get("sympy_format", ""))
+                
+                try:
+                    sym_expr = model.sympy(best_idx)
+                except Exception:
+                    sym_expr = sp.sympify(formula)
+
+                loss = float(best.get("loss", np.nan))
+                
+                all_results.append({
+                    "sym_expr": sym_expr,
+                    "score": best_score,
+                    "loss": loss,
+                    "complexity": int(best.get("complexity", -1)),
+                    "r2": best_r2,
+                    "pareto_r2_weight": r2w,
+                    "pareto_lambda": lam
+                })
+        
+        return all_results
 
     def fit(self, X, y):
         if isinstance(y, pd.Series):
@@ -431,84 +450,128 @@ class DeepPySRRegressor:
             try:
                 # We pass the internal x0, x1... names to _fit_single_target
                 # PySR will use them as variable names
-                sym_expr, score, loss, complexity, r2 = self._fit_single_target(
-                    X_fit, target_y, target_name, )
+                results = self._fit_single_target(X_fit, target_y, target_name)
 
-                # Ensure sym_expr is a sympy expression
-                if not hasattr(sym_expr, "xreplace"):
-                    sym_expr = sp.sympify(sym_expr)
+                # Loop through all results (grid search might return multiple)
+                for i, res in enumerate(results):
+                    sym_expr = res["sym_expr"]
+                    score = res["score"]
+                    loss = res["loss"]
+                    complexity = res["complexity"]
+                    r2 = res["r2"]
+                    r2w = res.get("pareto_r2_weight")
+                    lam = res.get("pareto_lambda")
 
-                if is_root:
-                    self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
-                    self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
+                    # Ensure sym_expr is a sympy expression
+                    if not hasattr(sym_expr, "xreplace"):
+                        sym_expr = sp.sympify(sym_expr)
 
-                # Round coefficients
-                if hasattr(sym_expr, "atoms"):
-                    for n in sym_expr.atoms(sp.Number):
-                        sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
+                    # Round coefficients
+                    if hasattr(sym_expr, "atoms"):
+                        # We need to make sure we don't modify the original sym_expr in the results list
+                        # though here it's fine as we are processing it.
+                        for n in sym_expr.atoms(sp.Number):
+                            sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
 
-                # pypysr uses 'v' prefix to avoid its internal x1->x0 translation
-                # pysr uses 'x' prefix.
-                prefix = "v" if self.model_provider == "pypysr" else "x"
-                
-                mapping = {}
-                for k in range(len(cols)):
-                    mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
-                
-                if hasattr(sym_expr, "xreplace"):
-                    sym_expr = sym_expr.xreplace(mapping)
-                
-                # Update involved variables after mapping to global x indices
-                involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
+                    # pypysr uses 'v' prefix to avoid its internal x1->x0 translation
+                    # pysr uses 'x' prefix.
+                    prefix = "v" if self.model_provider == "pypysr" else "x"
+                    
+                    mapping = {}
+                    for k in range(len(cols)):
+                        mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
+                    
+                    if hasattr(sym_expr, "xreplace"):
+                        sym_expr = sym_expr.xreplace(mapping)
+                    
+                    # Update involved variables after mapping to global x indices
+                    involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
 
-                if is_redundant(target_name, sym_expr, self.relationships_):
-                    print(f"Relationship for {target_name} is redundant. Skipping.")
-                    continue
+                    # For grid search, we only want to follow the 'best' one for layering.
+                    # We pick the first result as the primary one for layering.
+                    is_primary = (i == 0)
 
-                relationship = {
-                    "target": target_name,
-                    "target_symbol": sp.Symbol(target_name),
-                    "layer": layer,
-                    "sympy": sym_expr,
-                    "formula": str(sym_expr),
-                    "involved": involved,
-                    "score": score,
-                    "loss": loss,
-                    "complexity": complexity,
-                    "r2": r2
-                }
+                    if is_primary and is_redundant(target_name, sym_expr, self.relationships_):
+                        # If the primary one is redundant, we might still want to record the others?
+                        # But DeepPySR's logic usually stops here.
+                        # For now, if primary is redundant, we skip this target's results.
+                        print(f"Relationship for {target_name} is redundant. Skipping.")
+                        break
 
-                if score < self.stopping_score and not is_root:
-                    print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
-                else:
+                    relationship = {
+                        "target": target_name,
+                        "target_symbol": sp.Symbol(target_name),
+                        "layer": layer,
+                        "sympy": sym_expr,
+                        "formula": str(sym_expr),
+                        "involved": involved,
+                        "score": score,
+                        "loss": loss,
+                        "complexity": complexity,
+                        "r2": r2,
+                        "pareto_r2_weight": r2w,
+                        "pareto_lambda": lam
+                    }
+
+                    if is_primary and not is_root and score < self.stopping_score:
+                        print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
+                        # We still add it to relationships so it's visible, but we won't expand it.
+                        self.relationships_.append(relationship)
+                        # We don't expand primary, but we might still add other grid search results for this target
+                        # However, typically if primary reached goal, we stop this target.
+                        # For consistency, let's add all results for this target but don't expand primary.
+                        continue 
+
                     self.relationships_.append(relationship)
-                    if layer < self.max_layers:
+                    
+                    # Only the primary relationship triggers new entries in the queue
+                    if is_primary and layer < self.max_layers:
                         for vname in involved:
                             try:
                                 v_idx = int(vname[1:])
                                 queue.append((vname, X_input_all[:, v_idx], layer + 1, target_name))
                             except (ValueError, IndexError):
                                 continue
+
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"Error modeling {target_name}: {e}")
 
         self.save_relationships()
         
-        # Populate equations_ with the top-level relationship for compatibility
+        # Populate equations_ with the best relationship (highest R2 and highest score) for the root target
         if self.relationships_:
             root_name = self.target_name_[0] if isinstance(self.target_name_, list) else self.target_name_
-            y_rel = next((r for r in self.relationships_ if r['target'] == root_name), None)
-            if y_rel:
-                # We create a minimal DataFrame that PySR expects for equations_
+            root_rels = [r for r in self.relationships_ if r['target'] == root_name]
+            if root_rels:
+                # Select the one with highest R2 and the one with highest score
+                best_r2_rel = max(root_rels, key=lambda x: x.get('r2', -np.inf))
+                best_score_rel = max(root_rels, key=lambda x: x.get('score', -np.inf))
+                
+                # Use a unique list of candidate relationships
+                candidates = []
+                # First one is highest R2
+                candidates.append(best_r2_rel)
+                # Second one is highest score, if different
+                if best_score_rel["formula"] != best_r2_rel["formula"]:
+                    candidates.append(best_score_rel)
+                
+                # We create a DataFrame that PySR expects for equations_
                 self.equations_ = pd.DataFrame([
                     {
-                        "equation": y_rel["formula"],
-                        "sympy_format": y_rel["sympy"],
-                        "loss": y_rel["loss"],
-                        "score": y_rel["score"],
-                        "complexity": y_rel["complexity"]
+                        "equation": rel["formula"],
+                        "sympy_format": rel["sympy"],
+                        "loss": rel["loss"],
+                        "score": rel["score"],
+                        "complexity": rel["complexity"],
+                        "r2": rel.get("r2", 0.0)
                     }
+                    for rel in candidates
                 ])
+                # For user convenience, also set a single best equation string attribute (the one with highest R2)
+                self._equation = best_r2_rel["formula"]
+                
                 # These attributes are often checked by PySR or scikit-learn
                 self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
                 self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
@@ -554,7 +617,7 @@ class DeepPySRRegressor:
     def save_relationships(self, filename="relationships.csv"):
         path = os.path.join(self.output_dir, filename)
         mapped_rels = self._get_mapped_relationships()
-        columns = ["layer", "target", "formula", "involved", "score", "r2", "loss", "complexity"]
+        columns = ["layer", "target", "formula", "involved", "score", "r2", "loss", "complexity", "pareto_r2_weight", "pareto_lambda"]
         with open(path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=columns)
             writer.writeheader()
@@ -567,25 +630,56 @@ class DeepPySRRegressor:
 
 
 
-    def plot(self, filename="hierarchy.png", target_variable=None):
+    def plot(self, filename="hierarchy.png", target_variable=None, pareto_r2_weight=None, pareto_lambda=None):
         if target_variable is None:
             target_variable = getattr(self, "target_name_", "y")
         feature_names = getattr(self, "feature_names_in_", None)
+        
+        # Default values for grid search selection if not specified
+        r2w = pareto_r2_weight if pareto_r2_weight is not None else 1.0
+        lam = pareto_lambda if pareto_lambda is not None else 0.001
+
         mapped_rels = self._get_mapped_relationships()
+        
+        # Filter relationships based on the specified r2w and lambda if multiple exist
+        # We only filter if the relationship has these keys (old models might not)
+        if mapped_rels and "pareto_r2_weight" in mapped_rels[0]:
+            filtered_rels = []
+            # If there are multiple relationships for the same target, we pick the one matching r2w/lam
+            for rel in mapped_rels:
+                if rel.get("pareto_r2_weight") == r2w and rel.get("pareto_lambda") == lam:
+                    filtered_rels.append(rel)
+            
+            mapped_rels = filtered_rels
+
         if not mapped_rels and (not feature_names):
-            print("No relationships or variables to plot.")
+            print(f"No relationships found for r2w={r2w}, lambda={lam}.")
             return
         path = os.path.join(self.output_dir, filename)
         plot_n_layer_graph(mapped_rels, path, feature_names=feature_names, target_variable=target_variable)
         print(f"Plot saved to {path}")
 
-    def plot_circle(self, filename="circle.png", target_variable=None):
+    def plot_circle(self, filename="circle.png", target_variable=None, pareto_r2_weight=None, pareto_lambda=None):
         if target_variable is None:
             target_variable = getattr(self, "target_name_", "y")
         feature_names = getattr(self, "feature_names_in_", None)
+        
+        # Default values for grid search selection if not specified
+        r2w = pareto_r2_weight if pareto_r2_weight is not None else 1.0
+        lam = pareto_lambda if pareto_lambda is not None else 0.001
+
         mapped_rels = self._get_mapped_relationships()
+        
+        # Filter relationships based on the specified r2w and lambda
+        if mapped_rels and "pareto_r2_weight" in mapped_rels[0]:
+            filtered_rels = []
+            for rel in mapped_rels:
+                if rel.get("pareto_r2_weight") == r2w and rel.get("pareto_lambda") == lam:
+                    filtered_rels.append(rel)
+            mapped_rels = filtered_rels
+
         if not mapped_rels and (not feature_names):
-            print("No relationships or variables to plot.")
+            print(f"No relationships found for r2w={r2w}, lambda={lam}.")
             return
         path = os.path.join(self.output_dir, filename)
         

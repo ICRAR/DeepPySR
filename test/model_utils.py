@@ -12,9 +12,12 @@ from DeepPySR.regressor import DeepPySRRegressor
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
-    vps_list = [25, 50]
-    vpr_list = [50, 100]
-    aps_list = [0.1, 1.0, 10.0, 50.0]
+    # vps_list = [25, 50]
+    # vpr_list = [50, 100]
+    # aps_list = [0.1, 1.0, 10.0, 50.0]
+    vps_list = [25]
+    vpr_list = [50]
+    aps_list = [10.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # 1. stdsr: All parameters set to 0
@@ -242,6 +245,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
     # For multithreading, procs should be 0 as it uses Julia threads instead.
     default_procs = 0 if parallelism == "multithreading" else 0
     
+    # niterations 100 might be too slow for many runs, use 20 for tests
     return {
         "parallelism": parallelism,
         "maxsize": 40,
