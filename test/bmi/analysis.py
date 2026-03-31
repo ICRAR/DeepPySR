@@ -263,23 +263,24 @@ def process_results():
                 for variant in os.listdir(deeppysr_dir):
                     v_path = os.path.join(deeppysr_dir, variant)
                     if not os.path.isdir(v_path): continue
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        _, X_age, y_age = load_bmi_agg_data(age=age)
-                        res = get_best_formula_from_raw(v_path, X_age, y_age)
-                        
-                        if isinstance(res, dict):
-                            for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                                r2, rmse, mae = metrics
-                                model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                                all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
-                        else:
-                            formula, complexity, metrics = res
+                    
+                    _, X_age, y_age = load_bmi_agg_data(age=age)
+                    res = get_best_formula_from_raw(v_path, X_age, y_age)
+                    
+                    if isinstance(res, dict):
+                        for (r2w, lamb), (formula, complexity, metrics) in res.items():
                             r2, rmse, mae = metrics
-                            if not formula:
+                            model_name = f"{variant}_r2w{r2w}_L{lamb}"
+                            all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
+                    else:
+                        formula, complexity, metrics = res
+                        r2, rmse, mae = metrics
+                        if not formula:
+                            pred_file = os.path.join(v_path, "predictions.csv")
+                            if os.path.exists(pred_file):
                                 df_pred = pd.read_csv(pred_file)
                                 r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                            all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
+                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
 
             # PySR
             pysr_dir = os.path.join(age_path, "pysr")
@@ -287,23 +288,24 @@ def process_results():
                 for variant in os.listdir(pysr_dir):
                     v_path = os.path.join(pysr_dir, variant)
                     if not os.path.isdir(v_path): continue
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        _, X_age, y_age = load_bmi_agg_data(age=age)
-                        res = get_best_formula_from_raw(v_path, X_age, y_age)
-                        
-                        if isinstance(res, dict):
-                            for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                                r2, rmse, mae = metrics
-                                model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                                all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
-                        else:
-                            formula, complexity, metrics = res
+                    
+                    _, X_age, y_age = load_bmi_agg_data(age=age)
+                    res = get_best_formula_from_raw(v_path, X_age, y_age)
+                    
+                    if isinstance(res, dict):
+                        for (r2w, lamb), (formula, complexity, metrics) in res.items():
                             r2, rmse, mae = metrics
-                            if not formula:
+                            model_name = f"{variant}_r2w{r2w}_L{lamb}"
+                            all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
+                    else:
+                        formula, complexity, metrics = res
+                        r2, rmse, mae = metrics
+                        if not formula:
+                            pred_file = os.path.join(v_path, "predictions.csv")
+                            if os.path.exists(pred_file):
                                 df_pred = pd.read_csv(pred_file)
                                 r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                            all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
+                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
 
     # 2. Process longitudinal
     long_dir = os.path.join(base_dir, "longitudinal")
@@ -348,27 +350,13 @@ def process_results():
                                     r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred_kansym'])
                                 
                                 all_data.append([age, 'KANSym', 'longitudinal', r2, rmse, mae, complexity, formula])
-                        else:
-                            # For DeepPySR and PySR in longitudinal
-                            if sd in ['deeppysr', 'pysr']:
-                                _, X_long, y_long = load_bmi_agg_data()
-                                res = get_best_formula_from_raw(m_path, X_long, y_long)
-                                
-                                if isinstance(res, dict):
-                                    for (r2w, lamb), (formula, complexity, _) in res.items():
-                                        if formula:
-                                            X_age_data = X_long[X_long['age'] == age]
-                                            y_age_data = y_long[X_long['age'] == age]
-                                            y_pred_best = evaluate_formula(formula, X_age_data)
-                                            r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
-                                        else:
-                                            r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
-                                        
-                                        model_name = f"{model_folder}_r2w{r2w}_L{lamb}"
-                                        all_data.append([age, model_name, 'longitudinal', r2, rmse, mae, complexity, formula])
-                                    continue # Skip the default append below
-                                else:
-                                    formula, complexity, _ = res
+                        # For DeepPySR and PySR in longitudinal
+                        if sd in ['deeppysr', 'pysr']:
+                            _, X_long, y_long = load_bmi_agg_data()
+                            res = get_best_formula_from_raw(m_path, X_long, y_long)
+                            
+                            if isinstance(res, dict):
+                                for (r2w, lamb), (formula, complexity, _) in res.items():
                                     if formula:
                                         X_age_data = X_long[X_long['age'] == age]
                                         y_age_data = y_long[X_long['age'] == age]
@@ -377,13 +365,26 @@ def process_results():
                                     else:
                                         r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
                                     
-                                    model_name = model_folder
+                                    model_name = f"{model_folder}_r2w{r2w}_L{lamb}"
+                                    all_data.append([age, model_name, 'longitudinal', r2, rmse, mae, complexity, formula])
+                                continue # Skip the default append below
                             else:
-                                r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
-                                formula, complexity = "", np.nan
-                                model_name = model_folder
+                                formula, complexity, _ = res
+                                if formula:
+                                    X_age_data = X_long[X_long['age'] == age]
+                                    y_age_data = y_long[X_long['age'] == age]
+                                    y_pred_best = evaluate_formula(formula, X_age_data)
+                                    r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
+                                else:
+                                    r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
                                 
-                            all_data.append([age, model_name, 'longitudinal', r2, rmse, mae, complexity, formula])
+                                model_name = model_folder
+                        else:
+                            r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
+                            formula, complexity = "", np.nan
+                            model_name = model_folder
+                            
+                        all_data.append([age, model_name, 'longitudinal', r2, rmse, mae, complexity, formula])
 
     # Create DataFrame and save
     result_df = pd.DataFrame(all_data, columns=['age', 'model', 'type', 'r2', 'rmse', 'mae', 'complexity', 'formula'])

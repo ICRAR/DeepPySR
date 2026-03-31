@@ -69,9 +69,9 @@ class DeepPySRRegressor:
             raise ValueError("Model is not fitted yet.")
 
         if isinstance(X, pd.DataFrame):
-            X_input = X.values
+            X_input = X.values.astype(np.float64)
         else:
-            X_input = X
+            X_input = np.asarray(X).astype(np.float64)
 
         # Create a dictionary to store values of intermediate variables
         # Initialize with input features
@@ -249,29 +249,45 @@ class DeepPySRRegressor:
             v_names = [f"x{i}" for i in range(n_features)]
             
         # Dynamically import PySRRegressor
+        import sys
+        
+        # 1. Update sys.path
+        pypysr_path_full = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
         if self.model_provider == "pypysr":
-            import sys
-            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
-            if os.path.exists(pypysr_path) and pypysr_path not in sys.path:
-                sys.path.insert(0, pypysr_path)
+            if os.path.exists(pypysr_path_full) and pypysr_path_full not in sys.path:
+                sys.path.insert(0, pypysr_path_full)
+        else:
+            if pypysr_path_full in sys.path:
+                # Remove all instances of pypysr_path from sys.path
+                sys.path = [p for p in sys.path if p != pypysr_path_full]
+
+        # 2. Clear sys.modules to force re-import when switching providers
+        # This is necessary because both providers might share sub-module names
+        # or we want to ensure we're getting the one from the current sys.path.
+        if "pysr" in sys.modules or "pypysr" in sys.modules:
+            for mod in list(sys.modules.keys()):
+                if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
+                    del sys.modules[mod]
+
+        # 3. Import the requested provider
+        if self.model_provider == "pypysr":
             from pypysr import PySRRegressor
             if params.get("verbosity", 0) > 0:
                 try:
                     import pypysr
                     print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
                 except ImportError:
-                    print(f"[DeepPySR] Using pypysr (import path: {pypysr_path})")
-            model = PySRRegressor(**params)
+                    print(f"[DeepPySR] Using pypysr (import path: {pypysr_path_full})")
         else:
-            import sys
-            pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
-            if pypysr_path in sys.path:
-                sys.path.remove(pypysr_path)
             from pysr import PySRRegressor
             if params.get("verbosity", 0) > 0:
-                import pysr
-                print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
-            model = PySRRegressor(**params)
+                try:
+                    import pysr
+                    print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
+                except ImportError:
+                    print(f"[DeepPySR] Using standard pysr")
+        
+        model = PySRRegressor(**params)
 
         if target_name == 'y':
             if hasattr(y, 'values'):
@@ -288,7 +304,7 @@ class DeepPySRRegressor:
             model.fit(X, y_fit, variable_names=v_names)
         
         eqs = model.equations_
-        
+
         if eqs is None or len(eqs) == 0:
             raise ValueError(f"No equations found for target {target_name}")
 
@@ -316,11 +332,23 @@ class DeepPySRRegressor:
                             y_pred = model.predict(X, index=idx)
                             # Handle NaNs and Infs in predictions
                             y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-                            prediction_cache[idx] = y_pred
+                            
+                            # If targets are integer-like, we might be in classification-via-regression.
+                            # Rounding here could significantly improve R2/Score for classification.
+                            # But we only do it if the target values are actually integers and non-binary.
+                            # For binary targets, we don't round as standard R2 or loss should work fine,
+                            # but for multiclass encoded as 0, 1, 2, rounding is often better.
+                            unique_fit = np.unique(y_fit)
+                            if len(unique_fit) > 2 and np.all(np.equal(np.mod(y_fit, 1), 0)):
+                                y_pred_eval = np.round(y_pred)
+                            else:
+                                y_pred_eval = y_pred
+                                
+                            prediction_cache[idx] = (y_pred, y_pred_eval)
                         else:
-                            y_pred = prediction_cache[idx]
+                            y_pred, y_pred_eval = prediction_cache[idx]
                         
-                        r2 = r2_score(y_fit, y_pred)
+                        r2 = r2_score(y_fit, y_pred_eval)
                         complexity = eqs.iloc[idx].get("complexity", 1)
                         
                         # Calculate Pareto Score
@@ -367,7 +395,6 @@ class DeepPySRRegressor:
                     "pareto_r2_weight": r2w,
                     "pareto_lambda": lam
                 })
-        
         return all_results
 
     def fit(self, X, y):
@@ -539,7 +566,7 @@ class DeepPySRRegressor:
                 print(f"Error modeling {target_name}: {e}")
 
         self.save_relationships()
-        
+        print(self.relationships_)
         # Populate equations_ with the best relationship (highest R2 and highest score) for the root target
         if self.relationships_:
             root_name = self.target_name_[0] if isinstance(self.target_name_, list) else self.target_name_
@@ -575,7 +602,7 @@ class DeepPySRRegressor:
                 # These attributes are often checked by PySR or scikit-learn
                 self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
                 self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
-
+        print(self._equation)
         return self
 
     def _get_mapped_relationships(self):

@@ -12,3 +12,5 @@
 /test_data/
 /test/bmi/results_bmi_all/*/
 /test/bmi/results_bmi_nocv/*/
+/test/diabetes130us/results_diab130_all/
+/test/diabetes130us/results_diab130_nocv/

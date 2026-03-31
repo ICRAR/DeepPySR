@@ -48,7 +48,7 @@ def main():
     pysr_base_kwargs = get_pysr_base_kwargs()
     
     # Extract parameters for folder naming
-    nit = pysr_base_kwargs.get('niterations', 100)
+    nit = pysr_base_kwargs.get('niterations', 10)
     pop = pysr_base_kwargs.get('populations', 30)
     sz = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
@@ -62,7 +62,8 @@ def main():
         'random_state': 42,
         'stratify_by': y,
         'ids': ids,
-        'extra_data': extra_data
+        'extra_data': extra_data,
+        'use_smote': True
     }
 
     # 1. Baseline Models
@@ -100,6 +101,7 @@ def main():
                 model_provider='pypysr',
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
+                stopping_score = 0.01,
                 **kwargs
             )
         
@@ -124,6 +126,7 @@ def main():
                 model_provider='pysr',
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
+                stopping_score = 0.01,
                 **kwargs
             )
         
@@ -134,7 +137,8 @@ def main():
     nocv_kwargs = {
         'task': task,
         'ids': ids,
-        'extra_data': extra_data
+        'extra_data': extra_data,
+        'use_smote': True
     }
 
     # 4.1 DeepPySR No-CV
@@ -152,6 +156,7 @@ def main():
                     model_provider='pypysr',
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
                     **kwargs
                 )
             run_nocv(deeppysr_factory_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_kwargs)
@@ -172,6 +177,7 @@ def main():
                     model_provider='pysr',
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
                     **kwargs
                 )
             run_nocv(deeppysr_pysr_factory_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_kwargs)
