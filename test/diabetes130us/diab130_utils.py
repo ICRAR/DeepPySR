@@ -143,9 +143,9 @@ def preprocess_diabetes_data(df):
     if 'diabetesMed' in df_proc.columns:
         df_proc['diabetesMed'] = df_proc['diabetesMed'].map({'No': 0, 'Yes': 1})
 
-    # readmitted, use 0 for NO, 1 for <30, and 2 for >30
+    # readmitted, use 1 for <30, and 0 for >30 and NO
     if 'readmitted' in df_proc.columns:
-        df_proc['readmitted'] = df_proc['readmitted'].map({'NO': 0, '<30': 1, '>30': 2})
+        df_proc['readmitted'] = df_proc['readmitted'].map({'NO': 0, '<30': 1, '>30': 0})
 
     return df_proc
 

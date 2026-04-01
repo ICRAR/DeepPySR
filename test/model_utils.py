@@ -214,7 +214,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'ExtraTrees': ExtraTreesClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBClassifier(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state, use_label_encoder=False, eval_metric='logloss'),
             'MLP': MLPClassifier(hidden_layer_sizes=(32, 16), alpha=0.1, max_iter=2000, random_state=random_state),
-            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='classification')
+            # 'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='classification')
         }
     else: # regression
         return {
@@ -223,7 +223,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'ExtraTrees': ExtraTreesRegressor(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBRegressor(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state),
             'MLP': MLPRegressor(hidden_layer_sizes=(32, 16), alpha=0.1, max_iter=2000, random_state=random_state),
-            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
+            # 'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
         }
 
 def get_pysr_base_kwargs(os_cpu_count=None):
@@ -260,6 +260,6 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "denoise": False, # Denoising can be very slow or get stuck, disabled for stability
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,
-        "niterations": 100,
-        "timeout_in_seconds": 600, # 10 minute timeout per fit to prevent hanging
+        "niterations": 100,#100,
+        "timeout_in_seconds": 3000, # 10 minute timeout per fit to prevent hanging
     }

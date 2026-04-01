@@ -16,8 +16,12 @@ from diab130_utils import load_and_clean_data
 def main():
     out_root = os.path.join(current_dir, "results_diab130_all")
     out_root_nocv = os.path.join(current_dir, "results_diab130_nocv")
+    out_root_ftsl = os.path.join(out_root, "ftsl")
+    out_root_nocv_ftsl = os.path.join(out_root_nocv, "ftsl")
     os.makedirs(out_root, exist_ok=True)
     os.makedirs(out_root_nocv, exist_ok=True)
+    os.makedirs(out_root_ftsl, exist_ok=True)
+    os.makedirs(out_root_nocv_ftsl, exist_ok=True)
     
     file_path = '/home/00101787/Projects/DeepPySR/test_data/Health/diabetes+130-us+hospitals+for+years+1999-2008/diabetic_data.csv'
     df = load_and_clean_data(file_path)
@@ -33,8 +37,8 @@ def main():
     # Extra data to save: target as well
     extra_data = {'readmitted': y}
     
-    # For classification/regression decision: 
-    # The target 'readmitted' has values 0, 1, 2. 
+    # For classification decision: 
+    # The target 'readmitted' has values 0, 1. 
     # DeepPySRRegressor is currently imported as Regressor, but let's see if we should use classification.
     # The issue says "stratify on the target of readmitted", which strongly implies classification.
     task = 'classification'
@@ -42,6 +46,8 @@ def main():
     # DeepPySR grid search params
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
+    
+    n_features_to_select = 20
     
     deeppysr_configs = get_deeppysr_configs()
     pysr_configs = get_pysr_configs()
@@ -65,6 +71,9 @@ def main():
         'extra_data': extra_data,
         'use_smote': True
     }
+    
+    cv_ftsl_kwargs = cv_kwargs.copy()
+    cv_ftsl_kwargs.update({'feature_selection': True, 'n_features_to_select': n_features_to_select})
 
     # 1. Baseline Models
     print(f"Evaluating Baseline Models...")
@@ -73,15 +82,27 @@ def main():
         model_out = os.path.join(out_root, "baselines", name)
         if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
             print(f"  Skipping {name} (results exist)")
-            continue
-        print(f"  {name}...")
-        
-        def baseline_factory(m=model_instance, n=name):
-            if n == 'KAN':
-                return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
-            return clone(m)
-        
-        run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
+        else:
+            print(f"  {name}...")
+            
+            def baseline_factory(m=model_instance, n=name):
+                if n == 'KAN':
+                    return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
+                return clone(m)
+            
+            run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
+
+        # Baseline with Feature Selection
+        model_out_ftsl = os.path.join(out_root_ftsl, "baselines", name)
+        if os.path.exists(os.path.join(model_out_ftsl, "overall_metrics.csv")):
+            print(f"  Skipping {name} ftsl (results exist)")
+        else:
+            print(f"  {name} with ftsl...")
+            def baseline_factory_ftsl(m=model_instance, n=name):
+                if n == 'KAN':
+                    return KANWrapper(input_dim=n_features_to_select, output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
+                return clone(m)
+            run_cv(baseline_factory_ftsl, X, y, outdir=model_out_ftsl, **cv_ftsl_kwargs)
 
     # 2. DeepPySR Models (pypysr - Grid Search)
     print(f"Evaluating DeepPySR (pypysr) Models...")
@@ -140,6 +161,9 @@ def main():
         'extra_data': extra_data,
         'use_smote': True
     }
+    
+    nocv_ftsl_kwargs = nocv_kwargs.copy()
+    nocv_ftsl_kwargs.update({'feature_selection': True, 'n_features_to_select': n_features_to_select})
 
     # 4.1 DeepPySR No-CV
     for cfg_name, cfg_overrides in deeppysr_configs.items():
@@ -182,10 +206,97 @@ def main():
                 )
             run_nocv(deeppysr_pysr_factory_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_kwargs)
 
+    # 5. Feature Selection runs
+    print(f"Evaluating Models with Feature Selection...")
+    
+    # 5.1 DeepPySR (pypysr) with Feature Selection
+    for cfg_name, cfg_overrides in deeppysr_configs.items():
+        full_cfg_name = f"{cfg_name}_{param_suffix}_ftsl"
+        deeppysr_out = os.path.join(out_root_ftsl, "deeppysr", full_cfg_name)
+        if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+            print(f"  {full_cfg_name}...")
+            def deeppysr_factory_ftsl():
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(cfg_overrides)
+                return DeepPySRRegressor(
+                    max_layers=1,
+                    output_dir=deeppysr_out,
+                    model_provider='pypysr',
+                    pareto_r2_weight=r2w_list,
+                    pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
+                    **kwargs
+                )
+            run_cv(deeppysr_factory_ftsl, X, y, outdir=deeppysr_out, scaler=False, **cv_ftsl_kwargs)
+
+    # 5.2 DeepPySR (pypysr) No-CV with Feature Selection
+    for cfg_name, cfg_overrides in deeppysr_configs.items():
+        full_cfg_name = f"{cfg_name}_{param_suffix}_ftsl_nocv"
+        deeppysr_out = os.path.join(out_root_nocv_ftsl, "deeppysr", full_cfg_name)
+        if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+            print(f"  {full_cfg_name}...")
+            def deeppysr_factory_ftsl_nocv(co=cfg_overrides, d_out=deeppysr_out):
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                return DeepPySRRegressor(
+                    max_layers=1,
+                    output_dir=d_out,
+                    model_provider='pypysr',
+                    pareto_r2_weight=r2w_list,
+                    pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
+                    **kwargs
+                )
+            run_nocv(deeppysr_factory_ftsl_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_ftsl_kwargs)
+
+    # 5.3 DeepPySR (pysr) with Feature Selection
+    for cfg_name, cfg_overrides in pysr_configs.items():
+        aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
+        full_name = f"pysr_{param_suffix}_aps{aps}_ftsl"
+        deeppysr_pysr_out = os.path.join(out_root_ftsl, "pysr", full_name)
+        if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
+            print(f"  {full_name}...")
+            def deeppysr_pysr_factory_ftsl(co=cfg_overrides):
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                return DeepPySRRegressor(
+                    max_layers=1,
+                    output_dir=deeppysr_pysr_out,
+                    model_provider='pysr',
+                    pareto_r2_weight=r2w_list,
+                    pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
+                    **kwargs
+                )
+            run_cv(deeppysr_pysr_factory_ftsl, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_ftsl_kwargs)
+
+    # 5.4 DeepPySR (pysr) No-CV with Feature Selection
+    for cfg_name, cfg_overrides in pysr_configs.items():
+        aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
+        full_name = f"pysr_{param_suffix}_aps{aps}_ftsl_nocv"
+        deeppysr_pysr_out = os.path.join(out_root_nocv_ftsl, "pysr", full_name)
+        if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
+            print(f"  {full_name}...")
+            def deeppysr_pysr_factory_ftsl_nocv(co=cfg_overrides, d_out=deeppysr_pysr_out):
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                return DeepPySRRegressor(
+                    max_layers=1,
+                    output_dir=d_out,
+                    model_provider='pysr',
+                    pareto_r2_weight=r2w_list,
+                    pareto_lambda=lambda_list,
+                    stopping_score = 0.01,
+                    **kwargs
+                )
+            run_nocv(deeppysr_pysr_factory_ftsl_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_ftsl_kwargs)
+
     # Aggregate results
     print(f"Aggregating results...")
     aggregate_results(out_root, task=task)
     aggregate_results(out_root_nocv, task=task)
+    aggregate_results(out_root_ftsl, task=task)
+    aggregate_results(out_root_nocv_ftsl, task=task)
 
 if __name__ == "__main__":
     main()

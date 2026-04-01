@@ -21,7 +21,8 @@ class DeepPySRRegressor:
         pypysr_path = None,
         pareto_lambda = 0.001,
         pareto_r2_weight = 1.0,
-        batch_size = None,
+        batching = False,
+        batch_size = 50,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
@@ -34,6 +35,7 @@ class DeepPySRRegressor:
         self.stopping_score = stopping_score
         self.pareto_lambda = pareto_lambda
         self.pareto_r2_weight = pareto_r2_weight
+        self.batching = batching
         self.batch_size = batch_size
         self.relationships_ = []
         self.equations_ = None
@@ -48,6 +50,7 @@ class DeepPySRRegressor:
             "pypysr_path": self.pypysr_path,
             "pareto_lambda": self.pareto_lambda,
             "pareto_r2_weight": self.pareto_r2_weight,
+            "batching": self.batching,
             "batch_size": self.batch_size,
         }
         params.update(self.pysr_kwargs)
@@ -221,13 +224,22 @@ class DeepPySRRegressor:
         # Remove deepPySR specific params before passing to PySRRegressor
         for p in [
             "max_layers", "output_dir", "decimal", "stopping_score", "relationships_", 
-            "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path", "batch_size",
+            "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path",
             "variable_prune_max", "variable_prune_start", "variable_prune_ramp"
         ]:
             if self.model_provider != "pypysr" and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
                 params.pop(p, None)
-            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path", "batch_size"]:
+            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
                 params.pop(p, None)
+
+        # Batching logic: if X.shape[0] > 10000 and user didn't specify batching, enable it.
+        # But if user DID specify batching or batch_size, keep those.
+        if X.shape[0] > 10000:
+            if "batching" not in self.pysr_kwargs:
+                params["batching"] = True
+            if "batch_size" not in self.pysr_kwargs and self.batch_size == 50:
+                 # If user didn't override batch_size, use 500 for large datasets
+                params["batch_size"] = 500
 
         # Apply conservative defaults for stability if not provided
         if "procs" not in params:
@@ -307,18 +319,6 @@ class DeepPySRRegressor:
                     print(f"[DeepPySR] Using standard pysr")
         
         model = PySRRegressor(**params)
-
-        if X.shape[0] > 10000:
-            if params.get("verbosity", 0) > 0:
-                print(f"[DeepPySR] Data samples > 10000 ({X.shape[0]}). Enabling batching.")
-            model.set_params(batching=True)
-            if self.batch_size is not None:
-                model.set_params(batch_size=self.batch_size)
-            elif "batch_size" not in params:
-                model.set_params(batch_size=500) # Default PySR is 50, but maybe 500 is better for >10000
-        elif self.batch_size is not None:
-            model.set_params(batching=True)
-            model.set_params(batch_size=self.batch_size)
 
         if target_name == 'y':
             if hasattr(y, 'values'):

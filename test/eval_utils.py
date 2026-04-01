@@ -5,6 +5,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold, KFold, GroupKFold, StratifiedGroupKFold
 from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 from imblearn.over_sampling import SMOTE
 
 def save_predictions(outdir, y_true, y_pred, y_prob=None, ids=None, fold=None, y_pred_sym=None, extra_data=None):
@@ -75,7 +76,7 @@ def calculate_metrics(y_true, y_pred, y_prob=None, task='regression'):
                 metrics['auc'] = 0.5
         return metrics
 
-def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='regression', n_splits=5, random_state=42, outdir=None, scaler=True, extra_data=None, use_smote=False):
+def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='regression', n_splits=5, random_state=42, outdir=None, scaler=True, extra_data=None, use_smote=False, feature_selection=False, n_features_to_select=10):
     if groups is not None:
         if stratify_by is not None:
             skf = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -111,6 +112,12 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             X_train = sc.fit_transform(X_train)
             X_test = sc.transform(X_test)
         
+        if feature_selection:
+            score_func = f_classif if task == 'classification' else f_regression
+            selector = SelectKBest(score_func=score_func, k=min(n_features_to_select, X_train.shape[1]))
+            X_train = selector.fit_transform(X_train, y_train)
+            X_test = selector.transform(X_test)
+
         if use_smote and task == 'classification':
             sm = SMOTE(random_state=random_state)
             X_train, y_train = sm.fit_resample(X_train, y_train)
@@ -197,7 +204,7 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
         
     return overall_metrics
 
-def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scaler=True, extra_data=None, use_smote=False, random_state=42):
+def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scaler=True, extra_data=None, use_smote=False, random_state=42, feature_selection=False, n_features_to_select=10):
     print(f"  Training on full dataset (no-CV)")
     X_values = X.values if hasattr(X, 'values') else X
     y_values = y.values if hasattr(y, 'values') else y
@@ -208,6 +215,11 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
     else:
         X_train = X_values
     
+    if feature_selection:
+        score_func = f_classif if task == 'classification' else f_regression
+        selector = SelectKBest(score_func=score_func, k=min(n_features_to_select, X_train.shape[1]))
+        X_train = selector.fit_transform(X_train, y_values)
+
     if use_smote and task == 'classification':
         sm = SMOTE(random_state=random_state)
         X_train, y_values = sm.fit_resample(X_train, y_values)
