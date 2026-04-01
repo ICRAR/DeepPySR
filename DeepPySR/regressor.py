@@ -253,7 +253,7 @@ class DeepPySRRegressor:
             
         # Dynamically import PySRRegressor
         import sys
-        
+
         # 2. Clear sys.modules to force re-import when switching providers
         # This is necessary because both providers might share sub-module names
         # or we want to ensure we're getting the one from the current sys.path.
@@ -633,7 +633,7 @@ class DeepPySRRegressor:
                 # These attributes are often checked by PySR or scikit-learn
                 self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
                 self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
-        print(self.equations_)
+        # print(self._equation)
         return self
 
     def _get_mapped_relationships(self):
