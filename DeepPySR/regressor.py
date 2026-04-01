@@ -21,6 +21,7 @@ class DeepPySRRegressor:
         pypysr_path = None,
         pareto_lambda = 0.001,
         pareto_r2_weight = 1.0,
+        batch_size = None,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
@@ -33,6 +34,7 @@ class DeepPySRRegressor:
         self.stopping_score = stopping_score
         self.pareto_lambda = pareto_lambda
         self.pareto_r2_weight = pareto_r2_weight
+        self.batch_size = batch_size
         self.relationships_ = []
         self.equations_ = None
 
@@ -46,6 +48,7 @@ class DeepPySRRegressor:
             "pypysr_path": self.pypysr_path,
             "pareto_lambda": self.pareto_lambda,
             "pareto_r2_weight": self.pareto_r2_weight,
+            "batch_size": self.batch_size,
         }
         params.update(self.pysr_kwargs)
         return params
@@ -218,12 +221,12 @@ class DeepPySRRegressor:
         # Remove deepPySR specific params before passing to PySRRegressor
         for p in [
             "max_layers", "output_dir", "decimal", "stopping_score", "relationships_", 
-            "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path",
+            "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path", "batch_size",
             "variable_prune_max", "variable_prune_start", "variable_prune_ramp"
         ]:
             if self.model_provider != "pypysr" and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
                 params.pop(p, None)
-            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
+            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path", "batch_size"]:
                 params.pop(p, None)
 
         # Apply conservative defaults for stability if not provided
@@ -251,16 +254,6 @@ class DeepPySRRegressor:
         # Dynamically import PySRRegressor
         import sys
         
-        # 1. Update sys.path
-        pypysr_path_full = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
-        if self.model_provider == "pypysr":
-            if os.path.exists(pypysr_path_full) and pypysr_path_full not in sys.path:
-                sys.path.insert(0, pypysr_path_full)
-        else:
-            if pypysr_path_full in sys.path:
-                # Remove all instances of pypysr_path from sys.path
-                sys.path = [p for p in sys.path if p != pypysr_path_full]
-
         # 2. Clear sys.modules to force re-import when switching providers
         # This is necessary because both providers might share sub-module names
         # or we want to ensure we're getting the one from the current sys.path.
@@ -268,6 +261,32 @@ class DeepPySRRegressor:
             for mod in list(sys.modules.keys()):
                 if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
                     del sys.modules[mod]
+
+        # 2.1 Handle Julia environment switching
+        # pypysr activates its own internal Julia environment, which can break standard pysr.
+        # If we are switching back to pysr, we might need to reactivate the default environment.
+        if "juliacall" in sys.modules:
+            try:
+                from juliacall import Main as jl
+                jl.seval("using Pkg")
+                if self.model_provider == "pypysr":
+                    # pypysr's fit() will handle its own Pkg.activate()
+                    pass
+                else:
+                    # If we are in pysr mode, ensure we are NOT in pypysr's environment.
+                    # Standard pysr expects the environment in .venv/julia_env or similar.
+                    # We try to activate the default project.
+                    curr_proj = jl.Pkg.project().path
+                    if "pypysr" in curr_proj:
+                        # Find the .venv path if possible, or just use the default env.
+                        # Usually, activating "" or "@v1.x" works, but let's be more specific.
+                        # Pkg.activate() with no args activates the default project.
+                        jl.Pkg.activate()
+                        if params.get("verbosity", 0) > 0:
+                            print(f"[DeepPySR] Reactivated default Julia environment (was {curr_proj})")
+            except Exception as e:
+                if params.get("verbosity", 0) > 0:
+                    print(f"[DeepPySR] Warning: Failed to manage Julia environment: {e}")
 
         # 3. Import the requested provider
         if self.model_provider == "pypysr":
@@ -277,7 +296,7 @@ class DeepPySRRegressor:
                     import pypysr
                     print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
                 except ImportError:
-                    print(f"[DeepPySR] Using pypysr (import path: {pypysr_path_full})")
+                    print(f"[DeepPySR] Using pypysr")
         else:
             from pysr import PySRRegressor
             if params.get("verbosity", 0) > 0:
@@ -288,6 +307,18 @@ class DeepPySRRegressor:
                     print(f"[DeepPySR] Using standard pysr")
         
         model = PySRRegressor(**params)
+
+        if X.shape[0] > 10000:
+            if params.get("verbosity", 0) > 0:
+                print(f"[DeepPySR] Data samples > 10000 ({X.shape[0]}). Enabling batching.")
+            model.set_params(batching=True)
+            if self.batch_size is not None:
+                model.set_params(batch_size=self.batch_size)
+            elif "batch_size" not in params:
+                model.set_params(batch_size=500) # Default PySR is 50, but maybe 500 is better for >10000
+        elif self.batch_size is not None:
+            model.set_params(batching=True)
+            model.set_params(batch_size=self.batch_size)
 
         if target_name == 'y':
             if hasattr(y, 'values'):
@@ -602,7 +633,7 @@ class DeepPySRRegressor:
                 # These attributes are often checked by PySR or scikit-learn
                 self.nout_ = len(self.target_name_) if isinstance(self.target_name_, list) else 1
                 self.selection_mask_ = np.ones(self.n_features_in_, dtype=bool)
-        print(self._equation)
+        print(self.equations_)
         return self
 
     def _get_mapped_relationships(self):
