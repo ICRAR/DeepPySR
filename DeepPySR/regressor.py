@@ -216,6 +216,13 @@ class DeepPySRRegressor:
         # Robustly handle NaNs and Infs
         return np.nan_to_num(res, nan=0.0, posinf=1e10, neginf=-1e10)
 
+    def predict_proba(self, X):
+        """
+        Return the raw predictions clipped to [0, 1] to serve as probabilities.
+        """
+        preds = self.predict(X)
+        return np.clip(preds, 0, 1)
+
     def _fit_single_target(self, X, y, target_name):
         # Create a new PySRRegressor instance with the same parameters as self
         # but with a specific random_state and potentially other tweaks for sub-fitting

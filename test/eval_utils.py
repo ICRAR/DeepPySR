@@ -54,10 +54,17 @@ def calculate_metrics(y_true, y_pred, y_prob=None, task='regression'):
         if not np.issubdtype(y_pred.dtype, np.integer):
             y_pred = np.round(y_pred).astype(int)
             
-        # Check if multiclass
-        unique_y = np.unique(y_true)
-        is_multiclass = len(unique_y) > 2
-        avg = 'macro' if is_multiclass else 'binary'
+        # Check if classification type
+        unique_y_true = np.unique(y_true)
+        unique_y_pred = np.unique(y_pred)
+        all_labels = np.unique(np.concatenate([unique_y_true, unique_y_pred]))
+        
+        # Consider it binary only if ALL labels (true and pred) are strictly subset of {0, 1}
+        is_binary = set(all_labels).issubset({0, 1})
+        avg = 'binary' if is_binary else 'macro'
+        
+        # AUC multiclass check
+        is_multiclass = len(unique_y_true) > 2
         
         metrics = {
             'accuracy': accuracy_score(y_true, y_pred),
@@ -98,6 +105,7 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
     all_extra_data = {k: [] for k in extra_data.keys()} if extra_data is not None else {}
     fold_metrics = []
     fold_importances = []
+    selected_feature_names = None
     
     X_values = X.values if hasattr(X, 'values') else X
     y_values = y.values if hasattr(y, 'values') else y
@@ -117,6 +125,10 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             selector = SelectKBest(score_func=score_func, k=min(n_features_to_select, X_train.shape[1]))
             X_train = selector.fit_transform(X_train, y_train)
             X_test = selector.transform(X_test)
+            if hasattr(X, 'columns'):
+                selected_feature_names = X.columns[selector.get_support()].tolist()
+            else:
+                selected_feature_names = [f'x{i}' for i in np.where(selector.get_support())[0]]
 
         if use_smote and task == 'classification':
             sm = SMOTE(random_state=random_state)
@@ -127,15 +139,28 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
         
         y_pred = model.predict(X_test)
         y_prob = None
-        if task == 'classification' and hasattr(model, 'predict_proba'):
-            y_prob = model.predict_proba(X_test)
-            if y_prob.ndim > 1:
-                if y_prob.shape[1] == 2:
-                    y_prob = y_prob[:, 1]
-                # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
-            elif y_prob.ndim == 1:
-                # If already 1D, assume it is probabilities of the positive class
-                pass
+        if task == 'classification':
+            if hasattr(model, 'predict_proba'):
+                y_prob = model.predict_proba(X_test)
+                if y_prob.ndim > 1:
+                    if y_prob.shape[1] == 2:
+                        y_prob = y_prob[:, 1]
+                    # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
+                elif y_prob.ndim == 1:
+                    # If already 1D, assume it is probabilities of the positive class
+                    pass
+                
+                # Update y_pred to be rounded classes for classification
+                if y_prob.ndim == 1:
+                    y_pred = np.round(y_prob).astype(int)
+                else:
+                    # For multi-class, take the argmax
+                    y_pred = np.argmax(y_prob, axis=1)
+            else:
+                # For models without predict_proba (like DeepPySRRegressor before update or other regressors)
+                # treat raw predictions as probabilities after clipping
+                y_prob = np.clip(y_pred, 0, 1)
+                y_pred = np.round(y_prob).astype(int)
     
         all_y_true.extend(y_test)
         all_y_pred.extend(y_pred)
@@ -192,8 +217,13 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
         
         if fold_importances:
             avg_importance = np.mean(fold_importances, axis=0)
+            if selected_feature_names is not None:
+                feature_names = selected_feature_names
+            else:
+                feature_names = X.columns if hasattr(X, 'columns') else [f'x{i}' for i in range(len(avg_importance))]
+            
             importance_df = pd.DataFrame({
-                'feature': X.columns if hasattr(X, 'columns') else [f'x{i}' for i in range(len(avg_importance))],
+                'feature': feature_names,
                 'importance': avg_importance
             })
             importance_df.to_csv(os.path.join(outdir, "feature_importance.csv"), index=False)
@@ -219,6 +249,12 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
         score_func = f_classif if task == 'classification' else f_regression
         selector = SelectKBest(score_func=score_func, k=min(n_features_to_select, X_train.shape[1]))
         X_train = selector.fit_transform(X_train, y_values)
+        if hasattr(X, 'columns'):
+            selected_feature_names = X.columns[selector.get_support()].tolist()
+        else:
+            selected_feature_names = [f'x{i}' for i in np.where(selector.get_support())[0]]
+    else:
+        selected_feature_names = None
 
     if use_smote and task == 'classification':
         sm = SMOTE(random_state=random_state)
@@ -229,15 +265,27 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
     
     y_pred = model.predict(X_train)
     y_prob = None
-    if task == 'classification' and hasattr(model, 'predict_proba'):
-        y_prob = model.predict_proba(X_train)
-        if y_prob.ndim > 1:
-            if y_prob.shape[1] == 2:
-                y_prob = y_prob[:, 1]
-            # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
-        elif y_prob.ndim == 1:
-            # If already 1D, assume it is probabilities of the positive class
-            pass
+    if task == 'classification':
+        if hasattr(model, 'predict_proba'):
+            y_prob = model.predict_proba(X_train)
+            if y_prob.ndim > 1:
+                if y_prob.shape[1] == 2:
+                    y_prob = y_prob[:, 1]
+                # If > 2 classes, keep all columns for roc_auc_score(multi_class='ovr')
+            elif y_prob.ndim == 1:
+                # If already 1D, assume it is probabilities of the positive class
+                pass
+            
+            # Update y_pred to be rounded classes for classification
+            if y_prob.ndim == 1:
+                y_pred = np.round(y_prob).astype(int)
+            else:
+                # For multi-class, take the argmax
+                y_pred = np.argmax(y_prob, axis=1)
+        else:
+            # For models without predict_proba, treat raw predictions as probabilities after clipping
+            y_prob = np.clip(y_pred, 0, 1)
+            y_pred = np.round(y_prob).astype(int)
 
     y_pred_sym = None
     if hasattr(model, 'symbolize'):
@@ -264,9 +312,33 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
 
         if hasattr(model, 'feature_importances_'):
             importance = model.feature_importances_
+            if selected_feature_names is not None:
+                feature_names = selected_feature_names
+            else:
+                feature_names = X.columns if hasattr(X, 'columns') else [f'x{i}' for i in range(len(importance))]
+                
             importance_df = pd.DataFrame({
-                'feature': X.columns if hasattr(X, 'columns') else [f'x{i}' for i in range(len(importance))],
+                'feature': feature_names,
                 'importance': importance
+            })
+            importance_df.to_csv(os.path.join(outdir, "feature_importance.csv"), index=False)
+        elif hasattr(model, 'coef_'):
+            # For linear models, use absolute values of coefficients as importance
+            # if y is not flattened, coef_ might be 2D
+            coef = model.coef_
+            if coef.ndim > 1:
+                coef = np.abs(coef).mean(axis=0)
+            else:
+                coef = np.abs(coef)
+            
+            if selected_feature_names is not None:
+                feature_names = selected_feature_names
+            else:
+                feature_names = X.columns if hasattr(X, 'columns') else [f'x{i}' for i in range(len(coef))]
+
+            importance_df = pd.DataFrame({
+                'feature': feature_names,
+                'importance': coef
             })
             importance_df.to_csv(os.path.join(outdir, "feature_importance.csv"), index=False)
             

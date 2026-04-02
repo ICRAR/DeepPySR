@@ -166,14 +166,25 @@ def process_results():
     X_full = df_full.drop(columns=['encounter_id', 'patient_nbr', 'readmitted'], errors='ignore')
     y_full = df_full['readmitted']
 
+    # New structure: base_dir / {noftsl, ftsl} / {baselines, deeppysr, pysr}
+    feature_folders = ['noftsl', 'ftsl']
     sub_dirs = ['baselines', 'deeppysr', 'pysr']
-    for sd in sub_dirs:
-        sd_path = os.path.join(base_dir, sd)
-        if not os.path.exists(sd_path): continue
-        for model_folder in os.listdir(sd_path):
-            m_path = os.path.join(sd_path, model_folder)
-            if not os.path.isdir(m_path): continue
-            pred_file = os.path.join(m_path, "predictions.csv")
+    
+    for ff in feature_folders:
+        ff_path = os.path.join(base_dir, ff)
+        if not os.path.exists(ff_path): continue
+        
+        for sd in sub_dirs:
+            sd_path = os.path.join(ff_path, sd)
+            if not os.path.exists(sd_path): continue
+            for model_folder in os.listdir(sd_path):
+                m_path = os.path.join(sd_path, model_folder)
+                if not os.path.isdir(m_path): continue
+                
+                # Tag model with feature selection info
+                model_tag = f"{ff}_{model_folder}"
+                
+                pred_file = os.path.join(m_path, "predictions.csv")
             if os.path.exists(pred_file):
                 df_pred = pd.read_csv(pred_file)
                 y_prob = None
@@ -186,29 +197,29 @@ def process_results():
 
                 if sd == 'baselines' and model_folder.lower() == 'kan':
                     acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], y_prob)
-                    all_data.append([model_folder, acc, f1, auc, np.nan, ""])
+                    all_data.append([model_tag, acc, f1, auc, np.nan, ""])
                     if 'y_pred_sym' in df_pred.columns:
                         formula, complexity, metrics = get_best_formula_from_raw(m_path, X_full, y_full, prefix='formulas_fold')
                         acc, f1, auc = metrics
                         if not formula:
                             acc, f1, auc = calculate_metrics(df_pred['y_true'], np.clip(np.round(df_pred['y_pred_sym']), 0, 2))
-                        all_data.append(['KANSym', acc, f1, auc, complexity, formula])
+                        all_data.append([f'{model_tag}Sym', acc, f1, auc, complexity, formula])
                 elif sd in ['deeppysr', 'pysr']:
                     res = get_best_formula_from_raw(m_path, X_full, y_full)
                     if isinstance(res, dict):
                         for (r2w, lamb), (formula, complexity, metrics) in res.items():
                             acc, f1, auc = metrics
-                            model_name = f"{model_folder}_r2w{r2w}_L{lamb}"
+                            model_name = f"{model_tag}_r2w{r2w}_L{lamb}"
                             all_data.append([model_name, acc, f1, auc, complexity, formula])
                     else:
                         formula, complexity, metrics = res
                         acc, f1, auc = metrics
                         if not formula:
                             acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                        all_data.append([model_folder, acc, f1, auc, complexity, formula])
+                        all_data.append([model_tag, acc, f1, auc, complexity, formula])
                 else:
                     acc, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], y_prob)
-                    all_data.append([model_folder, acc, f1, auc, np.nan, ""])
+                    all_data.append([model_tag, acc, f1, auc, np.nan, ""])
 
     result_df = pd.DataFrame(all_data, columns=['model', 'accuracy', 'f1', 'auc', 'complexity', 'formula'])
     result_df.to_csv(os.path.join(base_dir, "diab130_aggregated_results.csv"), index=False)

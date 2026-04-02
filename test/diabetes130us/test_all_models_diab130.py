@@ -17,11 +17,15 @@ def main():
     out_root = os.path.join(current_dir, "results_diab130_all")
     out_root_nocv = os.path.join(current_dir, "results_diab130_nocv")
     out_root_ftsl = os.path.join(out_root, "ftsl")
+    out_root_noftsl = os.path.join(out_root, "noftsl")
     out_root_nocv_ftsl = os.path.join(out_root_nocv, "ftsl")
+    out_root_nocv_noftsl = os.path.join(out_root_nocv, "noftsl")
     os.makedirs(out_root, exist_ok=True)
     os.makedirs(out_root_nocv, exist_ok=True)
     os.makedirs(out_root_ftsl, exist_ok=True)
+    os.makedirs(out_root_noftsl, exist_ok=True)
     os.makedirs(out_root_nocv_ftsl, exist_ok=True)
+    os.makedirs(out_root_nocv_noftsl, exist_ok=True)
     
     file_path = '/home/00101787/Projects/DeepPySR/test_data/Health/diabetes+130-us+hospitals+for+years+1999-2008/diabetic_data.csv'
     df = load_and_clean_data(file_path)
@@ -39,9 +43,14 @@ def main():
     
     # For classification decision: 
     # The target 'readmitted' has values 0, 1. 
-    # DeepPySRRegressor is currently imported as Regressor, but let's see if we should use classification.
-    # The issue says "stratify on the target of readmitted", which strongly implies classification.
-    task = 'classification'
+    # Determine task based on target uniqueness
+    unique_y = np.unique(y)
+    if len(unique_y) <= 10 and np.all(np.equal(unique_y, unique_y.astype(int))):
+        task = 'classification'
+    else:
+        task = 'regression'
+    
+    print(f"Detected task: {task} (unique values: {len(unique_y)})")
     
     # DeepPySR grid search params
     r2w_list = [1, 1.5, 2]
@@ -79,7 +88,7 @@ def main():
     print(f"Evaluating Baseline Models...")
     baseline_models = get_baseline_models(task=task, input_dim=X.shape[1])
     for name, model_instance in baseline_models.items():
-        model_out = os.path.join(out_root, "baselines", name)
+        model_out = os.path.join(out_root_noftsl, "baselines", name)
         if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
             print(f"  Skipping {name} (results exist)")
         else:
@@ -108,7 +117,7 @@ def main():
     print(f"Evaluating DeepPySR (pypysr) Models...")
     for cfg_name, cfg_overrides in deeppysr_configs.items():
         full_cfg_name = f"{cfg_name}_{param_suffix}_grid"
-        deeppysr_out = os.path.join(out_root, "deeppysr", full_cfg_name)
+        deeppysr_out = os.path.join(out_root_noftsl, "deeppysr", full_cfg_name)
         if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
             continue
         
@@ -133,7 +142,7 @@ def main():
     for cfg_name, cfg_overrides in pysr_configs.items():
         aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
         full_name = f"pysr_{param_suffix}_aps{aps}_grid"
-        deeppysr_pysr_out = os.path.join(out_root, "pysr", full_name)
+        deeppysr_pysr_out = os.path.join(out_root_noftsl, "pysr", full_name)
         if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
             continue
         
@@ -168,7 +177,7 @@ def main():
     # 4.1 DeepPySR No-CV
     for cfg_name, cfg_overrides in deeppysr_configs.items():
         full_cfg_name = f"{cfg_name}_{param_suffix}_grid_nocv"
-        deeppysr_out = os.path.join(out_root_nocv, "deeppysr", full_cfg_name)
+        deeppysr_out = os.path.join(out_root_nocv_noftsl, "deeppysr", full_cfg_name)
         if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
             print(f"  {full_cfg_name}...")
             def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
@@ -189,7 +198,7 @@ def main():
     for cfg_name, cfg_overrides in pysr_configs.items():
         aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
         full_name = f"pysr_{param_suffix}_aps{aps}_grid_nocv"
-        deeppysr_pysr_out = os.path.join(out_root_nocv, "pysr", full_name)
+        deeppysr_pysr_out = os.path.join(out_root_nocv_noftsl, "pysr", full_name)
         if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
             print(f"  {full_name}...")
             def deeppysr_pysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_pysr_out):
@@ -293,8 +302,8 @@ def main():
 
     # Aggregate results
     print(f"Aggregating results...")
-    aggregate_results(out_root, task=task)
-    aggregate_results(out_root_nocv, task=task)
+    aggregate_results(out_root_noftsl, task=task)
+    aggregate_results(out_root_nocv_noftsl, task=task)
     aggregate_results(out_root_ftsl, task=task)
     aggregate_results(out_root_nocv_ftsl, task=task)
 
