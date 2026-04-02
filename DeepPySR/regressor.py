@@ -287,22 +287,37 @@ class DeepPySRRegressor:
                 else:
                     # If we are in pysr mode, ensure we are NOT in pypysr's environment.
                     # Standard pysr expects the environment in .venv/julia_env or similar.
-                    # We try to activate the default project.
-                    curr_proj = jl.Pkg.project().path
-                    if "pypysr" in curr_proj:
-                        # Find the .venv path if possible, or just use the default env.
-                        # Usually, activating "" or "@v1.x" works, but let's be more specific.
-                        # Pkg.activate() with no args activates the default project.
+                    # We try to activate the environment managed by juliapkg.
+                    try:
+                        import juliapkg
+                        pysr_env = juliapkg.project()
+                        jl.Pkg.activate(pysr_env)
+                        if params.get("verbosity", 0) > 0:
+                            print(f"[DeepPySR] Reactivated PySR Julia environment at {pysr_env}")
+                    except (ImportError, Exception):
+                        # Fallback to default activation if juliapkg is not available or fails
                         jl.Pkg.activate()
                         if params.get("verbosity", 0) > 0:
-                            print(f"[DeepPySR] Reactivated default Julia environment (was {curr_proj})")
+                            print(f"[DeepPySR] Reactivated default Julia environment")
             except Exception as e:
                 if params.get("verbosity", 0) > 0:
                     print(f"[DeepPySR] Warning: Failed to manage Julia environment: {e}")
 
         # 3. Import the requested provider
         if self.model_provider == "pypysr":
-            from pypysr import PySRRegressor
+            # If we are in pypysr mode, and we were previously in pysr mode,
+            # we should check if MyPySR can be loaded.
+            # pypysr's _initialize_julia() will activate its own environment.
+            try:
+                from pypysr import PySRRegressor
+            except Exception as e:
+                if params.get("verbosity", 0) > 0:
+                    print(f"[DeepPySR] Error importing pypysr: {e}")
+                # Try to force re-import if it failed due to already loaded julia packages
+                if "pypysr" in sys.modules:
+                    del sys.modules["pypysr"]
+                from pypysr import PySRRegressor
+
             if params.get("verbosity", 0) > 0:
                 try:
                     import pypysr
@@ -310,12 +325,26 @@ class DeepPySRRegressor:
                 except ImportError:
                     print(f"[DeepPySR] Using pypysr")
         else:
+            # We must import pysr first
+            import pysr
+            
+            # 4. Handle pysr-specific Julia package binding
+            # If pypysr was previously used, it might have changed the Julia environment
+            # or even loaded a different version of SymbolicRegression.
+            # We force a reload of pysr.julia_import to ensure 'SymbolicRegression' 
+            # is correctly bound to the one in the current (reactivated) environment.
+            try:
+                import importlib
+                importlib.reload(pysr.julia_import)
+            except Exception as e:
+                if params.get("verbosity", 0) > 0:
+                    print(f"[DeepPySR] Warning: Failed to reload pysr.julia_import: {e}")
+
             from pysr import PySRRegressor
             if params.get("verbosity", 0) > 0:
                 try:
-                    import pysr
                     print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
-                except ImportError:
+                except Exception:
                     print(f"[DeepPySR] Using standard pysr")
         
         model = PySRRegressor(**params)
@@ -332,7 +361,14 @@ class DeepPySRRegressor:
             warnings.simplefilter("ignore", ConvergenceWarning)
             # Ensure variable_names is passed as a list of strings if X is not a DataFrame
             # PySRRegressor should handle it, but for pypysr we want to be explicit
-            model.fit(X, y_fit, variable_names=v_names)
+            try:
+                model.fit(X, y_fit, variable_names=v_names)
+            except Exception as e:
+                if self.model_provider == "pypysr" and "juliacall" in sys.modules:
+                    print(f"\n[DeepPySR] Error during pypysr fit: {e}")
+                    print("[DeepPySR] This is often caused by Julia environment conflicts after using standard pysr in the same session.")
+                    print("[DeepPySR] Please try to restart the Python session if you need to switch between providers.")
+                raise e
         
         eqs = model.equations_
 
