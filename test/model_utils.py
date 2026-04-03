@@ -8,12 +8,140 @@ from xgboost import XGBClassifier, XGBRegressor
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from kan import KAN
 from DeepPySR.regressor import DeepPySRRegressor
+from sklearn.base import BaseEstimator, RegressorMixin, ClassifierMixin
+
+# --- Torch MLP with Dropout ---
+class TorchMLP(torch.nn.Module):
+    def __init__(self, input_dim, hidden_layer_sizes=(128, 64, 32), output_dim=1, dropout=0.2, task='regression', activation='leaky_relu'):
+        super().__init__()
+        layers = []
+        last_dim = input_dim
+        
+        if activation == 'leaky_relu':
+            act_fn = torch.nn.LeakyReLU(0.01)
+        elif activation == 'gelu':
+            act_fn = torch.nn.GELU()
+        else:
+            act_fn = torch.nn.ReLU()
+
+        for h in hidden_layer_sizes:
+            layers.append(torch.nn.Linear(last_dim, h))
+            layers.append(torch.nn.BatchNorm1d(h))
+            layers.append(act_fn)
+            if dropout > 0:
+                layers.append(torch.nn.Dropout(dropout))
+            last_dim = h
+        layers.append(torch.nn.Linear(last_dim, output_dim))
+        self.network = torch.nn.Sequential(*layers)
+        self.task = task
+
+    def forward(self, x):
+        return self.network(x)
+
+class MLPWrapper(BaseEstimator):
+    def __init__(self, input_dim=None, hidden_layer_sizes=(256, 128, 64), dropout=0.1, 
+                 lr=0.001, epochs=300, batch_size=32, weight_decay=1e-3, 
+                 activation='leaky_relu', task='regression', random_state=42):
+        self.input_dim = input_dim
+        self.hidden_layer_sizes = hidden_layer_sizes
+        self.dropout = dropout
+        self.lr = lr
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.weight_decay = weight_decay
+        self.activation = activation
+        self.task = task
+        self.random_state = random_state
+        self.model = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def fit(self, X, y):
+        torch.manual_seed(self.random_state)
+        if self.input_dim is None:
+            self.input_dim = X.shape[1]
+        
+        output_dim = 1
+        if self.task == 'classification':
+            unique_y = np.unique(y)
+            if len(unique_y) > 2:
+                output_dim = len(unique_y)
+        
+        self.model = TorchMLP(self.input_dim, self.hidden_layer_sizes, output_dim, self.dropout, self.task, self.activation).to(self.device)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
+        
+        if self.task == 'regression':
+            criterion = torch.nn.MSELoss()
+        else:
+            if output_dim == 1:
+                criterion = torch.nn.BCEWithLogitsLoss()
+            else:
+                criterion = torch.nn.CrossEntropyLoss()
+
+        X_t = torch.tensor(X, dtype=torch.float32).to(self.device)
+        if self.task == 'regression':
+            y_t = torch.tensor(y, dtype=torch.float32).reshape(-1, 1).to(self.device)
+        else:
+            if output_dim == 1:
+                y_t = torch.tensor(y, dtype=torch.float32).reshape(-1, 1).to(self.device)
+            else:
+                y_t = torch.tensor(y, dtype=torch.long).to(self.device)
+
+        dataset = torch.utils.data.TensorDataset(X_t, y_t)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
+        self.model.train()
+        for epoch in range(self.epochs):
+            epoch_loss = 0
+            for batch_X, batch_y in loader:
+                optimizer.zero_grad()
+                outputs = self.model(batch_X)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+            scheduler.step(epoch_loss / len(loader))
+        return self
+
+    def predict(self, X):
+        self.model.eval()
+        with torch.no_grad():
+            X_t = torch.tensor(X, dtype=torch.float32).to(self.device)
+            outputs = self.model(X_t)
+            if self.task == 'regression':
+                return outputs.cpu().numpy().ravel()
+            else:
+                if outputs.shape[1] == 1:
+                    return (torch.sigmoid(outputs) > 0.5).cpu().numpy().astype(int).ravel()
+                else:
+                    return torch.argmax(outputs, dim=1).cpu().numpy()
+
+    def predict_proba(self, X):
+        if self.task != 'classification':
+            raise ValueError("predict_proba only for classification")
+        self.model.eval()
+        with torch.no_grad():
+            X_t = torch.tensor(X, dtype=torch.float32).to(self.device)
+            outputs = self.model(X_t)
+            if outputs.shape[1] == 1:
+                probs = torch.sigmoid(outputs).cpu().numpy().ravel()
+                return np.column_stack([1 - probs, probs])
+            else:
+                return torch.nn.functional.softmax(outputs, dim=1).cpu().numpy()
+
+class MLPRegressorWrapper(MLPWrapper, RegressorMixin):
+    def __init__(self, **kwargs):
+        super().__init__(task='regression', **kwargs)
+
+class MLPClassifierWrapper(MLPWrapper, ClassifierMixin):
+    def __init__(self, **kwargs):
+        super().__init__(task='classification', **kwargs)
 
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
     vps_list = [25, 50, 75]
-    vpr_list = [50, 100]
+    vpr_list = [50, 100, 150]
     aps_list = [0.1, 1.0, 10.0, 50.0]
     # vps_list = [25]
     # vpr_list = [50]
@@ -71,7 +199,7 @@ def get_pysr_configs():
 
 # --- KAN Wrapper ---
 class KANWrapper:
-    def __init__(self, input_dim, output_dim=1, hidden_dim=5, steps=200, update_grid=False, task='regression', lamb=0.01, lamb_l1=0.1):
+    def __init__(self, input_dim, output_dim=1, hidden_dim=5, steps=200, update_grid=False, task='regression', lamb=0.05, lamb_l1=1):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # Ensure input, hidden, and output dims are integers
         input_dim = int(input_dim) if not isinstance(input_dim, list) else int(input_dim[0])
@@ -213,8 +341,8 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'RandomForest': RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'ExtraTrees': ExtraTreesClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBClassifier(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state, use_label_encoder=False, eval_metric='logloss'),
-            'MLP': MLPClassifier(hidden_layer_sizes=(32, 16), alpha=0.1, max_iter=2000, random_state=random_state),
-            # 'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='classification')
+            'MLP': MLPClassifierWrapper(hidden_layer_sizes=(256, 128, 64), dropout=0.1, activation='leaky_relu', random_state=random_state),
+            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='classification')
         }
     else: # regression
         return {
@@ -222,8 +350,8 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'RandomForest': RandomForestRegressor(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'ExtraTrees': ExtraTreesRegressor(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBRegressor(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state),
-            'MLP': MLPRegressor(hidden_layer_sizes=(32, 16), alpha=0.1, max_iter=2000, random_state=random_state),
-            # 'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
+            'MLP': MLPRegressorWrapper(hidden_layer_sizes=(256, 128, 64), dropout=0.1, activation='leaky_relu', random_state=random_state),
+            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
         }
 
 def get_pysr_base_kwargs(os_cpu_count=None):
