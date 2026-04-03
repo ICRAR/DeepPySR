@@ -12,7 +12,7 @@ from DeepPySR.regressor import DeepPySRRegressor
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
-    vps_list = [25, 50]
+    vps_list = [25, 50, 75]
     vpr_list = [50, 100]
     aps_list = [0.1, 1.0, 10.0, 50.0]
     # vps_list = [25]
