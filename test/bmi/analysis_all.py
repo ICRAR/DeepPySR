@@ -589,6 +589,17 @@ def plot_results(df):
             ax.set_xlabel('Age', fontsize=16)
             ax.tick_params(axis='both', which='major', labelsize=12)
 
+            if metric in ['rmse', 'mae']:
+                ax.set_ylim(0, 10)
+                # Label values over 10 in power way
+                data_subset = plot_df[(plot_df['type'] == t)]
+                for i, row_data in data_subset.iterrows():
+                    val = row_data[metric]
+                    if val > 10:
+                        ax.annotate(f'{val:.1e}', (row_data['age'], 9.8),
+                                    textcoords="offset points", xytext=(0,5),
+                                    ha='center', fontsize=10, color=model_colors[row_data['display_model']])
+
             # Remove default legends
             if ax.get_legend():
                 ax.get_legend().remove()
@@ -641,9 +652,9 @@ def plot_settings_comparison(df):
     # Target models for comparison
     target_settings = [
         'fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'srpsm_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'srprn_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'stdsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
+        'srpsm_nit100_pop30_sz200_vps0_vpr0_aps10.0_grid_r2w1.5_L0.005',
+        'srprn_nit100_pop30_sz200_vps50_vpr50_aps0_grid_r2w1.5_L0.005',
+        'stdsr_nit100_pop30_sz200_vps0_vpr0_aps0_grid_r2w1.5_L0.005',
         'pysr_nit100_pop30_sz200_aps10.0_grid_r2w1.5_L0.005'
     ]
 
@@ -690,6 +701,17 @@ def plot_settings_comparison(df):
             ax.set_ylabel(metric.upper(), fontsize=16)
             ax.set_xlabel('Age', fontsize=16)
             ax.tick_params(axis='both', which='major', labelsize=12)
+
+            if metric in ['rmse', 'mae']:
+                ax.set_ylim(0, 10)
+                # Label values over 10 in power way
+                data_subset = plot_df[(plot_df['type'] == t)]
+                for i, row_data in data_subset.iterrows():
+                    val = row_data[metric]
+                    if val > 10:
+                        ax.annotate(f'{val:.1e}', (row_data['age'], 9.8),
+                                    textcoords="offset points", xytext=(0,5),
+                                    ha='center', fontsize=10, color=model_colors[row_data['model']])
 
             # Remove default legends
             if ax.get_legend():

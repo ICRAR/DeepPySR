@@ -88,7 +88,7 @@ class MLPWrapper(BaseEstimator):
                 y_t = torch.tensor(y, dtype=torch.long).to(self.device)
 
         dataset = torch.utils.data.TensorDataset(X_t, y_t)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=True, drop_last=True)
 
         self.model.train()
         for epoch in range(self.epochs):
