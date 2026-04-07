@@ -1,0 +1,3 @@
+type,model,formula,r2,complexity
+red,stdsr_vps0_vpr0_aps0_nit100_pop30_sz200_grid_r2w1.0_L0.001,alcohol/pH**1.0 + log(sulphates) + 2.93,0.28636915281512476,11.0
+white,fullsr_vps25_vpr150_aps10.0_nit100_pop30_sz200_grid_r2w1.0_L0.01,0.36*alcohol + 2.98*exp(-1.0*volatile acidity - 5.54/(residual sugar**1.0*free sulfur dioxide**1.0)),0.0,23.0

@@ -105,10 +105,14 @@ def main():
                 def deeppysr_factory():
                     kwargs = pysr_base_kwargs.copy()
                     kwargs.update(cfg_overrides)
+                    
+                    # If model_provider is not in cfg_overrides, default to 'pypysr'
+                    provider = cfg_overrides.get('model_provider', 'pypysr')
+                    
                     return DeepPySRRegressor(
                         max_layers=1,
                         output_dir=deeppysr_out,
-                        model_provider='pypysr',
+                        model_provider=provider,
                         pareto_r2_weight=r2w_list,
                         pareto_lambda=lambda_list,
                         **kwargs
@@ -160,10 +164,14 @@ def main():
                     def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
                         kwargs = pysr_base_kwargs.copy()
                         kwargs.update(co)
+                        
+                        # If model_provider is not in co, default to 'pypysr'
+                        provider = co.get('model_provider', 'pypysr')
+                        
                         return DeepPySRRegressor(
                             max_layers=1,
                             output_dir=d_out,
-                            model_provider='pypysr',
+                            model_provider=provider,
                             pareto_r2_weight=r2w_list,
                             pareto_lambda=lambda_list,
                             **kwargs
