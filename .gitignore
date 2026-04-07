@@ -14,4 +14,8 @@
 /test/bmi/results_bmi_nocv/*/
 /test/diabetes130us/results_diab130_all/
 /test/diabetes130us/results_diab130_nocv/
+/test/wineQuality/results_red_all/
+/test/wineQuality/results_red_nocv/
 /scripts/
+/test/wineQuality/results_white_all/
+/test/wineQuality/results_white_nocv/
