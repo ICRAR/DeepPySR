@@ -23,6 +23,10 @@ class DeepPySRRegressor:
         pareto_r2_weight = 1.0,
         batching = False,
         batch_size = 50,
+        use_mdl = True,
+        use_nsga2 = True,
+        use_lexicase = True,
+        use_hotspot_protection = True,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
@@ -37,6 +41,10 @@ class DeepPySRRegressor:
         self.pareto_r2_weight = pareto_r2_weight
         self.batching = batching
         self.batch_size = batch_size
+        self.use_mdl = use_mdl
+        self.use_nsga2 = use_nsga2
+        self.use_lexicase = use_lexicase
+        self.use_hotspot_protection = use_hotspot_protection
         self.relationships_ = []
         self.equations_ = None
 
@@ -52,6 +60,10 @@ class DeepPySRRegressor:
             "pareto_r2_weight": self.pareto_r2_weight,
             "batching": self.batching,
             "batch_size": self.batch_size,
+            "use_mdl": self.use_mdl,
+            "use_nsga2": self.use_nsga2,
+            "use_lexicase": self.use_lexicase,
+            "use_hotspot_protection": self.use_hotspot_protection,
         }
         params.update(self.pysr_kwargs)
         return params
@@ -232,9 +244,12 @@ class DeepPySRRegressor:
         for p in [
             "max_layers", "output_dir", "decimal", "stopping_score", "relationships_", 
             "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path",
+            "use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection",
             "variable_prune_max", "variable_prune_start", "variable_prune_ramp"
         ]:
-            if self.model_provider != "pypysr" and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
+            if self.model_provider not in ["pypysr", "pypysrdev1"] and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
+                params.pop(p, None)
+            elif self.model_provider != "pypysrdev1" and p in ["use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection"]:
                 params.pop(p, None)
             elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
                 params.pop(p, None)
@@ -265,7 +280,7 @@ class DeepPySRRegressor:
         
         # Determine variable names for this fit
         n_features = X.shape[1]
-        if self.model_provider == "pypysr":
+        if self.model_provider in ["pypysr", "pypysrdev1"]:
             v_names = [f"v{i}" for i in range(n_features)]
         else:
             v_names = [f"x{i}" for i in range(n_features)]
@@ -276,9 +291,9 @@ class DeepPySRRegressor:
         # 2. Clear sys.modules to force re-import when switching providers
         # This is necessary because both providers might share sub-module names
         # or we want to ensure we're getting the one from the current sys.path.
-        if "pysr" in sys.modules or "pypysr" in sys.modules:
+        if "pysr" in sys.modules or "pypysr" in sys.modules or "pypysrdev1" in sys.modules:
             for mod in list(sys.modules.keys()):
-                if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
+                if mod in ['pysr', 'pypysr', 'pypysrdev1'] or mod.startswith(('pysr.', 'pypysr.', 'pypysrdev1.')):
                     del sys.modules[mod]
 
         # 2.1 Handle Julia environment switching
@@ -288,7 +303,7 @@ class DeepPySRRegressor:
             try:
                 from juliacall import Main as jl
                 jl.seval("using Pkg")
-                if self.model_provider == "pypysr":
+                if self.model_provider in ["pypysr", "pypysrdev1"]:
                     # pypysr's fit() will handle its own Pkg.activate()
                     pass
                 else:
@@ -331,6 +346,22 @@ class DeepPySRRegressor:
                     print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
                 except ImportError:
                     print(f"[DeepPySR] Using pypysr")
+        elif self.model_provider == "pypysrdev1":
+            try:
+                from pypysrdev1 import PySRRegressor
+            except Exception as e:
+                if params.get("verbosity", 0) > 0:
+                    print(f"[DeepPySR] Error importing pypysrdev1: {e}")
+                if "pypysrdev1" in sys.modules:
+                    del sys.modules["pypysrdev1"]
+                from pypysrdev1 import PySRRegressor
+
+            if params.get("verbosity", 0) > 0:
+                try:
+                    import pypysrdev1
+                    print(f"[DeepPySR] Using pypysrdev1 from: {os.path.abspath(pypysrdev1.__file__)}")
+                except ImportError:
+                    print(f"[DeepPySR] Using pypysrdev1")
         else:
             # We must import pysr first
             import pysr
@@ -371,8 +402,8 @@ class DeepPySRRegressor:
             try:
                 model.fit(X, y_fit, variable_names=v_names)
             except Exception as e:
-                if self.model_provider == "pypysr" and "juliacall" in sys.modules:
-                    print(f"\n[DeepPySR] Error during pypysr fit: {e}")
+                if self.model_provider in ["pypysr", "pypysrdev1"] and "juliacall" in sys.modules:
+                    print(f"\n[DeepPySR] Error during {self.model_provider} fit: {e}")
                     print("[DeepPySR] This is often caused by Julia environment conflicts after using standard pysr in the same session.")
                     print("[DeepPySR] Please try to restart the Python session if you need to switch between providers.")
                 raise e
@@ -571,12 +602,14 @@ class DeepPySRRegressor:
                     if hasattr(sym_expr, "atoms"):
                         # We need to make sure we don't modify the original sym_expr in the results list
                         # though here it's fine as we are processing it.
-                        for n in sym_expr.atoms(sp.Number):
+                        for n in list(sym_expr.atoms(sp.Number)):
                             sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
 
-                    # pypysr uses 'v' prefix to avoid its internal x1->x0 translation
-                    # pysr uses 'x' prefix.
-                    prefix = "v" if self.model_provider == "pypysr" else "x"
+                    # Map sympy formula using SymPy's xreplace with symbols
+                    # xreplace with symbols is safe against partial name matches.
+                    # IMPORTANT: We map to 'x' prefix regardless of provider for internal consistency
+                    # within the DeepPySR hierarchy, as layers use 'x' to reference each other.
+                    prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
                     
                     mapping = {}
                     for k in range(len(cols)):
@@ -705,7 +738,8 @@ class DeepPySRRegressor:
 
             # Map sympy formula using SymPy's xreplace with symbols
             # xreplace with symbols is safe against partial name matches.
-            sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+            sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
             if hasattr(new_rel["sympy"], "xreplace"):
                 new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
             new_rel["formula"] = str(new_rel["sympy"])
@@ -799,7 +833,8 @@ class DeepPySRRegressor:
                 if rel:
                     expr = rel['sympy']
                     if hasattr(self, "feature_names_in_"):
-                        sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+                        prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+                        sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
                         expr = expr.xreplace(sym_mapping)
                     exprs[name] = expr
             return exprs
@@ -812,8 +847,9 @@ class DeepPySRRegressor:
             if not hasattr(self, "feature_names_in_"):
                 return expr
                 
-            # Map x0, x1... to original feature names
-            mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+            # Map x0, x1... (or v0, v1... for pypysr) to original feature names
+            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+            mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
             return expr.xreplace(mapping)
 
     def latex(self):
