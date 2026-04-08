@@ -125,10 +125,12 @@ def main():
         def deeppysr_factory():
             kwargs = pysr_base_kwargs.copy()
             kwargs.update(cfg_overrides)
+            # Default to pypysr if model_provider is not in the config
+            provider = kwargs.pop('model_provider', 'pypysr')
             return DeepPySRRegressor(
                 max_layers=1,
                 output_dir=deeppysr_out,
-                model_provider='pypysr',
+                model_provider=provider,
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
                 stopping_score = 0.01,
@@ -183,10 +185,12 @@ def main():
             def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
                 kwargs = pysr_base_kwargs.copy()
                 kwargs.update(co)
+                # Default to pypysr if model_provider is not in the config
+                provider = kwargs.pop('model_provider', 'pypysr')
                 return DeepPySRRegressor(
                     max_layers=1,
                     output_dir=d_out,
-                    model_provider='pypysr',
+                    model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,
@@ -227,10 +231,12 @@ def main():
             def deeppysr_factory_ftsl():
                 kwargs = pysr_base_kwargs.copy()
                 kwargs.update(cfg_overrides)
+                # Default to pypysr if model_provider is not in the config
+                provider = kwargs.pop('model_provider', 'pypysr')
                 return DeepPySRRegressor(
                     max_layers=1,
                     output_dir=deeppysr_out,
-                    model_provider='pypysr',
+                    model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,
@@ -247,10 +253,12 @@ def main():
             def deeppysr_factory_ftsl_nocv(co=cfg_overrides, d_out=deeppysr_out):
                 kwargs = pysr_base_kwargs.copy()
                 kwargs.update(co)
+                # Default to pypysr if model_provider is not in the config
+                provider = kwargs.pop('model_provider', 'pypysr')
                 return DeepPySRRegressor(
                     max_layers=1,
                     output_dir=d_out,
-                    model_provider='pypysr',
+                    model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,

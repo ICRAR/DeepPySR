@@ -96,13 +96,14 @@ def main():
             grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid")
 
             def deeppysr_factory(co=cfg, gout=grid_out):
-                provider = co.get('model_provider', 'pypysr')
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                provider = kwargs.pop('model_provider', 'pypysr')
                 return DeepPySRRegressor(
-                    **pysr_base_kwargs,
-                    **co,
+                    **kwargs,
                     max_layers=1,
                     output_dir=gout,
-                    # model_provider=provider,
+                    model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,
@@ -116,13 +117,14 @@ def main():
             # DeepPySR No CV
             grid_out_nocv = os.path.join(out_root_nocv, "deeppysr", f"{cfg_name}_{param_suffix}_grid")
             def deeppysr_factory_nocv(co=cfg, gout=grid_out_nocv):
-                provider = co.get('model_provider', 'pypysr')
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                provider = kwargs.pop('model_provider', 'pypysr')
                 return DeepPySRRegressor(
-                    **pysr_base_kwargs,
-                    **co,
+                    **kwargs,
                     max_layers=1,
                     output_dir=gout,
-                    # model_provider=provider,
+                    model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,
