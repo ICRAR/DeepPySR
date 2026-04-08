@@ -140,12 +140,12 @@ class MLPClassifierWrapper(MLPWrapper, ClassifierMixin):
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
-    vps_list = [25, 50, 75]
+    # vps_list = [25, 50, 75]
+    # vpr_list = [50, 100, 150]
+    # aps_list = [0.1, 1.0, 10.0, 50.0]
+    vps_list = [25, 50]
     vpr_list = [50, 100, 150]
-    aps_list = [0.1, 1.0, 10.0, 50.0]
-    # vps_list = [25]
-    # vpr_list = [50]
-    # aps_list = [10.0]
+    aps_list = [10.0, 50.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # 1. stdsr: All parameters set to 0
@@ -186,21 +186,21 @@ def get_deeppysr_configs():
                     "variable_prune_max": vpm,
                 }
 
-    # # 5. v2fullsr: pypysrdev1 with all 4 parameters
-    # for vps in vps_list:
-    #     for vpr in vpr_list:
-    #         for aps in aps_list:
-    #             configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
-    #                 "model_provider": "pypysrdev1",
-    #                 "adaptive_parsimony_scaling": aps,
-    #                 "variable_prune_start": vps,
-    #                 "variable_prune_ramp": vpr,
-    #                 "variable_prune_max": vpm,
-    #                 "use_mdl": True,
-    #                 "use_nsga2": True,
-    #                 "use_lexicase": True,
-    #                 "use_hotspot_protection": True,
-    #             }
+    # 5. v2fullsr: pypysrdev1 with all 4 parameters
+    for vps in vps_list:
+        for vpr in vpr_list:
+            for aps in aps_list:
+                configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
+                    "model_provider": "pypysrdev1",
+                    "adaptive_parsimony_scaling": aps,
+                    "variable_prune_start": vps,
+                    "variable_prune_ramp": vpr,
+                    "variable_prune_max": vpm,
+                    "use_mdl": True,
+                    "use_nsga2": True,
+                    "use_lexicase": True,
+                    "use_hotspot_protection": True,
+                }
     return configs
 
 # --- PySR Configs ---
