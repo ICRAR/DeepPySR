@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
+from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, run_nocv, aggregate_results
 from bmi_utils import load_bmi_agg_data
 
@@ -27,6 +27,7 @@ def main():
     lambda_list = [0.001, 0.005, 0.01]
     
     deeppysr_configs = get_deeppysr_configs()
+    pysr_configs = get_pysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
     
     # Extract parameters for folder naming
@@ -105,19 +106,38 @@ def main():
                     kwargs = pysr_base_kwargs.copy()
                     kwargs.update(cfg_overrides)
                     
-                    # If model_provider is not in cfg_overrides, default to 'pypysr'
-                    provider = cfg_overrides.get('model_provider', 'pypysr')
-                    
                     return DeepPySRRegressor(
                         max_layers=1,
                         output_dir=deeppysr_out,
-                        model_provider=provider,
                         pareto_r2_weight=r2w_list,
                         pareto_lambda=lambda_list,
                         **kwargs
                     )
                 
                 run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
+
+            # 3. DeepPySR (pysr) Model (Requested)
+            print(f"Evaluating DeepPySR (pysr) Model...")
+            for cfg_name, cfg_overrides in pysr_configs.items():
+                aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
+                full_name = f"pysr_{param_suffix}_aps{aps}_grid"
+                deeppysr_pysr_out = os.path.join(run_out_root, "pysr", full_name)
+                if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
+                    continue
+
+                print(f"  {full_name}...")
+                def deeppysr_pysr_factory(co=cfg_overrides):
+                    kwargs = pysr_base_kwargs.copy()
+                    kwargs.update(co)
+                    return DeepPySRRegressor(
+                        max_layers=1,
+                        output_dir=deeppysr_pysr_out,
+                        pareto_r2_weight=r2w_list,
+                        pareto_lambda=lambda_list,
+                        **kwargs
+                    )
+
+                run_cv(deeppysr_pysr_factory, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_kwargs)
 
             # # 3. No-CV runs for DeepPySR (3 settings)
             # print(f"Evaluating No-CV Models...")

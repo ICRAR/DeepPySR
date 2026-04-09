@@ -137,6 +137,17 @@ class MLPClassifierWrapper(MLPWrapper, ClassifierMixin):
     def __init__(self, **kwargs):
         super().__init__(task='classification', **kwargs)
 
+# --- PySR Configs ---
+def get_pysr_configs():
+    configs = {}
+    aps_list = [0.1, 1.0, 10.0, 50.0]
+    for aps in aps_list:
+        configs[f"pysr_aps{aps}"] = {
+            "model_provider": "pysr",
+            "adaptive_parsimony_scaling": aps,
+        }
+    return configs
+
 # --- DeepPySR Configs ---
 def get_deeppysr_configs():
     configs = {}
@@ -148,14 +159,7 @@ def get_deeppysr_configs():
     aps_list = [10.0, 50.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
-    # 1. stdsr: All parameters set to 0
-    for aps in aps_list:
-        configs["stdsr_vps0_vpr0_aps0"] = {
-            "model_provider": "pysr",
-            "adaptive_parsimony_scaling": aps,
-        }
-
-    # 2. fullsr: Tune all 4 parameters
+    # 1. fullsr: Tune all 4 parameters
     for vps in vps_list:
         for vpr in vpr_list:
             for aps in aps_list:
@@ -171,7 +175,7 @@ def get_deeppysr_configs():
                     "use_hotspot_protection": False,
                 }
 
-    # 3. v2fullsr: pypysr with all 4 parameters
+    # 3. v2fullsr: pypysr with all 8 parameters
     for vps in vps_list:
         for vpr in vpr_list:
             for aps in aps_list:
