@@ -14,10 +14,10 @@ from .utils import is_redundant, ensure_output_dir, plot_n_layer_graph, plot_cir
 class DeepPySRRegressor:
     def __init__(
         self,
-        max_layers=4,
+        max_layers=1,
         output_dir="outputs/deepPySR",
         stopping_score = 2,
-        model_provider = "pysr",
+        model_provider = "pypysr",
         pypysr_path = None,
         pareto_lambda = 0.001,
         pareto_r2_weight = 1.0,
@@ -47,6 +47,7 @@ class DeepPySRRegressor:
         self.use_hotspot_protection = use_hotspot_protection
         self.relationships_ = []
         self.equations_ = None
+        self.loss_history_ = []
 
     def get_params(self, deep=True):
         params = {
@@ -67,6 +68,14 @@ class DeepPySRRegressor:
         }
         params.update(self.pysr_kwargs)
         return params
+
+    def set_params(self, **params):
+        for key, value in params.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                self.pysr_kwargs[key] = value
+        return self
 
 
     def predict(self, X):
@@ -235,7 +244,13 @@ class DeepPySRRegressor:
         preds = self.predict(X)
         return np.clip(preds, 0, 1)
 
-    def _fit_single_target(self, X, y, target_name):
+    def _fit_provider(self, X, y, target_names):
+        """Fits one or more targets using the current model provider (pysr or pypysr)."""
+        # y can be 1D or 2D (multi-target)
+        if not isinstance(target_names, list):
+            target_names = [target_names]
+            y = y.reshape(-1, 1)
+            
         # Create a new PySRRegressor instance with the same parameters as self
         # but with a specific random_state and potentially other tweaks for sub-fitting
         params = self.get_params()
@@ -249,7 +264,7 @@ class DeepPySRRegressor:
         ]:
             if self.model_provider not in ["pypysr", "pypysrdev1"] and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
                 params.pop(p, None)
-            elif self.model_provider != "pypysrdev1" and p in ["use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection"]:
+            elif p in ["use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection"]:
                 params.pop(p, None)
             elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
                 params.pop(p, None)
@@ -269,21 +284,22 @@ class DeepPySRRegressor:
             # Standard PySR 1.x default is often too aggressive for many-layered DeepPySR
             params["procs"] = min((os.cpu_count() or 2) - 1, 4)
 
+        if self.model_provider in ["pypysr", "pypysrdev1"] and len(target_names) > 1:
+            # pypysrdev1 (and potentially pypysr) fails with multi-output if progress is True
+            params["progress"] = False
+
 
         # Configure PySR to use our output_dir for its files
-        # We use a subfolder for each target to avoid collisions if running in parallel
+        # We use a subfolder for each target set to avoid collisions if running in parallel
         # though currently it's sequential.
-        target_output_dir = os.path.join(self.output_dir, "pysr_outputs", target_name)
+        target_output_dir = os.path.join(self.output_dir, "pysr_outputs", "_".join(target_names[:3]) + (f"_{len(target_names)}" if len(target_names) > 3 else ""))
         os.makedirs(target_output_dir, exist_ok=True)
         
         params["output_directory"] = target_output_dir
         
         # Determine variable names for this fit
         n_features = X.shape[1]
-        if self.model_provider in ["pypysr", "pypysrdev1"]:
-            v_names = [f"v{i}" for i in range(n_features)]
-        else:
-            v_names = [f"x{i}" for i in range(n_features)]
+        v_names = [f"x{i}" for i in range(n_features)]
             
         # Dynamically import PySRRegressor
         import sys
@@ -291,9 +307,9 @@ class DeepPySRRegressor:
         # 2. Clear sys.modules to force re-import when switching providers
         # This is necessary because both providers might share sub-module names
         # or we want to ensure we're getting the one from the current sys.path.
-        if "pysr" in sys.modules or "pypysr" in sys.modules or "pypysrdev1" in sys.modules:
+        if "pysr" in sys.modules or "pypysr" in sys.modules:
             for mod in list(sys.modules.keys()):
-                if mod in ['pysr', 'pypysr', 'pypysrdev1'] or mod.startswith(('pysr.', 'pypysr.', 'pypysrdev1.')):
+                if mod in ['pysr', 'pypysr'] or mod.startswith(('pysr.', 'pypysr.')):
                     del sys.modules[mod]
 
         # 2.1 Handle Julia environment switching
@@ -303,7 +319,7 @@ class DeepPySRRegressor:
             try:
                 from juliacall import Main as jl
                 jl.seval("using Pkg")
-                if self.model_provider in ["pypysr", "pypysrdev1"]:
+                if self.model_provider in ["pypysr"]:
                     # pypysr's fit() will handle its own Pkg.activate()
                     pass
                 else:
@@ -326,181 +342,435 @@ class DeepPySRRegressor:
                     print(f"[DeepPySR] Warning: Failed to manage Julia environment: {e}")
 
         # 3. Import the requested provider
-        if self.model_provider == "pypysr":
-            # If we are in pypysr mode, and we were previously in pysr mode,
-            # we should check if MyPySR can be loaded.
-            # pypysr's _initialize_julia() will activate its own environment.
-            try:
-                from pypysr import PySRRegressor
-            except Exception as e:
-                if params.get("verbosity", 0) > 0:
-                    print(f"[DeepPySR] Error importing pypysr: {e}")
-                # Try to force re-import if it failed due to already loaded julia packages
-                if "pypysr" in sys.modules:
-                    del sys.modules["pypysr"]
-                from pypysr import PySRRegressor
-
-            if params.get("verbosity", 0) > 0:
+        try:
+            if self.model_provider == "pypysr":
+                # If we are in pypysr mode, and we were previously in pysr mode,
+                # we should check if MyPySR can be loaded.
+                # pypysr's _initialize_julia() will activate its own environment.
                 try:
-                    import pypysr
-                    print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
-                except ImportError:
-                    print(f"[DeepPySR] Using pypysr")
-        elif self.model_provider == "pypysrdev1":
-            try:
-                from pypysrdev1 import PySRRegressor
-            except Exception as e:
+                    from pypysr import PySRRegressor
+                    from juliacall import Main as jl
+                    # Ensure MyPySR is loaded and available
+                    try:
+                        import pypysr
+                        pypysr.sr._initialize_julia()
+                    except:
+                        pass
+                except Exception as e:
+                    if params.get("verbosity", 0) > 0:
+                        print(f"[DeepPySR] Error importing pypysr: {e}")
+                    # Try to force re-import if it failed due to already loaded julia packages
+                    if "pypysr" in sys.modules:
+                        del sys.modules["pypysr"]
+                    from pypysr import PySRRegressor
+
                 if params.get("verbosity", 0) > 0:
-                    print(f"[DeepPySR] Error importing pypysrdev1: {e}")
-                if "pypysrdev1" in sys.modules:
-                    del sys.modules["pypysrdev1"]
-                from pypysrdev1 import PySRRegressor
-
-            if params.get("verbosity", 0) > 0:
-                try:
-                    import pypysrdev1
-                    print(f"[DeepPySR] Using pypysrdev1 from: {os.path.abspath(pypysrdev1.__file__)}")
-                except ImportError:
-                    print(f"[DeepPySR] Using pypysrdev1")
-        else:
-            # We must import pysr first
-            import pysr
-            
-            # 4. Handle pysr-specific Julia package binding
-            # If pypysr was previously used, it might have changed the Julia environment
-            # or even loaded a different version of SymbolicRegression.
-            # We force a reload of pysr.julia_import to ensure 'SymbolicRegression' 
-            # is correctly bound to the one in the current (reactivated) environment.
-            try:
-                import importlib
-                importlib.reload(pysr.julia_import)
-            except Exception as e:
-                if params.get("verbosity", 0) > 0:
-                    print(f"[DeepPySR] Warning: Failed to reload pysr.julia_import: {e}")
-
-            from pysr import PySRRegressor
-            if params.get("verbosity", 0) > 0:
-                try:
-                    print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
-                except Exception:
-                    print(f"[DeepPySR] Using standard pysr")
-        
-        model = PySRRegressor(**params)
-
-        if target_name == 'y':
-            if hasattr(y, 'values'):
-                y_fit = y.values.ravel()
+                    try:
+                        import pypysr
+                        print(f"[DeepPySR] Using pypysr from: {os.path.abspath(pypysr.__file__)}")
+                    except ImportError:
+                        print(f"[DeepPySR] Using pypysr")
             else:
-                y_fit = np.array(y).ravel()
-        else:
-            y_fit = np.array(y).ravel()
+                # We must import pysr first
+                import pysr
+                
+                # 4. Handle pysr-specific Julia package binding
+                # If pypysr was previously used, it might have changed the Julia environment
+                # or even loaded a different version of SymbolicRegression.
+                # We force a reload of pysr.julia_import to ensure 'SymbolicRegression' 
+                # is correctly bound to the one in the current (reactivated) environment.
+                try:
+                    import importlib
+                    importlib.reload(pysr.julia_import)
+                except Exception as e:
+                    if params.get("verbosity", 0) > 0:
+                        print(f"[DeepPySR] Warning: Failed to reload pysr.julia_import: {e}")
+
+                from pysr import PySRRegressor
+                if params.get("verbosity", 0) > 0:
+                    try:
+                        print(f"[DeepPySR] Using standard pysr from: {os.path.abspath(pysr.__file__)}")
+                    except Exception:
+                        print(f"[DeepPySR] Using standard pysr")
+        except ImportError as e:
+            if params.get("verbosity", 0) > 0:
+                print(f"[DeepPySR] Critical Error: Failed to import {self.model_provider}: {e}")
+            raise e
+        
+        # Remove record_loss_history from params as it's not a PySR keyword arg
+        params.pop("record_loss_history", None)
+        params.pop("record_loss", None) # Also remove record_loss just in case
+        # Also remove logger if we are using it
+        logger_to_use = params.pop("logger", None)
+
+        if self.model_provider in ["pypysr"]:
+            try:
+                from juliacall import Main as jl
+                # Define a custom logger in Julia to record loss per iteration
+                # We use 'Main.MyPySR' to be explicit since we're in Main
+                jl.seval("""
+                if !isdefined(Main, :PythonLossLogger)
+                    try
+                        import MyPySR: AbstractSRLogger, logging_callback!, should_log, increment_log_step!, get_logger
+                    catch
+                        import .MyPySR: AbstractSRLogger, logging_callback!, should_log, increment_log_step!, get_logger
+                    end
+                    using Logging: ConsoleLogger
+                    
+                    mutable struct PythonLossLogger <: AbstractSRLogger
+                        losses::Vector{Float64}
+                        iterations::Vector{Int}
+                        cur_iteration::Int
+                        log_interval::Int
+                    end
+                    
+                    get_logger(logger::PythonLossLogger) = ConsoleLogger()
+                    should_log(logger::PythonLossLogger) = true
+                    increment_log_step!(logger::PythonLossLogger) = nothing
+                    
+                    function logging_callback!(logger::PythonLossLogger; state, datasets, ropt, options)
+                        logger.cur_iteration += 1
+                        if logger.cur_iteration % logger.log_interval == 0
+                            # Get min loss from first dataset's Hall of Fame
+                            hof = state.halls_of_fame[1]
+                            if hof.exists[end] # Check if anything exists
+                                # find min loss
+                                min_loss = Inf
+                                for member in hof.members[hof.exists]
+                                    if member.loss < min_loss
+                                        min_loss = member.loss
+                                    end
+                                end
+                                push!(logger.losses, Float64(min_loss))
+                                push!(logger.iterations, Int(logger.cur_iteration))
+                            end
+                        end
+                        return nothing
+                    end
+                end
+                """)
+                # Create the logger instance
+                log_interval = 1 # Record every iteration
+                self._jl_logger = jl.PythonLossLogger([], [], 0, log_interval)
+                # We must use 'full_options' or similar if the provider doesn't support 'logger' in constructor
+                # but pypysr should support it if it's based on recent SymbolicRegression.jl
+                # For now, let's try to pass it via pysr_kwargs if it fails in constructor
+                logger_to_use = self._jl_logger
+            except Exception as e:
+                print(f"[DeepPySR] Warning: Failed to setup Julia loss logger: {e}")
+
+        model = PySRRegressor(**params)
+        
+        if logger_to_use is not None:
+             # PySRRegressor (pypysr) uses __init__ but we can try setting attribute
+             # if set_params is not available. 
+             try:
+                 model.set_params(logger=logger_to_use)
+             except AttributeError:
+                 model.logger = logger_to_use
+
+        # Robustly handle y shape
+        y_fit = np.array(y).astype(np.float64)
+        if y_fit.ndim == 2:
+            if y_fit.shape[1] == 1:
+                y_fit = y_fit.ravel()
+            else:
+                # Multiple targets: check if we are using pypysr
+                # They expect [targets, rows] in Julia, but the Python wrapper 
+                # for pypysr handles transposing internally if we pass [rows, targets].
+                # Wait, if pypysr.sr.PySRRegressor.fit does y_jl = y_np.T, 
+                # then it expects [rows, targets] from us.
+                pass
+        
+        # Ensure X is [rows, features] for model.fit() as it is standard Scikit-Learn.
+        X_fit = X
             
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", ConvergenceWarning)
-            # Ensure variable_names is passed as a list of strings if X is not a DataFrame
-            # PySRRegressor should handle it, but for pypysr we want to be explicit
             try:
-                model.fit(X, y_fit, variable_names=v_names)
+                # Both standard pysr and our custom providers now support multi-target in a single fit
+                model.fit(X_fit, y_fit, variable_names=v_names)
             except Exception as e:
-                if self.model_provider in ["pypysr", "pypysrdev1"] and "juliacall" in sys.modules:
+                if self.model_provider in ["pypysr"] and "juliacall" in sys.modules:
                     print(f"\n[DeepPySR] Error during {self.model_provider} fit: {e}")
                     print("[DeepPySR] This is often caused by Julia environment conflicts after using standard pysr in the same session.")
                     print("[DeepPySR] Please try to restart the Python session if you need to switch between providers.")
                 raise e
         
-        eqs = model.equations_
+        # Record loss history if requested
+        if self.model_provider in ["pypysr"] and hasattr(self, "_jl_logger"):
+            try:
+                self.loss_history_.append({
+                    "target": "_".join(target_names),
+                    "iterations": list(self._jl_logger.iterations),
+                    "losses": list(self._jl_logger.losses)
+                })
+            except Exception:
+                pass
+        
+        # PySR returns equations_ as a list of dataframes for multi-target, or a single dataframe for single-target
+        all_eqs = model.equations_
+        if all_eqs is None or (isinstance(all_eqs, list) and len(all_eqs) == 0):
+             raise ValueError(f"No equations found for targets {target_names}")
 
-        if eqs is None or len(eqs) == 0:
-            raise ValueError(f"No equations found for target {target_name}")
+        # pypysr might return a dictionary of dataframes for multi-target
+        # but let's check for standard PySR list first
+        if isinstance(all_eqs, dict):
+            all_eqs = [all_eqs[i] for i in sorted(all_eqs.keys())]
+        elif not isinstance(all_eqs, list):
+            all_eqs = [all_eqs]
 
         # Prepare parameters for grid search
         r2w_list = self.pareto_r2_weight if isinstance(self.pareto_r2_weight, (list, np.ndarray)) else [self.pareto_r2_weight]
         lambda_list = self.pareto_lambda if isinstance(self.pareto_lambda, (list, np.ndarray)) else [self.pareto_lambda]
 
-        all_results = []
+        multi_target_results = {}
         
-        # Dictionary to cache predictions to avoid redundant model.predict calls
-        prediction_cache = {}
+        for t_idx, target_name in enumerate(target_names):
+            eqs = all_eqs[t_idx]
+            
+            # Dictionary to cache predictions to avoid redundant model.predict calls
+            prediction_cache = {}
+            target_results = []
+            
+            # Extract current target y
+            if y_fit.ndim == 1:
+                cur_y_fit = y_fit
+            else:
+                cur_y_fit = y_fit[:, t_idx]
 
-        for r2w in r2w_list:
-            for lam in lambda_list:
-                # Manually iterate through the equations and select the one with the highest Pareto Score
-                # Score = R^2 * exp(-lambda * (complexity - 1))
-                best_score = -np.inf
-                best_idx = 0
-                best_r2 = -np.inf
-                
-                for idx in range(len(eqs)):
-                    try:
-                        # Use model.predict to get predictions for this equation
-                        if idx not in prediction_cache:
-                            y_pred = model.predict(X, index=idx)
-                            # Handle NaNs and Infs in predictions
-                            y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-                            
-                            # If targets are integer-like, we might be in classification-via-regression.
-                            # Rounding here could significantly improve R2/Score for classification.
-                            # But we only do it if the target values are actually integers and non-binary.
-                            # For binary targets, we don't round as standard R2 or loss should work fine,
-                            # but for multiclass encoded as 0, 1, 2, rounding is often better.
-                            unique_fit = np.unique(y_fit)
-                            if len(unique_fit) > 2 and np.all(np.equal(np.mod(y_fit, 1), 0)):
-                                y_pred_eval = np.round(y_pred)
-                            else:
-                                y_pred_eval = y_pred
-                                
-                            prediction_cache[idx] = (y_pred, y_pred_eval)
-                        else:
-                            y_pred, y_pred_eval = prediction_cache[idx]
-                        
-                        r2 = r2_score(y_fit, y_pred_eval)
-                        complexity = eqs.iloc[idx].get("complexity", 1)
-                        
-                        # Calculate Pareto Score
-                        # Using the weight as a power for r2
-                        # Ensure r2 is positive to avoid issues with non-integer powers
-                        safe_r2 = max(0.0001, r2)
-                        score = (safe_r2 ** r2w) * np.exp(-lam * (complexity - 1))
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_r2 = r2
-                            best_idx = idx
-                    except Exception as e:
-                        # Catching Distributed.ProcessExitedException or other Julia/PySR errors
-                        print(f"[DeepPySR] Warning: Error calculating Score for equation {idx} (possibly dead worker): {e}")
-                        if "ProcessExitedException" in str(e):
-                            print("[DeepPySR] Worker process died. Aborting Pareto score optimization for this target.")
-                            break
-                        continue
-                
-                # If all equation evaluations failed for this combination, best_idx might be 0 but best_score still -inf
-                if best_score == -np.inf:
-                    print(f"[DeepPySR] Warning: All equation evaluations failed for r2w={r2w}, lambda={lam}. Using default first equation.")
+            for r2w in r2w_list:
+                for lam in lambda_list:
+                    best_score = -np.inf
                     best_idx = 0
-                    best_r2 = 0.0
-                    best_score = 0.0
+                    best_r2 = -np.inf
                     
-                best = eqs.iloc[best_idx]
-                formula = str(best["equation"]) if "equation" in best else str(best.get("sympy_format", ""))
-                
-                try:
-                    sym_expr = model.sympy(best_idx)
-                except Exception:
-                    sym_expr = sp.sympify(formula)
+                    for idx in range(len(eqs)):
+                        try:
+                            # Use model.predict to get predictions for this equation
+                            # model.predict handles multi-target correctly if we pass index and target
+                            cache_key = (t_idx, idx)
+                            if cache_key not in prediction_cache:
+                                if len(all_eqs) > 1:
+                                    # Multi-target predict
+                                    # Check if the model is from pypysr or standard pysr
+                                    # Standard pysr 0.x might not support 'target' in predict, 
+                                    # but it supports multiple outputs in one predict call if index is a list?
+                                    # Actually, for standard pysr, we can just call predict(X, index=idx) 
+                                    # and it returns a 2D array if it's a multi-target model.
+                                    # 1. Try passing index directly (works for some versions, returns 2D if multi-target)
+                                    try:
+                                        y_pred_all = model.predict(X, index=idx)
+                                        if isinstance(y_pred_all, (list, tuple)) and len(y_pred_all) > t_idx:
+                                             y_pred = y_pred_all[t_idx]
+                                        elif hasattr(y_pred_all, "ndim") and y_pred_all.ndim == 2:
+                                            y_pred = y_pred_all[:, t_idx]
+                                        else:
+                                            y_pred = y_pred_all
+                                    except Exception:
+                                        # 2. Try passing indices as a list (common for newer multi-output PySR)
+                                        try:
+                                            indices = [None] * len(all_eqs)
+                                            indices[t_idx] = idx
+                                            y_pred_all = model.predict(X, index=indices)
+                                            if isinstance(y_pred_all, (list, tuple)) and len(y_pred_all) > t_idx:
+                                                 y_pred = y_pred_all[t_idx]
+                                            elif hasattr(y_pred_all, "ndim") and y_pred_all.ndim == 2:
+                                                y_pred = y_pred_all[:, t_idx]
+                                            else:
+                                                y_pred = y_pred_all
+                                        except Exception:
+                                            # 3. Last resort fallback for other providers (pypysr)
+                                            try:
+                                                # Check if the provider is actually pypysr
+                                                if self.model_provider in ["pypysr"]:
+                                                    try:
+                                                        y_pred = model.predict(X, index=idx, target=t_idx)
+                                                    except TypeError:
+                                                        # Fallback if 'target' is not a keyword arg
+                                                        y_pred_all = model.predict(X, index=idx)
+                                                        if hasattr(y_pred_all, "ndim") and y_pred_all.ndim == 2:
+                                                            y_pred = y_pred_all[:, t_idx]
+                                                        elif isinstance(y_pred_all, (list, tuple)):
+                                                            y_pred = y_pred_all[t_idx]
+                                                        else:
+                                                            y_pred = y_pred_all
+                                                else:
+                                                    # Standard PySR multi-output: try to predict everything and slice
+                                                    # best_idx is usually 0 for the first equation
+                                                    y_pred_all = model.predict(X) 
+                                                    if isinstance(y_pred_all, (list, tuple)) and len(y_pred_all) > t_idx:
+                                                         y_pred = y_pred_all[t_idx]
+                                                    elif hasattr(y_pred_all, "ndim") and y_pred_all.ndim == 2:
+                                                        y_pred = y_pred_all[:, t_idx]
+                                                    else:
+                                                        y_pred = y_pred_all
+                                                    
+                                                    if idx != 0:
+                                                        # We can't easily get other indices for standard PySR multi-output
+                                                        # if the above list-of-indices method failed.
+                                                        # We'll just use these but R2/Score will only be accurate for idx=0.
+                                                        pass
+                                            except Exception as e:
+                                                # 4. If everything fails, maybe we can't get individual predictions
+                                                # for specific equations in multi-output mode easily
+                                                print(f"[DeepPySR] Warning: Could not get individual prediction for target {t_idx} index {idx}: {e}")
+                                                y_pred = np.zeros(X.shape[0])
+                                else:
+                                    y_pred = model.predict(X, index=idx)
+                                    
+                                # Handle NaNs and Infs in predictions
+                                y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
+                                
+                                unique_fit = np.unique(cur_y_fit)
+                                if len(unique_fit) > 2 and np.all(np.equal(np.mod(cur_y_fit, 1), 0)):
+                                    y_pred_eval = np.round(y_pred)
+                                else:
+                                    y_pred_eval = y_pred
+                                    
+                                prediction_cache[cache_key] = (y_pred, y_pred_eval)
+                            else:
+                                y_pred, y_pred_eval = prediction_cache[cache_key]
+                            
+                            r2 = r2_score(cur_y_fit, y_pred_eval)
+                            complexity = eqs.iloc[idx].get("complexity", 1)
+                            
+                            safe_r2 = max(0.0001, r2)
+                            score = (safe_r2 ** r2w) * np.exp(-lam * (complexity - 1))
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_r2 = r2
+                                best_idx = idx
+                        except Exception as e:
+                            print(f"[DeepPySR] Warning: Error calculating Score for target {target_name} equation {idx}: {e}")
+                            continue
+                    
+                    if best_score == -np.inf:
+                        best_idx = 0
+                        best_r2 = 0.0
+                        best_score = 0.0
+                        
+                    best = eqs.iloc[best_idx]
+                    formula = str(best["equation"]) if "equation" in best else str(best.get("sympy_format", ""))
+                    
+                    try:
+                        # model.sympy(best_idx) might need target for multi-output
+                        if len(all_eqs) > 1:
+                            try:
+                                sym_expr = model.sympy(best_idx, target=t_idx)
+                            except Exception:
+                                # Fallback if target is not supported
+                                try:
+                                    sym_expr_list = model.sympy(best_idx)
+                                    if isinstance(sym_expr_list, list):
+                                        sym_expr = sym_expr_list[t_idx]
+                                    else:
+                                        sym_expr = sym_expr_list
+                                except Exception:
+                                    sym_expr = sp.sympify(formula)
+                        else:
+                             sym_expr = model.sympy(best_idx)
+                    except Exception:
+                        sym_expr = sp.sympify(formula)
 
-                loss = float(best.get("loss", np.nan))
-                
-                all_results.append({
-                    "sym_expr": sym_expr,
-                    "score": best_score,
-                    "loss": loss,
-                    "complexity": int(best.get("complexity", -1)),
-                    "r2": best_r2,
-                    "pareto_r2_weight": r2w,
-                    "pareto_lambda": lam
-                })
-        return all_results
+                    target_results.append({
+                        "sym_expr": sym_expr,
+                        "score": best_score,
+                        "loss": float(best.get("loss", 1e10)),
+                        "complexity": int(best.get("complexity", -1)),
+                        "r2": best_r2,
+                        "pareto_r2_weight": r2w,
+                        "pareto_lambda": lam
+                    })
+            multi_target_results[target_name] = target_results
+            
+        if self.model_provider in ["pypysr"] and len(target_names) == 1:
+            try:
+                # If we didn't go through the multi-target loop above (which fits one by one)
+                # but we are in a single target fit, we can still get the loss history.
+                if hasattr(self, "_jl_logger"):
+                    self.loss_history_ = [{
+                        "target": target_names[0],
+                        "iterations": list(self._jl_logger.iterations),
+                        "losses": list(self._jl_logger.losses)
+                    }]
+            except Exception:
+                pass
+
+        return multi_target_results
+
+    def _process_fit_results(self, target_name, results, layer, parent_name, X_input_all, cols, queue):
+        """Processes results from _fit_provider and updates relationships and queue."""
+        is_root = (isinstance(self.target_name_, list) and target_name in self.target_name_) or \
+                  (not isinstance(self.target_name_, list) and target_name == self.target_name_)
+
+        for i, res in enumerate(results):
+            sym_expr = res["sym_expr"]
+            score = res["score"]
+            loss = res["loss"]
+            complexity = res["complexity"]
+            r2 = res["r2"]
+            r2w = res.get("pareto_r2_weight")
+            lam = res.get("pareto_lambda")
+
+            # Ensure sym_expr is a sympy expression
+            if not hasattr(sym_expr, "xreplace"):
+                sym_expr = sp.sympify(sym_expr)
+
+            # Round coefficients
+            if hasattr(sym_expr, "atoms"):
+                for n in list(sym_expr.atoms(sp.Number)):
+                    sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
+
+            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+            
+            mapping = {}
+            for k in range(len(cols)):
+                mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
+            
+            if hasattr(sym_expr, "xreplace"):
+                sym_expr = sym_expr.xreplace(mapping)
+            
+            involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
+            is_primary = (i == 0)
+
+            if is_primary and is_redundant(target_name, sym_expr, self.relationships_, layer=layer):
+                print(f"Relationship for {target_name} is redundant. Skipping.")
+                # Important: don't 'break' as it would skip OTHER targets if processed in batch
+                # But here we are in a loop over grid search results for a SINGLE target.
+                # So break is actually correct for THIS target.
+                break
+
+            relationship = {
+                "target": target_name,
+                "target_symbol": sp.Symbol(target_name),
+                "layer": layer,
+                "sympy": sym_expr,
+                "formula": str(sym_expr),
+                "involved": involved,
+                "score": score,
+                "loss": loss,
+                "complexity": complexity,
+                "r2": r2,
+                "pareto_r2_weight": r2w,
+                "pareto_lambda": lam
+            }
+
+            if is_primary and not is_root and score < self.stopping_score:
+                print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
+                self.relationships_.append(relationship)
+                continue 
+
+            self.relationships_.append(relationship)
+            
+            if is_primary and layer < self.max_layers:
+                for vname in involved:
+                    try:
+                        v_idx = int(vname[1:])
+                        queue.append((vname, X_input_all[:, v_idx], layer + 1, target_name))
+                    except (ValueError, IndexError):
+                        continue
 
     def fit(self, X, y):
         if isinstance(y, pd.Series):
@@ -530,16 +800,32 @@ class DeepPySRRegressor:
         self.n_features_in_ = X_input_all.shape[1]
         ensure_output_dir(self.output_dir)
         self.relationships_ = []
+        self.loss_history_ = []
         
         # Initialize queue with all targets
         queue = []
         if isinstance(self.target_name_, list):
-            for i, name in enumerate(self.target_name_):
-                queue.append((name, y_input[:, i], 1, None))
+            # Fit all root targets together
+            print(f"--- Fitting root targets {self.target_name_} at layer 1 ---")
+            try:
+                multi_results = self._fit_provider(X_input_all, y_input, self.target_name_)
+                for target_name in self.target_name_:
+                    results = multi_results[target_name]
+                    self._process_fit_results(target_name, results, 1, None, X_input_all, list(range(X_input_all.shape[1])), queue)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"Error modeling root targets: {e}")
+                raise e
         else:
             queue.append((self.target_name_, y_input, 1, None))
             
         processed_targets = set()
+        if isinstance(self.target_name_, list):
+            processed_targets.update(self.target_name_)
+        else:
+            # We don't add it yet as it's in the queue to be processed
+            pass
 
         while queue:
             target_name, target_y, layer, parent_name = queue.pop(0)
@@ -547,8 +833,6 @@ class DeepPySRRegressor:
                 continue
 
             # Skip if target already processed, but allow roots to be re-processed if they appear as features
-            # (though in multi-output, roots shouldn't typically be features of each other initially,
-            # but DeepPySR's logic might allow it later).
             is_root = (isinstance(self.target_name_, list) and target_name in self.target_name_) or \
                       (not isinstance(self.target_name_, list) and target_name == self.target_name_)
             
@@ -558,16 +842,15 @@ class DeepPySRRegressor:
 
             print(f"--- Fitting {target_name} at layer {layer} ---")
 
-            if is_root:
-                X_fit = X_input_all
-                cols = list(range(X_input_all.shape[1]))
-            else:
-                try:
-                    idx = int(target_name[1:])
-                except (ValueError, IndexError):
-                    # For non-indexed targets that aren't root, we might have an issue
-                    # but typically intermediate targets are x0, x1...
-                    idx = -1
+            # For non-root targets, we still fit one by one for now as they might have different feature masks
+            # though in current DeepPySR they mostly use all features (minus themselves).
+            try:
+                idx = -1
+                if not is_root:
+                    try:
+                        idx = int(target_name[1:])
+                    except (ValueError, IndexError):
+                        idx = -1
                 
                 parent_idx = None
                 if parent_name and parent_name.startswith("x") and not ((isinstance(self.target_name_, list) and parent_name in self.target_name_) or (not isinstance(self.target_name_, list) and parent_name == self.target_name_)):
@@ -579,98 +862,15 @@ class DeepPySRRegressor:
                 cols = [j for j in range(X_input_all.shape[1]) if j != idx and j != parent_idx]
                 X_fit = X_input_all[:, cols]
 
-            try:
-                # We pass the internal x0, x1... names to _fit_single_target
-                # PySR will use them as variable names
-                results = self._fit_single_target(X_fit, target_y, target_name)
-
-                # Loop through all results (grid search might return multiple)
-                for i, res in enumerate(results):
-                    sym_expr = res["sym_expr"]
-                    score = res["score"]
-                    loss = res["loss"]
-                    complexity = res["complexity"]
-                    r2 = res["r2"]
-                    r2w = res.get("pareto_r2_weight")
-                    lam = res.get("pareto_lambda")
-
-                    # Ensure sym_expr is a sympy expression
-                    if not hasattr(sym_expr, "xreplace"):
-                        sym_expr = sp.sympify(sym_expr)
-
-                    # Round coefficients
-                    if hasattr(sym_expr, "atoms"):
-                        # We need to make sure we don't modify the original sym_expr in the results list
-                        # though here it's fine as we are processing it.
-                        for n in list(sym_expr.atoms(sp.Number)):
-                            sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
-
-                    # Map sympy formula using SymPy's xreplace with symbols
-                    # xreplace with symbols is safe against partial name matches.
-                    # IMPORTANT: We map to 'x' prefix regardless of provider for internal consistency
-                    # within the DeepPySR hierarchy, as layers use 'x' to reference each other.
-                    prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
-                    
-                    mapping = {}
-                    for k in range(len(cols)):
-                        mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
-                    
-                    if hasattr(sym_expr, "xreplace"):
-                        sym_expr = sym_expr.xreplace(mapping)
-                    
-                    # Update involved variables after mapping to global x indices
-                    involved = sorted({str(s) for s in sym_expr.free_symbols}) if hasattr(sym_expr, "free_symbols") else []
-
-                    # For grid search, we only want to follow the 'best' one for layering.
-                    # We pick the first result as the primary one for layering.
-                    is_primary = (i == 0)
-
-                    if is_primary and is_redundant(target_name, sym_expr, self.relationships_):
-                        # If the primary one is redundant, we might still want to record the others?
-                        # But DeepPySR's logic usually stops here.
-                        # For now, if primary is redundant, we skip this target's results.
-                        print(f"Relationship for {target_name} is redundant. Skipping.")
-                        break
-
-                    relationship = {
-                        "target": target_name,
-                        "target_symbol": sp.Symbol(target_name),
-                        "layer": layer,
-                        "sympy": sym_expr,
-                        "formula": str(sym_expr),
-                        "involved": involved,
-                        "score": score,
-                        "loss": loss,
-                        "complexity": complexity,
-                        "r2": r2,
-                        "pareto_r2_weight": r2w,
-                        "pareto_lambda": lam
-                    }
-
-                    if is_primary and not is_root and score < self.stopping_score:
-                        print(f"Goal reached for {target_name} (score={score:.2f} < {self.stopping_score}). Leaf node.")
-                        # We still add it to relationships so it's visible, but we won't expand it.
-                        self.relationships_.append(relationship)
-                        # We don't expand primary, but we might still add other grid search results for this target
-                        # However, typically if primary reached goal, we stop this target.
-                        # For consistency, let's add all results for this target but don't expand primary.
-                        continue 
-
-                    self.relationships_.append(relationship)
-                    
-                    # Only the primary relationship triggers new entries in the queue
-                    if is_primary and layer < self.max_layers:
-                        for vname in involved:
-                            try:
-                                v_idx = int(vname[1:])
-                                queue.append((vname, X_input_all[:, v_idx], layer + 1, target_name))
-                            except (ValueError, IndexError):
-                                continue
+                multi_results = self._fit_provider(X_fit, target_y, target_name)
+                results = multi_results[target_name]
+                self._process_fit_results(target_name, results, layer, parent_name, X_input_all, cols, queue)
 
             except Exception as e:
                 import traceback
                 traceback.print_exc()
                 print(f"Error modeling {target_name}: {e}")
+                raise e
 
         self.save_relationships()
         print(self.relationships_)
@@ -736,17 +936,26 @@ class DeepPySRRegressor:
             if not hasattr(new_rel["sympy"], "xreplace"):
                 new_rel["sympy"] = sp.sympify(new_rel["sympy"])
 
-            # Map sympy formula using SymPy's xreplace with symbols
-            # xreplace with symbols is safe against partial name matches.
-            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
-            sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
-            if hasattr(new_rel["sympy"], "xreplace"):
-                new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
-            new_rel["formula"] = str(new_rel["sympy"])
-            
-            # Map involved
-            new_rel["involved"] = sorted({str(s) for s in new_rel["sympy"].free_symbols})
-            mapped_rels.append(new_rel)
+                # Map sympy formula using SymPy's xreplace with symbols
+                # xreplace with symbols is safe against partial name matches.
+                prefix = "v" if self.model_provider in ["pypysr"] else "x"
+                sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+                if hasattr(new_rel["sympy"], "xreplace"):
+                    new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
+                new_rel["formula"] = str(new_rel["sympy"])
+                
+                # If target_name is a root target, also map it to its original name
+                if isinstance(self.target_name_, list):
+                    # Find which original target this is
+                    try:
+                        t_idx = int(new_rel["target"][1:])
+                        new_rel["target"] = self.target_name_[t_idx]
+                    except (ValueError, IndexError):
+                        pass
+                
+                # Map involved
+                new_rel["involved"] = sorted({str(s) for s in new_rel["sympy"].free_symbols})
+                mapped_rels.append(new_rel)
         return mapped_rels
 
     def save_relationships(self, filename="relationships.csv"):
@@ -833,7 +1042,7 @@ class DeepPySRRegressor:
                 if rel:
                     expr = rel['sympy']
                     if hasattr(self, "feature_names_in_"):
-                        prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+                        prefix = "v" if self.model_provider in ["pypysr"] else "x"
                         sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
                         expr = expr.xreplace(sym_mapping)
                     exprs[name] = expr
@@ -848,7 +1057,7 @@ class DeepPySRRegressor:
                 return expr
                 
             # Map x0, x1... (or v0, v1... for pypysr) to original feature names
-            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+            prefix = "v" if self.model_provider in ["pypysr"] else "x"
             mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
             return expr.xreplace(mapping)
 

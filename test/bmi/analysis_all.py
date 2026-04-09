@@ -282,36 +282,12 @@ def process_results():
                                 r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
                         all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
 
-            # PySR
-            pysr_dir = os.path.join(age_path, "pysr")
-            if os.path.exists(pysr_dir):
-                for variant in os.listdir(pysr_dir):
-                    v_path = os.path.join(pysr_dir, variant)
-                    if not os.path.isdir(v_path): continue
-
-                    _, X_age, y_age = load_bmi_agg_data(age=age)
-                    res = get_best_formula_from_raw(v_path, X_age, y_age)
-
-                    if isinstance(res, dict):
-                        for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                            r2, rmse, mae = metrics
-                            model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                            all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
-                    else:
-                        formula, complexity, metrics = res
-                        r2, rmse, mae = metrics
-                        if not formula:
-                            pred_file = os.path.join(v_path, "predictions.csv")
-                            if os.path.exists(pred_file):
-                                df_pred = pd.read_csv(pred_file)
-                                r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
 
     # 2. Process longitudinal
     long_dir = os.path.join(base_dir, "longitudinal")
     if os.path.exists(long_dir):
         # We need to iterate over models here
-        sub_dirs = ['baselines', 'deeppysr', 'pysr']
+        sub_dirs = ['baselines', 'deeppysr']
         for sd in sub_dirs:
             sd_path = os.path.join(long_dir, sd)
             if not os.path.exists(sd_path): continue
@@ -420,8 +396,8 @@ def plot_results(df):
         if t == 'longitudinal':
             # For longitudinal models, we find the best formula across all ages
 
-            # 1. Best DeepPySR (highest overall R2 among fullsr, stdsr, srpsm, srprn)
-            deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+            # 1. Best DeepPySR (highest overall R2 among fullsr, stdsr, v2fullsr)
+            deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
             if not deeppysr_long.empty:
                 model_variants = deeppysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
                 best_model_name = None
@@ -462,24 +438,6 @@ def plot_results(df):
                             'formula': formula_info['formula'], 'r2': row['r2'], 'complexity': formula_info['complexity']
                         })
 
-            # 3. Best PySR (highest overall R2 among pysr_ variants)
-            pysr_long = type_df[type_df['model'].str.contains('pysr_', na=False)]
-            if not pysr_long.empty:
-                model_variants = pysr_long.groupby('model').agg({'formula': 'first'}).reset_index()
-                best_pysr_name = None
-                best_pysr_r2 = -np.inf
-                for _, row in model_variants.iterrows():
-                    y_pred = evaluate_formula(row['formula'], X_all)
-                    r2, _, _ = calculate_metrics(y_all, y_pred)
-                    if r2 > best_pysr_r2:
-                        best_pysr_r2 = r2
-                        best_pysr_name = row['model']
-
-                if best_pysr_name:
-                    for age in ages:
-                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_pysr_name)].iloc[0].copy()
-                        row['display_model'] = 'Best PySR'
-                        selected_data.append(row)
 
             # 4. KANSym (highest overall R2)
             kansym_long = type_df[type_df['model'] == 'KANSym']
@@ -517,7 +475,7 @@ def plot_results(df):
                 age_df = type_df[type_df['age'] == age]
 
                 # DeepPySR variants
-                deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+                deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
                 if not deeppysr_df.empty:
                     best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
                     best_deeppysr['display_model'] = 'Best DeepPySR'
@@ -533,12 +491,6 @@ def plot_results(df):
                             'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
                         })
 
-                # PySR variants
-                pysr_df = age_df[age_df['model'].str.contains('pysr_', na=False)]
-                if not pysr_df.empty:
-                    best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
-                    best_pysr['display_model'] = 'Best PySR'
-                    selected_data.append(best_pysr)
 
                 # KAN and KANSym
                 for m in ['KAN', 'KANSym']:
@@ -642,8 +594,8 @@ def plot_results(df):
 
 def plot_settings_comparison(df):
     """
-    Plot performance (r2, rmse, mae, complexity) for 4 settings of DeepPySR (fullsr, stdsr, srpsm, srprn)
-    and PySR variants using r2w=1 and lambda=0.001 (or 0.0001).
+    Plot performance (r2, rmse, mae, complexity) for 3 settings of DeepPySR (fullsr, stdsr, v2fullsr)
+    and any PySR variants if exist (using r2w=1 and lambda=0.001 (or 0.0001)).
     """
 
     # Try to find common patterns
@@ -652,10 +604,8 @@ def plot_settings_comparison(df):
     # Target models for comparison
     target_settings = [
         'fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'srpsm_nit100_pop30_sz200_vps0_vpr0_aps10.0_grid_r2w1.5_L0.005',
-        'srprn_nit100_pop30_sz200_vps50_vpr50_aps0_grid_r2w1.5_L0.005',
+        'v2fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
         'stdsr_nit100_pop30_sz200_vps0_vpr0_aps0_grid_r2w1.5_L0.005',
-        'pysr_nit100_pop30_sz200_aps10.0_grid_r2w1.5_L0.005'
     ]
 
     # Filter only if they exist in df
@@ -734,7 +684,7 @@ def plot_settings_comparison(df):
                fontsize=14, frameon=True, title='Settings & Types', title_fontsize=16,
                handlelength=4.0) # Increase handlelength to show dashes more clearly
 
-    plt.suptitle(f'DeepPySR vs PySR Settings Comparison (r2w=1, lambda={lambda_val})', fontsize=26, fontweight='bold', y=0.99)
+    plt.suptitle(f'DeepPySR Settings Comparison (r2w=1, lambda={lambda_val})', fontsize=26, fontweight='bold', y=0.99)
     plt.tight_layout(rect=[0, 0, 0.9, 0.96])
     plot_path = os.path.join(current_dir, 'results_bmi_all', 'bmi_settings_comparison.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')

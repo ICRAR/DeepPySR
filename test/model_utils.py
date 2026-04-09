@@ -149,49 +149,34 @@ def get_deeppysr_configs():
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # 1. stdsr: All parameters set to 0
-    configs["stdsr_vps0_vpr0_aps0"] = {
-        "adaptive_parsimony_scaling": 0.0,
-        "variable_prune_start": 0,
-        "variable_prune_ramp": 0,
-        "variable_prune_max": 0.0,
-    }
-
-    # 2. srpsm: Only tune adaptive_parsimony_scaling, others set to 0
     for aps in aps_list:
-        configs[f"srpsm_vps0_vpr0_aps{aps}"] = {
+        configs["stdsr_vps0_vpr0_aps0"] = {
+            "model_provider": "pysr",
             "adaptive_parsimony_scaling": aps,
-            "variable_prune_start": 0,
-            "variable_prune_ramp": 0,
-            "variable_prune_max": 0.0,
         }
 
-    # 3. srprn: Only tune variable_prune_start/ramp/max, set adaptive_parsimony_scaling to 0
-    for vps in vps_list:
-        for vpr in vpr_list:
-            configs[f"srprn_vps{vps}_vpr{vpr}_aps0"] = {
-                "adaptive_parsimony_scaling": 0.0,
-                "variable_prune_start": vps,
-                "variable_prune_ramp": vpr,
-                "variable_prune_max": vpm,
-            }
-
-    # 4. fullsr: Tune all 4 parameters
+    # 2. fullsr: Tune all 4 parameters
     for vps in vps_list:
         for vpr in vpr_list:
             for aps in aps_list:
                 configs[f"fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
+                    "model_provider": "pypysr",
                     "adaptive_parsimony_scaling": aps,
                     "variable_prune_start": vps,
                     "variable_prune_ramp": vpr,
                     "variable_prune_max": vpm,
+                    "use_mdl": False,
+                    "use_nsga2": False,
+                    "use_lexicase": False,
+                    "use_hotspot_protection": False,
                 }
 
-    # 5. v2fullsr: pypysrdev1 with all 4 parameters
+    # 3. v2fullsr: pypysr with all 4 parameters
     for vps in vps_list:
         for vpr in vpr_list:
             for aps in aps_list:
                 configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
-                    "model_provider": "pypysrdev1",
+                    "model_provider": "pypysr",
                     "adaptive_parsimony_scaling": aps,
                     "variable_prune_start": vps,
                     "variable_prune_ramp": vpr,
@@ -201,16 +186,6 @@ def get_deeppysr_configs():
                     "use_lexicase": True,
                     "use_hotspot_protection": True,
                 }
-    return configs
-
-# --- PySR Configs ---
-def get_pysr_configs():
-    configs = {}
-    aps_list = [0.1, 1.0, 10.0, 50.0]
-    for aps in aps_list:
-        configs[f"pysr_aps{aps}"] = {
-            "adaptive_parsimony_scaling": aps,
-        }
     return configs
 
 # --- KAN Wrapper ---
@@ -394,8 +369,10 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "parallelism": parallelism,
         "maxsize": 40,
         "binary_operators": ["+", "*", "/", "-", "cond(x,y) = x > 0 ? y : y*0"],
-        "extra_sympy_mappings": {'cond': sympy_cond},
-        "unary_operators": ["exp", "log"],
+        "extra_sympy_mappings": {
+            'cond': sympy_cond,
+        },
+        "unary_operators": ["exp", "log", "sin", "sqrt", "abs"],
         "parsimony": 0.001,
         "populations": 100,
         "population_size": 200,

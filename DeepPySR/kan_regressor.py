@@ -26,7 +26,7 @@ class KANPySRRegressor:
         kan_lamb=0.1,
         kan_lamb_entropy=2.0,
         output_dir="outputs/kan_pysr",
-        model_provider="pysr",
+        model_provider="pypysr",
         pypysr_path=None,
         pareto_lambda=0.01,
         pareto_r2_weight=1.0,

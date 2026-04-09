@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
+from model_utils import get_deeppysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, run_nocv, aggregate_results
 from wine_utils import load_wine_data
 
@@ -40,7 +40,6 @@ def main():
         lambda_list = [0.001, 0.005, 0.01]
         
         deeppysr_configs = get_deeppysr_configs()
-        pysr_configs = get_pysr_configs()
         pysr_base_kwargs = get_pysr_base_kwargs()
         
         # Extract parameters for folder naming
@@ -134,37 +133,6 @@ def main():
                 print(f"    Skipping grid nocv (results exist)")
             else:
                 run_nocv(deeppysr_factory_nocv, X, y, outdir=grid_out_nocv, scaler=False, **nocv_kwargs)
-
-        # 3. PySR Comparison
-        print(f"\nEvaluating PySR Comparison...")
-        for cfg_name, cfg in pysr_configs.items():
-            print(f"  Config: {cfg_name}...")
-            pysr_out = os.path.join(out_root, "pysr", f"{cfg_name}_{param_suffix}")
-
-            def deeppysr_pysr_factory(co=cfg):
-                return DeepPySRRegressor(
-                    **pysr_base_kwargs,
-                    **co,
-                    max_layers=1,
-                    output_dir=pysr_out,
-                    model_provider='pysr',
-                    pareto_r2_weight=r2w_list,
-                    pareto_lambda=lambda_list,
-                    stopping_score = 0.01,
-                )
-                
-
-            if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
-                print(f"    Skipping (results exist)")
-            else:
-                run_cv(deeppysr_pysr_factory, X, y, outdir=pysr_out, scaler=False, **cv_kwargs)
-            
-            # PySR No CV
-            pysr_out_nocv = os.path.join(out_root_nocv, "pysr", f"{cfg_name}_{param_suffix}")
-            if os.path.exists(os.path.join(pysr_out_nocv, "overall_metrics.csv")):
-                print(f"    Skipping nocv (results exist)")
-            else:
-                run_nocv(deeppysr_pysr_factory, X, y, outdir=pysr_out_nocv, scaler=False, **nocv_kwargs)
 
         # Final Aggregation
         print(f"\nAggregating results for {wine_type}...")

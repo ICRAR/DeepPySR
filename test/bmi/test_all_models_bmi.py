@@ -9,15 +9,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
+from model_utils import get_deeppysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, run_nocv, aggregate_results
 from bmi_utils import load_bmi_agg_data
 
 def main():
     out_root = os.path.join(current_dir, "results_bmi_all")
-    out_root_nocv = os.path.join(current_dir, "results_bmi_nocv")
+    # out_root_nocv = os.path.join(current_dir, "results_bmi_nocv")
     os.makedirs(out_root, exist_ok=True)
-    os.makedirs(out_root_nocv, exist_ok=True)
+    # os.makedirs(out_root_nocv, exist_ok=True)
     
     settings = ['longitudinal', 'age_specific']
     ages = [8, 10, 14, 17, 20, 23, 27]
@@ -27,7 +27,6 @@ def main():
     lambda_list = [0.001, 0.005, 0.01]
     
     deeppysr_configs = get_deeppysr_configs()
-    pysr_configs = get_pysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
     
     # Extract parameters for folder naming
@@ -43,7 +42,7 @@ def main():
             runs = [("longitudinal", ids, X, y)]
             # Use flattened root for longitudinal
             run_out_root_base = out_root
-            run_out_root_nocv_base = out_root_nocv
+            # run_out_root_nocv_base = out_root_nocv
         else:
             runs = []
             for age in ages:
@@ -51,7 +50,7 @@ def main():
                 if not X.empty:
                     runs.append((f"age_{age}", ids, X, y))
             run_out_root_base = os.path.join(out_root, setting)
-            run_out_root_nocv_base = os.path.join(out_root_nocv, setting)
+            # run_out_root_nocv_base = os.path.join(out_root_nocv, setting)
         
         for run_name, ids, X, y in runs:
             print(f"\n--- Run: {run_name} ---")
@@ -120,93 +119,49 @@ def main():
                 
                 run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
 
-            # 3. DeepPySR (pysr) Model (Requested)
-            print(f"Evaluating DeepPySR (pysr) Model...")
-            for cfg_name, cfg_overrides in pysr_configs.items():
-                aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
-                full_name = f"pysr_{param_suffix}_aps{aps}_grid"
-                deeppysr_pysr_out = os.path.join(run_out_root, "pysr", full_name)
-                if os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
-                    continue
-                
-                print(f"  {full_name}...")
-                def deeppysr_pysr_factory(co=cfg_overrides):
-                    kwargs = pysr_base_kwargs.copy()
-                    kwargs.update(co)
-                    return DeepPySRRegressor(
-                        max_layers=1,
-                        output_dir=deeppysr_pysr_out,
-                        model_provider='pysr',
-                        pareto_r2_weight=r2w_list,
-                        pareto_lambda=lambda_list,
-                        **kwargs
-                    )
-                
-                run_cv(deeppysr_pysr_factory, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_kwargs)
-
-            # 4. No-CV runs for DeepPySR (4 settings) and PySR (Requested)
-            print(f"Evaluating No-CV Models...")
-            run_out_root_nocv = os.path.join(run_out_root_nocv_base, run_name)
-            os.makedirs(run_out_root_nocv, exist_ok=True)
-            
-            nocv_kwargs = {
-                'ids': ids,
-                'task': 'regression',
-                'extra_data': X[['age']] if 'age' in X.columns else None
-            }
-
-            # 4.1 DeepPySR No-CV
-            for cfg_name, cfg_overrides in deeppysr_configs.items():
-                full_cfg_name = f"{cfg_name}_{param_suffix}_grid_nocv"
-                deeppysr_out = os.path.join(run_out_root_nocv, "deeppysr", full_cfg_name)
-                if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
-                    print(f"  {full_cfg_name}...")
-                    def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
-                        kwargs = pysr_base_kwargs.copy()
-                        kwargs.update(co)
-                        
-                        # If model_provider is not in co, default to 'pypysr'
-                        provider = co.get('model_provider', 'pypysr')
-                        
-                        return DeepPySRRegressor(
-                            max_layers=1,
-                            output_dir=d_out,
-                            model_provider=provider,
-                            pareto_r2_weight=r2w_list,
-                            pareto_lambda=lambda_list,
-                            **kwargs
-                        )
-                    run_nocv(deeppysr_factory_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_kwargs)
-
-            # 4.2 DeepPySR (pysr) No-CV
-            for cfg_name, cfg_overrides in pysr_configs.items():
-                aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
-                full_name = f"pysr_{param_suffix}_aps{aps}_grid_nocv"
-                deeppysr_pysr_out = os.path.join(run_out_root_nocv, "pysr", full_name)
-                if not os.path.exists(os.path.join(deeppysr_pysr_out, "overall_metrics.csv")):
-                    print(f"  {full_name}...")
-                    def deeppysr_pysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_pysr_out):
-                        kwargs = pysr_base_kwargs.copy()
-                        kwargs.update(co)
-                        return DeepPySRRegressor(
-                            max_layers=1,
-                            output_dir=d_out,
-                            model_provider='pysr',
-                            pareto_r2_weight=r2w_list,
-                            pareto_lambda=lambda_list,
-                            **kwargs
-                        )
-                    run_nocv(deeppysr_pysr_factory_nocv, X, y, outdir=deeppysr_pysr_out, scaler=False, **nocv_kwargs)
-
+            # # 3. No-CV runs for DeepPySR (3 settings)
+            # print(f"Evaluating No-CV Models...")
+            # run_out_root_nocv = os.path.join(run_out_root_nocv_base, run_name)
+            # os.makedirs(run_out_root_nocv, exist_ok=True)
+            #
+            # nocv_kwargs = {
+            #     'ids': ids,
+            #     'task': 'regression',
+            #     'extra_data': X[['age']] if 'age' in X.columns else None
+            # }
+            #
+            # # 3.1 DeepPySR No-CV
+            # for cfg_name, cfg_overrides in deeppysr_configs.items():
+            #     full_cfg_name = f"{cfg_name}_{param_suffix}_grid_nocv"
+            #     deeppysr_out = os.path.join(run_out_root_nocv, "deeppysr", full_cfg_name)
+            #     if not os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+            #         print(f"  {full_cfg_name}...")
+            #         def deeppysr_factory_nocv(co=cfg_overrides, d_out=deeppysr_out):
+            #             kwargs = pysr_base_kwargs.copy()
+            #             kwargs.update(co)
+            #
+            #             # If model_provider is not in co, default to 'pypysr'
+            #             provider = co.get('model_provider', 'pypysr')
+            #
+            #             return DeepPySRRegressor(
+            #                 max_layers=1,
+            #                 output_dir=d_out,
+            #                 model_provider=provider,
+            #                 pareto_r2_weight=r2w_list,
+            #                 pareto_lambda=lambda_list,
+            #                 **kwargs
+            #             )
+            #         run_nocv(deeppysr_factory_nocv, X, y, outdir=deeppysr_out, scaler=False, **nocv_kwargs)
+            #
             # Aggregate results for this run
             print(f"Aggregating results for {run_name}...")
             aggregate_results(run_out_root, task='regression')
-            aggregate_results(run_out_root_nocv, task='regression')
+            # aggregate_results(run_out_root_nocv, task='regression')
 
-    # Finally, aggregate EVERYTHING across settings
+    # # Finally, aggregate EVERYTHING across settings
     print(f"\nAggregating all results across all settings...")
     aggregate_results(out_root, task='regression')
-    aggregate_results(out_root_nocv, task='regression')
+    # aggregate_results(out_root_nocv, task='regression')
 
 if __name__ == "__main__":
     main()
