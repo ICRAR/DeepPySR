@@ -27,6 +27,7 @@ class DeepPySRRegressor:
         use_nsga2 = True,
         use_lexicase = True,
         use_hotspot_protection = True,
+        loss_history = False,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
@@ -47,6 +48,7 @@ class DeepPySRRegressor:
         self.use_hotspot_protection = use_hotspot_protection
         self.relationships_ = []
         self.equations_ = None
+        self.loss_history = loss_history
         self.loss_history_ = []
 
     def get_params(self, deep=True):
@@ -348,6 +350,10 @@ class DeepPySRRegressor:
                 # we should check if MyPySR can be loaded.
                 # pypysr's _initialize_julia() will activate its own environment.
                 try:
+                    # Add MyPySR python path if not already in sys.path
+                    pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
+                    if pypysr_path not in sys.path:
+                        sys.path.insert(0, pypysr_path)
                     from pypysr import PySRRegressor
                     from juliacall import Main as jl
                     # Ensure MyPySR is loaded and available
@@ -403,6 +409,8 @@ class DeepPySRRegressor:
         # Also remove logger if we are using it
         logger_to_use = params.pop("logger", None)
 
+        # Set up loss logger for pypysr
+        # Note: Standard pysr has a different logger interface and is not yet supported
         if self.model_provider in ["pypysr"]:
             try:
                 from juliacall import Main as jl
@@ -411,9 +419,11 @@ class DeepPySRRegressor:
                 jl.seval("""
                 if !isdefined(Main, :PythonLossLogger)
                     try
-                        import MyPySR: AbstractSRLogger, logging_callback!, should_log, increment_log_step!, get_logger
+                        import MyPySR: AbstractSRLogger, get_logger
+                        import .MyPySR.LoggingModule: logging_callback!, should_log, increment_log_step!
                     catch
-                        import .MyPySR: AbstractSRLogger, logging_callback!, should_log, increment_log_step!, get_logger
+                        import .MyPySR: AbstractSRLogger, get_logger
+                        import .MyPySR.LoggingModule: logging_callback!, should_log, increment_log_step!
                     end
                     using Logging: ConsoleLogger
                     
@@ -462,12 +472,8 @@ class DeepPySRRegressor:
         model = PySRRegressor(**params)
         
         if logger_to_use is not None:
-             # PySRRegressor (pypysr) uses __init__ but we can try setting attribute
-             # if set_params is not available. 
-             try:
-                 model.set_params(logger=logger_to_use)
-             except AttributeError:
-                 model.logger = logger_to_use
+             # PySRRegressor (pypysr) uses logger_spec in constructor
+             model.logger_spec = logger_to_use
 
         # Robustly handle y shape
         y_fit = np.array(y).astype(np.float64)
@@ -497,14 +503,17 @@ class DeepPySRRegressor:
                     print("[DeepPySR] Please try to restart the Python session if you need to switch between providers.")
                 raise e
         
-        # Record loss history if requested
-        if self.model_provider in ["pypysr"] and hasattr(self, "_jl_logger"):
+        # Record loss history if requested - one entry per target
+        if self.loss_history and self.model_provider in ["pypysr", "pysr"] and hasattr(self, "_jl_logger"):
             try:
-                self.loss_history_.append({
-                    "target": "_".join(target_names),
-                    "iterations": list(self._jl_logger.iterations),
-                    "losses": list(self._jl_logger.losses)
-                })
+                # For multi-target, create a separate loss history entry for each target
+                # They all optimize together so iterations/losses are the same, but we record per-target
+                for target_name in target_names:
+                    self.loss_history_.append({
+                        "target": target_name,
+                        "iterations": list(self._jl_logger.iterations),
+                        "losses": list(self._jl_logger.losses)
+                    })
             except Exception:
                 pass
         
@@ -685,19 +694,6 @@ class DeepPySRRegressor:
                     })
             multi_target_results[target_name] = target_results
             
-        if self.model_provider in ["pypysr"] and len(target_names) == 1:
-            try:
-                # If we didn't go through the multi-target loop above (which fits one by one)
-                # but we are in a single target fit, we can still get the loss history.
-                if hasattr(self, "_jl_logger"):
-                    self.loss_history_ = [{
-                        "target": target_names[0],
-                        "iterations": list(self._jl_logger.iterations),
-                        "losses": list(self._jl_logger.losses)
-                    }]
-            except Exception:
-                pass
-
         return multi_target_results
 
     def _process_fit_results(self, target_name, results, layer, parent_name, X_input_all, cols, queue):

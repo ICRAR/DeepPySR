@@ -254,7 +254,7 @@ def run_extreme_test():
     }
     
     # Common parameters
-    aps = 1.0
+    aps = 100
     vps = 25
     vpr = 50
     vpm = 0.7
@@ -277,44 +277,44 @@ def run_extreme_test():
         
         configs = {
             # REMEMBER TO RUN STDSR AND FULLSR AND V2FULLSR IN 2 SEPARATE PROCESSES
-            "stdsr": {
-                "type": "deeppysr",
-                "params": {
-                    "model_provider": "pysr",
-                    "adaptive_parsimony_scaling": aps,
-                    **base_kwargs
-                }
-            },
-            # "fullsr": {
+            # "stdsr": {
             #     "type": "deeppysr",
             #     "params": {
-            #         "model_provider": "pypysrdev1",
+            #         "model_provider": "pysr",
             #         "adaptive_parsimony_scaling": aps,
-            #         "variable_prune_start": vps,
-            #         "variable_prune_ramp": vpr,
-            #         "variable_prune_max": vpm,
-            #         "use_mdl": False,
-            #         "use_nsga2": False,
-            #         "use_lexicase": False,
-            #         "use_hotspot_protection": False,
             #         **base_kwargs
             #     }
             # },
-            # "v2fullsr": {
-            #     "type": "deeppysr",
-            #     "params": {
-            #         "model_provider": "pypysrdev1",
-            #         "adaptive_parsimony_scaling": aps,
-            #         "variable_prune_start": vps,
-            #         "variable_prune_ramp": vpr,
-            #         "variable_prune_max": vpm,
-            #         "use_mdl": True,
-            #         "use_nsga2": True,
-            #         "use_lexicase": True,
-            #         "use_hotspot_protection": True,
-            #         **base_kwargs
-            #     }
-            # }
+            "fullsr": {
+                "type": "deeppysr",
+                "params": {
+                    "model_provider": "pypysr",
+                    "adaptive_parsimony_scaling": aps,
+                    "variable_prune_start": vps,
+                    "variable_prune_ramp": vpr,
+                    "variable_prune_max": vpm,
+                    "use_mdl": False,
+                    "use_nsga2": False,
+                    "use_lexicase": False,
+                    "use_hotspot_protection": False,
+                    **base_kwargs
+                }
+            },
+            "v2fullsr": {
+                "type": "deeppysr",
+                "params": {
+                    "model_provider": "pypysr",
+                    "adaptive_parsimony_scaling": aps,
+                    "variable_prune_start": vps,
+                    "variable_prune_ramp": vpr,
+                    "variable_prune_max": vpm,
+                    "use_mdl": True,
+                    "use_nsga2": True,
+                    "use_lexicase": True,
+                    "use_hotspot_protection": True,
+                    **base_kwargs
+                }
+            }
         }
         
         for name, config in configs.items():
@@ -332,7 +332,7 @@ def run_extreme_test():
             all_results.append(result)
             
     df_results = pd.DataFrame(all_results)
-    df_results.to_csv(os.path.join(out_dir, "all_extreme_results1.csv"), index=False)
+    df_results.to_csv(os.path.join(out_dir, "all_extreme_results2.csv"), index=False)
     
 
 if __name__ == "__main__":
