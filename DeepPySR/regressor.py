@@ -995,26 +995,31 @@ class DeepPySRRegressor:
             if not hasattr(new_rel["sympy"], "xreplace"):
                 new_rel["sympy"] = sp.sympify(new_rel["sympy"])
 
-                # Map sympy formula using SymPy's xreplace with symbols
-                # xreplace with symbols is safe against partial name matches.
-                prefix = "x"
-                sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
-                if hasattr(new_rel["sympy"], "xreplace"):
-                    new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
-                new_rel["formula"] = str(new_rel["sympy"])
-                
-                # If target_name is a root target, also map it to its original name
-                if isinstance(self.target_name_, list):
-                    # Find which original target this is
-                    try:
+            # Map sympy formula using SymPy's xreplace with symbols
+            # xreplace with symbols is safe against partial name matches.
+            sym_mapping = {sp.Symbol(f"x{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
+            
+            if hasattr(new_rel["sympy"], "xreplace"):
+                new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
+            
+            new_rel["formula"] = str(new_rel["sympy"])
+            
+            # If target_name is a root target, also map it to its original name
+            if isinstance(self.target_name_, list):
+                # Find which original target this is
+                try:
+                    if new_rel["target"].startswith("y"):
                         t_idx = int(new_rel["target"][1:])
-                        new_rel["target"] = self.target_name_[t_idx]
-                    except (ValueError, IndexError):
-                        pass
-                
-                # Map involved
+                        if t_idx < len(self.target_name_):
+                            new_rel["target"] = self.target_name_[t_idx]
+                except (ValueError, IndexError):
+                    pass
+            
+            # Map involved
+            if hasattr(new_rel["sympy"], "free_symbols"):
                 new_rel["involved"] = sorted({str(s) for s in new_rel["sympy"].free_symbols})
-                mapped_rels.append(new_rel)
+            
+            mapped_rels.append(new_rel)
         return mapped_rels
 
     def save_relationships(self, filename="relationships.csv"):
