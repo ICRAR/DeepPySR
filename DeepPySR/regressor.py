@@ -121,11 +121,6 @@ class DeepPySRRegressor:
             # Prepare lambdified function for fast evaluation
             symbols = [sp.Symbol(s) for s in involved]
             
-            # Use extra_mappings to ensure custom operators are correctly translated to numpy
-            # Priority is given to extra_mappings to avoid conflicts with numpy functions
-            # We map custom functions to SymPy Piecewise first, before lambdifying.
-            curr_expr = expr
-            
             # Identify and replace custom functions in extra_mappings
             # We map custom functions to SymPy expressions first, before lambdifying.
             curr_expr = expr
@@ -409,9 +404,8 @@ class DeepPySRRegressor:
         # Also remove logger if we are using it
         logger_to_use = params.pop("logger", None)
 
-        # Set up loss logger for pypysr
-        # Note: Standard pysr has a different logger interface and is not yet supported
-        if self.model_provider in ["pypysr"]:
+        # Set up loss logger for pypysr or pysr
+        if self.model_provider == "pypysr":
             try:
                 from juliacall import Main as jl
                 # Define a custom logger in Julia to record loss per iteration
@@ -469,6 +463,69 @@ class DeepPySRRegressor:
             except Exception as e:
                 print(f"[DeepPySR] Warning: Failed to setup Julia loss logger: {e}")
 
+        elif self.model_provider == "pysr":
+            try:
+                from pysr.logger_specs import AbstractLoggerSpec
+                from juliacall import Main as jl
+
+                jl.seval("""
+                if !isdefined(Main, :PythonLossLogger)
+                    import SymbolicRegression: AbstractSRLogger, get_logger
+                    import SymbolicRegression.LoggingModule
+                    using Logging
+                    
+                    mutable struct PythonLossLogger <: AbstractLogger
+                        losses::Vector{Float64}
+                        iterations::Vector{Int}
+                        cur_iteration::Int
+                        log_interval::Int
+                    end
+                    
+                    Logging.min_enabled_level(logger::PythonLossLogger) = Logging.Info
+                    Logging.shouldlog(logger::PythonLossLogger, level, _module, group, id) = true
+                    Logging.log(logger::PythonLossLogger, level, message, _module, group, id, file, line; kwargs...) = nothing
+                    
+                    # Define the logging_callback! method in the SymbolicRegression.LoggingModule
+                    SymbolicRegression.LoggingModule.eval(quote
+                        function logging_callback!(logger::SRLogger{Main.PythonLossLogger}; state, datasets, ropt, options)
+                            if should_log(logger)
+                                my_logger = logger.logger
+                                hof = state.halls_of_fame[1]
+                                if any(hof.exists)
+                                    min_loss = minimum(member.loss for member in hof.members[hof.exists])
+                                    my_logger.cur_iteration += 1
+                                    push!(my_logger.losses, Float64(min_loss))
+                                    push!(my_logger.iterations, Int(my_logger.cur_iteration))
+                                end
+                                increment_log_step!(logger)
+                            end
+                        end
+                    end)
+                end
+
+                """)
+
+                log_interval = 1
+                my_logger = jl.PythonLossLogger([], [], 0, log_interval)
+                self._jl_logger = jl.SRLogger(logger=my_logger, log_interval=log_interval)
+                class PySRLossLoggerSpec(AbstractLoggerSpec):
+                    def __init__(self, logger):
+                        self._logger = logger
+
+                    def create_logger(self):
+                        return self._logger
+
+                    def write_hparams(self, logger, hparams):
+                        return None
+
+                    def close(self, logger):
+                        return None
+
+                params["logger_spec"] = PySRLossLoggerSpec(self._jl_logger)
+            except Exception as e:
+                if params.get("verbosity", 0) > 0:
+                    print(f"[DeepPySR] Warning: Failed to setup pysr loss logger: {e}")
+
         model = PySRRegressor(**params)
         
         if logger_to_use is not None:
@@ -509,10 +566,16 @@ class DeepPySRRegressor:
                 # For multi-target, create a separate loss history entry for each target
                 # They all optimize together so iterations/losses are the same, but we record per-target
                 for target_name in target_names:
+                    if self.model_provider == "pypysr":
+                        iterations = list(self._jl_logger.iterations)
+                        losses = list(self._jl_logger.losses)
+                    else:
+                        iterations = list(self._jl_logger.logger.iterations)
+                        losses = list(self._jl_logger.logger.losses)
                     self.loss_history_.append({
                         "target": target_name,
-                        "iterations": list(self._jl_logger.iterations),
-                        "losses": list(self._jl_logger.losses)
+                        "iterations": iterations,
+                        "losses": losses
                     })
             except Exception:
                 pass
@@ -719,7 +782,7 @@ class DeepPySRRegressor:
                 for n in list(sym_expr.atoms(sp.Number)):
                     sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
 
-            prefix = "v" if self.model_provider in ["pypysr", "pypysrdev1"] else "x"
+            prefix = "x"
             
             mapping = {}
             for k in range(len(cols)):
@@ -934,7 +997,7 @@ class DeepPySRRegressor:
 
                 # Map sympy formula using SymPy's xreplace with symbols
                 # xreplace with symbols is safe against partial name matches.
-                prefix = "v" if self.model_provider in ["pypysr"] else "x"
+                prefix = "x"
                 sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
                 if hasattr(new_rel["sympy"], "xreplace"):
                     new_rel["sympy"] = new_rel["sympy"].xreplace(sym_mapping)
@@ -1038,7 +1101,7 @@ class DeepPySRRegressor:
                 if rel:
                     expr = rel['sympy']
                     if hasattr(self, "feature_names_in_"):
-                        prefix = "v" if self.model_provider in ["pypysr"] else "x"
+                        prefix = "x"
                         sym_mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
                         expr = expr.xreplace(sym_mapping)
                     exprs[name] = expr
@@ -1053,7 +1116,7 @@ class DeepPySRRegressor:
                 return expr
                 
             # Map x0, x1... (or v0, v1... for pypysr) to original feature names
-            prefix = "v" if self.model_provider in ["pypysr"] else "x"
+            prefix = "x"
             mapping = {sp.Symbol(f"{prefix}{i}"): sp.Symbol(name) for i, name in enumerate(self.feature_names_in_)}
             return expr.xreplace(mapping)
 
