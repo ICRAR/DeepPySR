@@ -345,7 +345,7 @@ def get_deeppysr_configs():
                     "variable_prune_max": vpm,
                     "use_mdl": True,
                     "use_nsga2": True,
-                    "use_lexicase": True,
+                    "use_lexicase": False,
                     "use_hotspot_protection": True,
                 }
     return configs

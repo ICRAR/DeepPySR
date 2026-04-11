@@ -259,12 +259,16 @@ class DeepPySRRegressor:
             "use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection",
             "variable_prune_max", "variable_prune_start", "variable_prune_ramp"
         ]:
-            if self.model_provider not in ["pypysr", "pypysrdev1"] and p in ["variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
-                params.pop(p, None)
-            elif p in ["use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection"]:
-                params.pop(p, None)
-            elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
-                params.pop(p, None)
+            if self.model_provider in ["pypysr", "pypysrdev1"]:
+                # pypysr supports these variables
+                if p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
+                    params.pop(p, None)
+            else:
+                # standard pysr does NOT support these variables
+                if p in ["use_mdl", "use_nsga2", "use_lexicase", "use_hotspot_protection", "variable_prune_max", "variable_prune_start", "variable_prune_ramp"]:
+                    params.pop(p, None)
+                elif p in ["max_layers", "output_dir", "decimal", "stopping_score", "relationships_", "model_provider", "pareto_lambda", "pareto_r2_weight", "pypysr_path"]:
+                    params.pop(p, None)
 
         # Batching logic: if X.shape[0] > 10000 and user didn't specify batching, enable it.
         # But if user DID specify batching or batch_size, keep those.
@@ -345,10 +349,9 @@ class DeepPySRRegressor:
                 # we should check if MyPySR can be loaded.
                 # pypysr's _initialize_julia() will activate its own environment.
                 try:
-                    # Add MyPySR python path if not already in sys.path
-                    pypysr_path = self.pypysr_path or os.path.expanduser("~/Projects/mypysr.jl/python")
-                    if pypysr_path not in sys.path:
-                        sys.path.insert(0, pypysr_path)
+                    # Add MyPySR python path if provided and not already in sys.path
+                    if self.pypysr_path and self.pypysr_path not in sys.path:
+                        sys.path.insert(0, self.pypysr_path)
                     from pypysr import PySRRegressor
                     from juliacall import Main as jl
                     # Ensure MyPySR is loaded and available
