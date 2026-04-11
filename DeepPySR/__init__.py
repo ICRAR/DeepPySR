@@ -1,4 +1,11 @@
 import os
+import sys
+
+# Isolate the environment to avoid conflicts with user site-packages
+# This is especially important for juliapkg/juliacall which scans sys.path for juliapkg.json
+os.environ["PYTHONNOUSERSITE"] = "1"
+# Remove user site-packages from sys.path if they are already present
+sys.path = [p for p in sys.path if ".local/lib/python" not in p]
 
 # Fix for JuliaCall/PySR segfaults: Must be set before juliacall is imported
 os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
