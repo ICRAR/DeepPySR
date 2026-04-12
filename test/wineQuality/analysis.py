@@ -273,29 +273,6 @@ def process_results():
                             r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
                     all_data.append([variant, wine_type, r2, rmse, mae, complexity, formula])
 
-        # PySR
-        pysr_dir = os.path.join(base_dir, "pysr")
-        if os.path.exists(pysr_dir):
-            for variant in os.listdir(pysr_dir):
-                v_path = os.path.join(pysr_dir, variant)
-                if not os.path.isdir(v_path): continue
-
-                res = get_best_formula_from_raw(v_path, X, y)
-
-                if isinstance(res, dict):
-                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                        r2, rmse, mae = metrics
-                        model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                        all_data.append([model_name, wine_type, r2, rmse, mae, complexity, formula])
-                else:
-                    formula, complexity, metrics = res
-                    r2, rmse, mae = metrics
-                    if not formula:
-                        pred_file = os.path.join(v_path, "predictions.csv")
-                        if os.path.exists(pred_file):
-                            df_pred = pd.read_csv(pred_file)
-                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                    all_data.append([variant, wine_type, r2, rmse, mae, complexity, formula])
 
 
     # Create DataFrame and save
@@ -326,7 +303,7 @@ def save_results(df):
             continue
 
         # DeepPySR variants
-        deeppysr_df = type_df[type_df['model'].str.contains('fullsr|stdsr|srpsm|srprn', na=False)]
+        deeppysr_df = type_df[type_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
         if not deeppysr_df.empty:
             best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
             best_deeppysr['display_model'] = 'Best DeepPySR'
@@ -342,12 +319,6 @@ def save_results(df):
                     'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
                 })
 
-        # PySR variants
-        pysr_df = type_df[type_df['model'].str.contains('pysr_', na=False)]
-        if not pysr_df.empty:
-            best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
-            best_pysr['display_model'] = 'Best PySR'
-            selected_data.append(best_pysr)
 
         # KAN and KANSym
         for m in ['KAN', 'KANSym']:

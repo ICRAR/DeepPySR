@@ -35,13 +35,19 @@ def is_redundant(
         target_name: str,
         sym_expr: sp.Expr,
         all_relationships: list[dict],
-        threshold: float = 1e-4
+        threshold: float = 1e-4,
+        layer: int = 1
 ) -> bool:
     """
     Checks redundancy by evaluating the new expression against existing
     relationships over a vectorized numerical grid.
     """
     if not all_relationships:
+        return False
+        
+    # We never consider root targets redundant (layer 1) based on identity check
+    # as we want to capture all root targets even if they are constant or same as others.
+    if layer == 1:
         return False
 
     # 1. Identify all involved symbols across all relationships

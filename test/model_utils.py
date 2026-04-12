@@ -221,7 +221,7 @@ class KANWrapper:
         input_dim = int(input_dim) if not isinstance(input_dim, list) else int(input_dim[0])
         hidden_dim = int(hidden_dim) if not isinstance(hidden_dim, list) else int(hidden_dim[0])
         output_dim = int(output_dim) if not isinstance(output_dim, list) else int(output_dim[0])
-        
+
         self.width = [input_dim, hidden_dim, output_dim]
         # Pass a copy to avoid in-place modification of self.width by pykan
         self.model = KAN(width=self.width.copy(), device=self.device)
@@ -237,18 +237,18 @@ class KANWrapper:
         # Reset symbolic info for a new training
         self.formula = None
         self.vars = None
-        
+
         X_t = torch.tensor(X, dtype=torch.float32).to(self.device)
         # Ensure we use an integer for reshape
         out_dim = self.width[-1]
         if isinstance(out_dim, list):
             out_dim = out_dim[0]
-            
+
         if self.task == 'classification' and out_dim == 1:
             y_t = torch.tensor(y, dtype=torch.float32).reshape(-1, 1).to(self.device)
         else:
             y_t = torch.tensor(y, dtype=torch.float32).reshape(-1, int(out_dim)).to(self.device)
-            
+
         dataset = {'train_input': X_t, 'train_label': y_t, 'test_input': X_t, 'test_label': y_t}
         self.model.fit(dataset, steps=self.steps, update_grid=self.update_grid, opt="LBFGS", lamb=self.lamb, lamb_l1=self.lamb_l1, lamb_entropy=2.,)
         return self
@@ -269,43 +269,43 @@ class KANWrapper:
                 self.formula = res[0]
         except Exception as e:
             print(f"Warning: KAN symbolization failed: {e}")
-        
+
         # If still None, default to 0.0
         if self.formula is None:
             self.formula = 0.0
-            
+
         return self
 
     def predict_symbolic(self, X):
         if self.formula is None:
             return self.predict(X)
-        
+
         # Handle default/constant formula
         if isinstance(self.formula, (int, float)) and self.formula == 0.0:
             y_pred = np.zeros(X.shape[0])
             if self.task == 'classification':
                 return y_pred.astype(int)
             return y_pred
-            
+
         try:
             # vars are x_1, x_2, ...
             if self.vars is None:
                 return self.predict(X)
-                
+
             f = sympy.lambdify(self.vars, self.formula, 'numpy')
             inputs = [X[:, i] for i in range(min(X.shape[1], len(self.vars)))]
             y_pred = f(*inputs)
-            
+
             if isinstance(y_pred, torch.Tensor):
                 y_pred = y_pred.detach().cpu().numpy()
-            
+
             if np.isscalar(y_pred):
                 y_pred = np.full(X.shape[0], y_pred)
-            
+
             y_pred = y_pred.ravel()
             # Clean NaNs and Infs for symbolic evaluation
             y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-            
+
             if self.task == 'classification':
                 return (y_pred > 0.5).astype(int)
             return y_pred
@@ -318,12 +318,12 @@ class KANWrapper:
         y_pred = self.model(X_t).detach().cpu().numpy().ravel()
         # Clean NaNs and Infs
         y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
-        
+
         if self.task == 'classification':
             out_dim = self.width[-1]
             if isinstance(out_dim, list):
                 out_dim = out_dim[0]
-                
+
             if out_dim == 1:
                 return (y_pred > 0.5).astype(int)
             else:
@@ -339,7 +339,7 @@ class KANWrapper:
         y_prob = self.model(X_t).detach().cpu().numpy()
         # Clean NaNs and Infs
         y_prob = np.nan_to_num(y_prob, nan=0.0, posinf=1.0, neginf=0.0)
-        
+
         out_dim = self.width[-1]
         if isinstance(out_dim, list):
             out_dim = out_dim[0]
@@ -348,6 +348,7 @@ class KANWrapper:
             y_prob = np.clip(y_prob.ravel(), 0, 1)
             return np.column_stack([1 - y_prob, y_prob])
         return y_prob
+
 
 # --- Model Factories ---
 def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_state=42):
@@ -394,8 +395,10 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "parallelism": parallelism,
         "maxsize": 40,
         "binary_operators": ["+", "*", "/", "-", "cond(x,y) = x > 0 ? y : y*0"],
-        "extra_sympy_mappings": {'cond': sympy_cond},
-        "unary_operators": ["exp", "log"],
+        "extra_sympy_mappings": {
+            'cond': sympy_cond,
+        },
+        "unary_operators": ["exp", "log", "sin", "sqrt"],
         "parsimony": 0.001,
         "populations": 100,
         "population_size": 200,
