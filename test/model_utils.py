@@ -314,7 +314,7 @@ def get_deeppysr_configs():
     # aps_list = [0.1, 1.0, 10.0, 50.0]
     vps_list = [25, 50]
     vpr_list = [50, 100, 150]
-    aps_list = [10.0, 50.0]
+    aps_list = [10.0, 50.0, 100.0]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # 1. fullsr: Tune all 4 parameters
@@ -380,7 +380,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "extra_sympy_mappings": {
             'cond': sympy_cond,
         },
-        "unary_operators": ["exp", "log", "sin", "sqrt", "abs"],
+        "unary_operators": ["exp", "log", "sin", "sqrt"],
         "parsimony": 0.001,
         "populations": 100,
         "population_size": 200,
