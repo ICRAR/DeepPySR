@@ -186,21 +186,21 @@ def get_deeppysr_configs():
                     "variable_prune_max": vpm,
                 }
 
-    # 5. v2fullsr: pypysrdev1 with all 4 parameters
-    for vps in vps_list:
-        for vpr in vpr_list:
-            for aps in aps_list:
-                configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
-                    "model_provider": "pypysrdev1",
-                    "adaptive_parsimony_scaling": aps,
-                    "variable_prune_start": vps,
-                    "variable_prune_ramp": vpr,
-                    "variable_prune_max": vpm,
-                    "use_mdl": True,
-                    "use_nsga2": True,
-                    "use_lexicase": True,
-                    "use_hotspot_protection": True,
-                }
+    # # 5. v2fullsr: pypysrdev1 with all 4 parameters
+    # for vps in vps_list:
+    #     for vpr in vpr_list:
+    #         for aps in aps_list:
+    #             configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
+    #                 "model_provider": "pypysrdev1",
+    #                 "adaptive_parsimony_scaling": aps,
+    #                 "variable_prune_start": vps,
+    #                 "variable_prune_ramp": vpr,
+    #                 "variable_prune_max": vpm,
+    #                 "use_mdl": True,
+    #                 "use_nsga2": True,
+    #                 "use_lexicase": True,
+    #                 "use_hotspot_protection": True,
+    #             }
     return configs
 
 # --- PySR Configs ---
