@@ -266,7 +266,7 @@ class DeepPySRRegressor:
         
         # Determine variable names for this fit
         n_features = X.shape[1]
-        v_names = [f"x{i}" for i in range(n_features)]
+        v_names = [f"x{i+1}" for i in range(n_features)] if self.model_provider in ["pypysr", "pypysrdev1"] else [f"x{i}" for i in range(n_features)]
             
         # Dynamically import PySRRegressor
         import sys
@@ -583,11 +583,24 @@ class DeepPySRRegressor:
                 for n in list(sym_expr.atoms(sp.Number)):
                     sym_expr = sym_expr.xreplace({n: sp.Float(round(float(n), self.decimal))})
 
-            prefix = "x"
+            # If using pypysr, it returns 1-based indices (x1, x2, ...)
+            # if we didn't provide variable_names.
+            # But if we DID provide variable_names (x1, x2, ...), it returns those.
+            # HOWEVER, pypysr/sr.py ALWAYS applies a x1->x0, x2->x1 mapping in .sympy()
+            # if the symbols in the expression are x1, x2, ...
+            
+            prefix = "x" if self.model_provider not in ["pypysr", "pypysrdev1"] else ""
 
             mapping = {}
-            for k in range(len(cols)):
-                mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
+            if prefix == "":
+                 # pypysr case: we already have x0, x1 in sym_expr because of its internal conversion
+                 # of our provided x1, x2.
+                 # So we map x0 -> x{cols[0]}, x1 -> x{cols[1]}
+                 for k in range(len(cols)):
+                     mapping[sp.Symbol(f"x{k}")] = sp.Symbol(f"x{cols[k]}")
+            else:
+                 for k in range(len(cols)):
+                     mapping[sp.Symbol(f"{prefix}{k}")] = sp.Symbol(f"x{cols[k]}")
 
             if hasattr(sym_expr, "xreplace"):
                 sym_expr = sym_expr.xreplace(mapping)
@@ -778,6 +791,9 @@ class DeepPySRRegressor:
             
         # Create a mapping from internal names to feature names
         # Internal names are always x0, x1, ... x{n-1}
+        # But MyPySR might return x1, x2, ...
+        # Based on pypysr/sr.py, it converts x1 -> x0, x2 -> x1, etc.
+        # So we should be getting x0, x1, ... in the relationships_
         mapping = {f"x{i}": name for i, name in enumerate(self.feature_names_in_)}
         
         # Sort internal names by length descending to avoid partial replacements (e.g., x10 replacing x1)
