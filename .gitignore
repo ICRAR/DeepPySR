@@ -10,6 +10,7 @@
 /**/predictions.csv
 /**/relationships.csv
 /test_data/
+/test/*/results*/*/
 /test/bmi/results_bmi_all/*/
 /test/bmi/results_bmi_nocv/*/
 /test/diabetes130us/results_diab130_all/
