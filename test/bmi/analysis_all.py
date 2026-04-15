@@ -58,7 +58,7 @@ def process_results():
                                 # For KANSym, we need formula and complexity
                                 # The user wants us to check all formulas and pick the best one
                                 _, X_age, y_age = load_bmi_agg_data(age=age)
-                                formula, complexity, metrics = get_best_formula_from_raw(model_path, X_age, y_age, prefix='formulas_fold')
+                                formula, complexity, metrics = get_best_formula_from_raw(model_path, X_age, y_age, prefix='formulas_fold',model_type='kan')
                                 r2, rmse, mae = metrics
 
                                 if not formula:
@@ -78,7 +78,32 @@ def process_results():
                     if not os.path.isdir(v_path): continue
 
                     _, X_age, y_age = load_bmi_agg_data(age=age)
-                    res = get_best_formula_from_raw(v_path, X_age, y_age)
+                    res = get_best_formula_from_raw(v_path, X_age, y_age, model_type='deeppysr')
+
+                    if isinstance(res, dict):
+                        for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                            r2, rmse, mae = metrics
+                            model_name = f"{variant}_r2w{r2w}_L{lamb}"
+                            all_data.append([age, model_name, 'age-specific', r2, rmse, mae, complexity, formula])
+                    else:
+                        formula, complexity, metrics = res
+                        r2, rmse, mae = metrics
+                        if not formula:
+                            pred_file = os.path.join(v_path, "predictions.csv")
+                            if os.path.exists(pred_file):
+                                df_pred = pd.read_csv(pred_file)
+                                r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
+                        all_data.append([age, variant, 'age-specific', r2, rmse, mae, complexity, formula])
+
+            # PySR
+            pysr_dir = os.path.join(age_path, "pysr")
+            if os.path.exists(pysr_dir):
+                for variant in os.listdir(pysr_dir):
+                    v_path = os.path.join(pysr_dir, variant)
+                    if not os.path.isdir(v_path): continue
+
+                    _, X_age, y_age = load_bmi_agg_data(age=age)
+                    res = get_best_formula_from_raw(v_path, X_age, y_age, model_type='pysr')
 
                     if isinstance(res, dict):
                         for (r2w, lamb), (formula, complexity, metrics) in res.items():
@@ -100,7 +125,7 @@ def process_results():
     long_dir = os.path.join(base_dir, "longitudinal")
     if os.path.exists(long_dir):
         # We need to iterate over models here
-        sub_dirs = ['baselines', 'deeppysr']
+        sub_dirs = ['baselines', 'deeppysr', 'pysr']
         for sd in sub_dirs:
             sd_path = os.path.join(long_dir, sd)
             if not os.path.exists(sd_path): continue
@@ -127,13 +152,13 @@ def process_results():
                                 # For longitudinal, we should also check all formulas
                                 # Load all longitudinal data
                                 _, X_long, y_long = load_bmi_agg_data()
-                                formula, complexity, metrics = get_best_formula_from_raw(m_path, X_long, y_long, prefix='formulas_fold')
+                                formula, complexity, metrics = get_best_formula_from_raw(m_path, X_long, y_long, prefix='formulas_fold', model_type='kan')
 
                                 if formula:
                                     # Predict for THIS age using the best formula
                                     X_age_data = X_long[X_long['age'] == age]
                                     y_age_data = y_long[X_long['age'] == age]
-                                    y_pred_best = evaluate_formula(formula, X_age_data)
+                                    y_pred_best = evaluate_formula(formula, X_age_data, model_type='kan')
                                     r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
                                 else:
                                     r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred_kansym'])
@@ -142,14 +167,14 @@ def process_results():
                         # For DeepPySR and PySR in longitudinal
                         if sd in ['deeppysr', 'pysr']:
                             _, X_long, y_long = load_bmi_agg_data()
-                            res = get_best_formula_from_raw(m_path, X_long, y_long)
+                            res = get_best_formula_from_raw(m_path, X_long, y_long, model_type=sd)
 
                             if isinstance(res, dict):
                                 for (r2w, lamb), (formula, complexity, _) in res.items():
                                     if formula:
                                         X_age_data = X_long[X_long['age'] == age]
                                         y_age_data = y_long[X_long['age'] == age]
-                                        y_pred_best = evaluate_formula(formula, X_age_data)
+                                        y_pred_best = evaluate_formula(formula, X_age_data, model_type=sd)
                                         r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
                                     else:
                                         r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
@@ -162,7 +187,7 @@ def process_results():
                                 if formula:
                                     X_age_data = X_long[X_long['age'] == age]
                                     y_age_data = y_long[X_long['age'] == age]
-                                    y_pred_best = evaluate_formula(formula, X_age_data)
+                                    y_pred_best = evaluate_formula(formula, X_age_data, model_type=sd)
                                     r2, rmse, mae = calculate_metrics(y_age_data, y_pred_best)
                                 else:
                                     r2, rmse, mae = calculate_metrics(age_df['y_true'], age_df['y_pred'])
@@ -210,7 +235,7 @@ def plot_results(df):
             # For longitudinal models, we find the best formula across all ages
 
             # 1. Best DeepPySR (highest overall R2 among fullsr, stdsr, v2fullsr)
-            deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
+            deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
             if not deeppysr_long.empty:
                 model_variants = deeppysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
                 best_model_name = None
@@ -251,6 +276,24 @@ def plot_results(df):
                             'formula': formula_info['formula'], 'r2': row['r2'], 'complexity': formula_info['complexity']
                         })
 
+            # 3. Best PySR (highest overall R2)
+            pysr_long = type_df[type_df['model'].str.contains('pysr', na=False)]
+            if not pysr_long.empty:
+                model_variants = pysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
+                best_model_name = None
+                best_r2 = -np.inf
+                for _, row in model_variants.iterrows():
+                    y_pred = evaluate_formula(row['formula'], X_all, model_type='pysr')
+                    r2, _, _ = calculate_metrics(y_all, y_pred)
+                    if r2 > best_r2:
+                        best_r2 = r2
+                        best_model_name = row['model']
+
+                if best_model_name:
+                    for age in ages:
+                        row = type_df[(type_df['age'] == age) & (type_df['model'] == best_model_name)].iloc[0].copy()
+                        row['display_model'] = 'PySR'
+                        selected_data.append(row)
 
             # 4. KANSym (highest overall R2)
             kansym_long = type_df[type_df['model'] == 'KANSym']
@@ -259,7 +302,7 @@ def plot_results(df):
                 best_kansym_name = None
                 best_kansym_r2 = -np.inf
                 for _, row in model_variants.iterrows():
-                    y_pred = evaluate_formula(row['formula'], X_all)
+                    y_pred = evaluate_formula(row['formula'], X_all, model_type='kan')
                     r2, _, _ = calculate_metrics(y_all, y_pred)
                     if r2 > best_kansym_r2:
                         best_kansym_r2 = r2
@@ -288,7 +331,7 @@ def plot_results(df):
                 age_df = type_df[type_df['age'] == age]
 
                 # DeepPySR variants
-                deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
+                deeppysr_df = age_df[age_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
                 if not deeppysr_df.empty:
                     best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
                     best_deeppysr['display_model'] = 'Best DeepPySR'
@@ -303,7 +346,12 @@ def plot_results(df):
                             'age': age, 'type': t, 'model': interp_deeppysr['model'],
                             'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
                         })
-
+                # PySR variants
+                pysr_df = age_df[age_df['model'].str.contains('pysr', na=False)]
+                if not pysr_df.empty:
+                    best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
+                    best_pysr['display_model'] = 'PySR'
+                    selected_data.append(best_pysr)
 
                 # KAN and KANSym
                 for m in ['KAN', 'KANSym']:
@@ -407,7 +455,7 @@ def plot_results(df):
 
 def plot_settings_comparison(df):
     """
-    Plot performance (r2, rmse, mae, complexity) for 3 settings of DeepPySR (fullsr, stdsr, v2fullsr)
+    Plot performance (r2, rmse, mae, complexity) for 3 settings of DeepPySR (fullsr, stdsr, srpsm, srprn, pysr)
     and any PySR variants if exist (using r2w=1 and lambda=0.001 (or 0.0001)).
     """
 
@@ -416,8 +464,11 @@ def plot_settings_comparison(df):
 
     # Target models for comparison
     target_settings = [
-        'fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'pysr_nit100_pop30_sz200_aps10.0_grid'
+        'fullsr_nit100_pop100_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
+        'srpsm_nit100_pop100_sz200_vps0_vpr0_aps10.0_grid_r2w1.5_L0.005',
+        'srprn_nit100_pop100_sz200_vps50_vpr50_aps0_grid_r2w1.5_L0.005',
+        'stdsr_nit100_pop100_sz200_vps0_vpr0_aps0_grid_r2w1.5_L0.005',
+        'pysr_nit100_pop100_sz200_aps10.0_grid'
     ]
 
     # Filter only if they exist in df
