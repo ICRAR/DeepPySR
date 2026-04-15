@@ -353,7 +353,8 @@ class KANPySRRegressor:
                         except Exception:
                             pass
 
-                func = sp.lambdify([sp.Symbol(name) for name in involved_names], curr_expr, modules=modules)
+                involved_symbols = [sp.Symbol(name) for name in involved_names]
+                func = sp.lambdify(involved_symbols, curr_expr, modules=modules)
                 
                 # Prepare arguments for the lambdified function
                 args = [current_values[idx] for idx in involved_indices]
@@ -482,7 +483,8 @@ class KANPySRRegressor:
                         # Need to handle potential piecewise or other things
                         modules = [{'cond': lambda x, y: np.where(x > 0, y, 0)}, 'numpy']
                         
-                        func = sp.lambdify([sp.Symbol(name) for name in involved_raw], final_y_expr, modules=modules)
+                        involved_symbols = [sp.Symbol(name) for name in involved_raw]
+                        func = sp.lambdify(involved_symbols, final_y_expr, modules=modules)
                         
                         # Prepare data
                         if isinstance(X_orig, pd.DataFrame):

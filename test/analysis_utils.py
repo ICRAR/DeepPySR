@@ -2,19 +2,69 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 import glob
 import re
 import sympy as sp
 
-def calculate_metrics(y_true, y_pred):
+def calculate_metrics(y_true, y_pred, y_prob=None, task='regression'):
     if len(y_true) == 0:
-        return np.nan, np.nan, np.nan
-    r2 = r2_score(y_true, y_pred)
-    # R2 should be no smaller than 0
-    r2 = max(0, r2)
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    mae = mean_absolute_error(y_true, y_pred)
-    return r2, rmse, mae
+        if task == 'regression':
+            return np.nan, np.nan, np.nan
+        else:
+            return np.nan, np.nan, np.nan, np.nan, np.nan
+
+    # Clean NaNs and Infs for metrics calculation to avoid ValueError in sklearn
+    y_pred = np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
+    if y_prob is not None:
+        y_prob = np.nan_to_num(y_prob, nan=0.0, posinf=1.0, neginf=0.0)
+
+    if task == 'regression':
+        r2 = r2_score(y_true, y_pred)
+        # R2 should be no smaller than 0
+        r2 = max(0, r2)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        mae = mean_absolute_error(y_true, y_pred)
+        return r2, rmse, mae
+    else:
+        # For classification, ensure y_pred is discrete (integer classes)
+        # Symbolic outputs are often continuous and need rounding/clipping
+        if not np.issubdtype(y_pred.dtype, np.integer):
+            # Clip to the range of y_true before/after rounding
+            y_min, y_max = np.min(y_true), np.max(y_true)
+            y_pred = np.clip(np.round(y_pred), y_min, y_max).astype(int)
+        else:
+            # Even if it's already integer, ensure it's within y_true's range
+            y_min, y_max = np.min(y_true), np.max(y_true)
+            y_pred = np.clip(y_pred, y_min, y_max)
+
+        # Check if classification type
+        unique_y_true = np.unique(y_true)
+        unique_y_pred = np.unique(y_pred)
+        all_labels = np.unique(np.concatenate([unique_y_true, unique_y_pred]))
+
+        # Consider it binary only if ALL labels (true and pred) are strictly subset of {0, 1}
+        is_binary = set(all_labels).issubset({0, 1})
+        avg = 'binary' if is_binary else 'macro'
+
+        # AUC multiclass check
+        is_multiclass = len(unique_y_true) > 2
+
+        acc = accuracy_score(y_true, y_pred)
+        prec = precision_score(y_true, y_pred, average=avg, zero_division=0)
+        rec = recall_score(y_true, y_pred, average=avg, zero_division=0)
+        f1 = f1_score(y_true, y_pred, average=avg, zero_division=0)
+        auc = 0.5
+        if y_prob is not None:
+            try:
+                if is_multiclass:
+                    # For multiclass, y_prob should be (n_samples, n_classes)
+                    auc = roc_auc_score(y_true, y_prob, multi_class='ovr', average='macro')
+                else:
+                    auc = roc_auc_score(y_true, y_prob)
+            except:
+                auc = 0.5
+        return acc, prec, rec, f1, auc
 
 def calculate_complexity(formula_str):
     """
@@ -34,10 +84,15 @@ def calculate_complexity(formula_str):
     # Complexity is just the number of tokens found
     return len(tokens)
 
-def map_variable_names(formula_str, feature_names):
+def map_variable_names(formula_str, feature_names, model_type='deeppysr'):
     """
     Map x0, x1... or x_0, x_1... back to original feature names.
     Use regex to avoid partial matches (e.g., x1 matching x10).
+
+    Note on indexing:
+    - KAN models: Use 0-based indexing (x0, x1...).
+    - PySR models: Use 0-based indexing (x0, x1...).
+    - DeepPySR (pypysr) models: Use 1-based indexing (x1, x2...).
     """
     if not formula_str or pd.isna(formula_str):
         return formula_str
@@ -46,18 +101,33 @@ def map_variable_names(formula_str, feature_names):
     indices = sorted(range(len(feature_names)), reverse=True)
 
     mapped_formula = str(formula_str)
+
+    # If it's KAN or PySR, it uses 0-based indexing.
+    # If it's DeepPySR (pypysr), it uses 1-based indexing.
+    is_0_based = model_type.lower() in ['deeppysr', 'pysr', 'kan']
+
     for i in indices:
         name = feature_names[i]
-        # Replace x_i and xi
-        mapped_formula = re.sub(rf'\bx_{i}\b', name, mapped_formula)
-        mapped_formula = re.sub(rf'\bx{i}\b', name, mapped_formula)
+        if is_0_based:
+            # Replace x_i and xi (PySR, KAN)
+            mapped_formula = re.sub(rf'\bx_{i}\b', name, mapped_formula)
+            mapped_formula = re.sub(rf'\bx{i}\b', name, mapped_formula)
+        else:
+            # Assume 1-based (DeepPySR/pypysr): x_{i+1} and x{i+1}
+            mapped_formula = re.sub(rf'\bx_{i+1}\b', name, mapped_formula)
+            mapped_formula = re.sub(rf'\bx{i+1}\b', name, mapped_formula)
 
     return mapped_formula
 
-def evaluate_formula(formula_str, X):
+def evaluate_formula(formula_str, X, model_type='deeppysr'):
     """
     Evaluate a symbolic formula (PySR, DeepPySR, or KAN) using SymPy.
     Supports both indexed variables (x0, x1...) and raw feature names.
+
+    Note on indexing:
+    - KAN models: Use 0-based indexing (x0, x1...).
+    - PySR models: Use 0-based indexing (x0, x1...).
+    - DeepPySR (pypysr) models: Use 1-based indexing (x1, x2...).
     """
     if not formula_str or pd.isna(formula_str):
         return np.zeros(len(X))
@@ -90,20 +160,28 @@ def evaluate_formula(formula_str, X):
 
         # Mapping for indexed variables if they exist in formula
         # We replace x0, x1... and x_0, x_1... with the actual column names
+        # Models use either 0-based (PySR, KAN) or 1-based (DeepPySR/pypysr) indexing.
+        is_0_based = model_type.lower() in ['deeppysr', 'pysr', 'kan']
+
         subs_dict = {}
         for i, name in enumerate(feature_names):
-            subs_dict[sp.Symbol(f"x{i}")] = sp.Symbol(name)
-            subs_dict[sp.Symbol(f"x_{i}")] = sp.Symbol(name)
+            if is_0_based:
+                subs_dict[sp.Symbol(f"x{i}")] = sp.Symbol(name)
+                subs_dict[sp.Symbol(f"x_{i}")] = sp.Symbol(name)
+            else:
+                subs_dict[sp.Symbol(f"x{i+1}")] = sp.Symbol(name)
+                subs_dict[sp.Symbol(f"x_{i+1}")] = sp.Symbol(name)
 
         expr = expr.xreplace(subs_dict)
 
         # Now evaluate the expression with X's data
         # We use lambdify for performance
-        variables = sorted([str(s) for s in expr.free_symbols])
+        symbols = [sp.Symbol(str(s)) for s in expr.free_symbols]
 
         # Prepare input data for lambdify
         input_data = []
-        for var in variables:
+        for s in symbols:
+            var = str(s)
             if var in X.columns:
                 input_data.append(X[var].values)
             else:
@@ -111,9 +189,9 @@ def evaluate_formula(formula_str, X):
                 # or it's a constant that was parsed as a symbol
                 input_data.append(np.zeros(len(X)))
 
-        f_lambdified = sp.lambdify(variables, expr, modules=['numpy'])
+        f_lambdified = sp.lambdify(symbols, expr, modules=['numpy'])
 
-        if not variables:
+        if not symbols:
             # Constant formula
             y_pred = float(expr)
         else:
@@ -130,17 +208,26 @@ def evaluate_formula(formula_str, X):
         # print(f"Error evaluating formula {formula_str}: {e}")
         return np.zeros(len(X))
 
-def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold'):
+def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold', task='regression', model_type='deeppysr'):
     """
     Find the best formula by evaluating all fold-specific formulas on raw data.
     Works for DeepPySR, PySR (prefix='relationships_fold') and KAN (prefix='formulas_fold').
     Returns a dictionary of (r2w, lambda): (formula, complexity, metrics) for DeepPySR grid search,
     or just a single (formula, complexity, metrics) if no grid search info is found.
     """
-    results = {} # {(r2w, lambda): (best_r2, best_formula, best_complexity, best_metrics)}
-    overall_best = (-float('inf'), "", np.nan, (np.nan, np.nan, np.nan))
+    results = {} # {(r2w, lambda): (best_score, best_formula, best_complexity, best_metrics)}
+    
+    # Use R2 for regression and F1 for classification as the sorting metric
+    if task == 'regression':
+        overall_best = (-float('inf'), "", np.nan, (np.nan, np.nan, np.nan))
+    else:
+        overall_best = (-float('inf'), "", np.nan, (np.nan, np.nan, np.nan, np.nan, np.nan))
 
     feature_names = list(X.columns) if hasattr(X, 'columns') else []
+
+    # If prefix matches KAN common prefixes, adjust model_type if not explicitly set
+    if 'formulas' in prefix and model_type == 'kan':
+        model_type = 'kan'
 
     pattern = os.path.join(folder_path, f"{prefix}*.csv")
     files = glob.glob(pattern)
@@ -167,17 +254,21 @@ def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold
                     lamb = row.get('pareto_lambda', 0.001)
                     key = (r2w, lamb)
 
-                    y_pred = evaluate_formula(formula, X)
-                    r2, rmse, mae = calculate_metrics(y_true, y_pred)
+                    y_pred = evaluate_formula(formula, X, model_type=model_type)
+                    metrics = calculate_metrics(y_true, y_pred, task=task)
+                    
+                    # Sort by R2 for regression, F1 for classification
+                    score = metrics[0] if task == 'regression' else metrics[3]
 
-                    if not np.isnan(r2):
+                    if not np.isnan(score):
+                        mapped_formula = map_variable_names(formula, feature_names, model_type=model_type)
                         # Update per-parameter best
-                        if key not in results or r2 > results[key][0]:
-                            results[key] = (r2, map_variable_names(formula, feature_names), complexity, (r2, rmse, mae))
+                        if key not in results or score > results[key][0]:
+                            results[key] = (score, mapped_formula, complexity, metrics)
 
                         # Update overall best
-                        if r2 > overall_best[0]:
-                            overall_best = (r2, map_variable_names(formula, feature_names), complexity, (r2, rmse, mae))
+                        if score > overall_best[0]:
+                            overall_best = (score, mapped_formula, complexity, metrics)
         except Exception as e:
             continue
 

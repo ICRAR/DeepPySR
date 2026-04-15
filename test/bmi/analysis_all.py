@@ -19,7 +19,7 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from bmi_utils import load_bmi_agg_data
-from analysis_utils import calculate_metrics, calculate_complexity, map_variable_names, evaluate_formula, get_best_formula_from_raw
+from analysis_utils import calculate_metrics, evaluate_formula, get_best_formula_from_raw
 
 def process_results():
     base_dir = os.path.join(current_dir, "results_bmi_all")
@@ -417,8 +417,7 @@ def plot_settings_comparison(df):
     # Target models for comparison
     target_settings = [
         'fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'v2fullsr_nit100_pop30_sz200_vps50_vpr50_aps10.0_grid_r2w1.5_L0.005',
-        'stdsr_nit100_pop30_sz200_vps0_vpr0_aps0_grid_r2w1.5_L0.005',
+        'pysr_nit100_pop30_sz200_aps10.0_grid'
     ]
 
     # Filter only if they exist in df

@@ -304,8 +304,10 @@ class KANWrapper:
             if self.vars is None:
                 return self.predict(X)
 
-            f = sympy.lambdify(self.vars, self.formula, 'numpy')
-            inputs = [X[:, i] for i in range(min(X.shape[1], len(self.vars)))]
+            # Ensure self.vars are converted to sympy symbols for lambdify
+            symbols = [sympy.Symbol(str(v)) for v in self.vars]
+            f = sympy.lambdify(symbols, self.formula, 'numpy')
+            inputs = [X[:, i] for i in range(min(X.shape[1], len(symbols)))]
             y_pred = f(*inputs)
 
             if isinstance(y_pred, torch.Tensor):

@@ -1,14 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-import glob
 import sys
-import re
-import sympy as sp
-
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import seaborn as sns
 
 # Add test/ and test/bmi to path to import load_bmi_agg_data
@@ -19,7 +13,7 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from wine_utils import load_wine_data
-from analysis_utils import calculate_metrics, calculate_complexity, map_variable_names, evaluate_formula, get_best_formula_from_raw
+from analysis_utils import calculate_metrics, get_best_formula_from_raw
 
 def process_results():
     wine_types = ['red', 'white']
@@ -50,7 +44,7 @@ def process_results():
                         if 'y_pred_kansym' in df_pred.columns:
                             # For KANSym, we need formula and complexity
                             # The user wants us to check all formulas and pick the best one
-                            formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold')
+                            formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold',model_type='kan')
                             r2, rmse, mae = metrics
 
                             if not formula:
@@ -69,7 +63,31 @@ def process_results():
                 v_path = os.path.join(deeppysr_dir, variant)
                 if not os.path.isdir(v_path): continue
 
-                res = get_best_formula_from_raw(v_path, X, y)
+                res = get_best_formula_from_raw(v_path, X, y,model_type='deeppysr')
+
+                if isinstance(res, dict):
+                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                        r2, rmse, mae = metrics
+                        model_name = f"{variant}_r2w{r2w}_L{lamb}"
+                        all_data.append([model_name, wine_type, r2, rmse, mae, complexity, formula])
+                else:
+                    formula, complexity, metrics = res
+                    r2, rmse, mae = metrics
+                    if not formula:
+                        pred_file = os.path.join(v_path, "predictions.csv")
+                        if os.path.exists(pred_file):
+                            df_pred = pd.read_csv(pred_file)
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
+                    all_data.append([variant, wine_type, r2, rmse, mae, complexity, formula])
+
+        # PySR
+        pysr_dir = os.path.join(base_dir, "pysr")
+        if os.path.exists(pysr_dir):
+            for variant in os.listdir(pysr_dir):
+                v_path = os.path.join(pysr_dir, variant)
+                if not os.path.isdir(v_path): continue
+
+                res = get_best_formula_from_raw(v_path, X, y,model_type='pysr')
 
                 if isinstance(res, dict):
                     for (r2w, lamb), (formula, complexity, metrics) in res.items():
@@ -116,7 +134,7 @@ def save_results(df):
             continue
 
         # DeepPySR variants
-        deeppysr_df = type_df[type_df['model'].str.contains('fullsr|stdsr|v2fullsr', na=False)]
+        deeppysr_df = type_df[type_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
         if not deeppysr_df.empty:
             best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
             best_deeppysr['display_model'] = 'Best DeepPySR'
@@ -132,6 +150,12 @@ def save_results(df):
                     'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
                 })
 
+        # PySR variants
+        pysr_df = type_df[type_df['model'].str.contains('pysr', na=False)]
+        if not pysr_df.empty:
+            best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
+            best_pysr['display_model'] = 'Best PySR'
+            selected_data.append(best_pysr)
 
         # KAN and KANSym
         for m in ['KAN', 'KANSym']:
@@ -158,7 +182,7 @@ def save_results(df):
     print(f"Best models plot data saved to {plot_csv_path}")
 
     # Print interpretable DeepPySR formulas
-    print("\n--- Interpretable DeepPySR Formulas (Complexity < 30) ---")
+    print("\n--- Interpretable DeepPySR Formulas (Complexity < 25) ---")
     interp_df = pd.DataFrame(interpretable_formulas)
     print(interp_df.to_string(index=False))
     interp_csv_path = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
@@ -241,12 +265,6 @@ if __name__ == "__main__":
     # The r2 is calculated by applying this formula on the entire dataset, not the fold.
 
     df = process_results()
-
-    # plot_results:
-    # longitudinal: for deeppysr, pysr, kansym that provides equations, I handled it specially.
-    # I got the equations from the bmi_aggregated_results.csv. Use the equation to predict the entire dataset (7 ages).
-    # The best equations would be ploted and saved in the results.
-    # For other models, we do it by assessing the metrics on the predictions.csv
 
     save_results(df)
     aggregate_feature_importance()

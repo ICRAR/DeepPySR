@@ -75,7 +75,8 @@ def is_redundant(
             involved = rel["involved"]
             # Check if we have all needed inputs for this relationship
             if all(v in values for v in involved):
-                f_rel = sp.lambdify([sp.Symbol(v) for v in involved], rel["sympy"], modules="numpy")
+                involved_symbols = [sp.Symbol(v) for v in involved]
+                f_rel = sp.lambdify(involved_symbols, rel["sympy"], modules="numpy")
                 args = [values[v] for v in involved]
                 values[rel["target"]] = f_rel(*args)
 
@@ -85,7 +86,8 @@ def is_redundant(
             # Cannot fully expand numerically, might happen if some inputs are missing
             return False
             
-        f_new = sp.lambdify([sp.Symbol(v) for v in involved_new], sym_expr, modules="numpy")
+        involved_new_symbols = [sp.Symbol(v) for v in involved_new]
+        f_new = sp.lambdify(involved_new_symbols, sym_expr, modules="numpy")
         new_val = f_new(*[values[v] for v in involved_new])
 
         # 6. Check if new_val is close to target_val (if target is in values)

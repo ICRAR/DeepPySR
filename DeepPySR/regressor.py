@@ -96,7 +96,7 @@ class DeepPySRRegressor:
             involved = rel['involved']
             
             # Prepare lambdified function for fast evaluation
-            symbols = [sp.Symbol(s) for s in involved]
+            symbols = [sp.Symbol(str(s)) for s in involved]
             
             # Identify and replace custom functions in extra_mappings
             # We map custom functions to SymPy expressions first, before lambdifying.

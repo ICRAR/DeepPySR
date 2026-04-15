@@ -52,7 +52,13 @@ def calculate_metrics(y_true, y_pred, y_prob=None, task='regression'):
         # For classification, ensure y_pred is discrete (integer classes)
         # DeepPySRRegressor might return continuous values that need rounding
         if not np.issubdtype(y_pred.dtype, np.integer):
-            y_pred = np.round(y_pred).astype(int)
+            # Clip to the range of y_true before/after rounding
+            y_min, y_max = np.min(y_true), np.max(y_true)
+            y_pred = np.clip(np.round(y_pred), y_min, y_max).astype(int)
+        else:
+            # Even if it's already integer, ensure it's within y_true's range
+            y_min, y_max = np.min(y_true), np.max(y_true)
+            y_pred = np.clip(y_pred, y_min, y_max)
             
         # Check if classification type
         unique_y_true = np.unique(y_true)
