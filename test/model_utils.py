@@ -1,4 +1,5 @@
 import os
+import inspect
 import numpy as np
 import torch
 import sympy
@@ -9,6 +10,17 @@ from sklearn.neural_network import MLPClassifier, MLPRegressor
 from kan import KAN
 from DeepPySR.regressor import DeepPySRRegressor
 from sklearn.base import BaseEstimator, RegressorMixin, ClassifierMixin
+
+# Optional AI Feynman 2.0 support.
+AIFeynman = None
+for _mod_name in ("aifeynman", "ai_feynman"):
+    try:
+        _mod = __import__(_mod_name, fromlist=["AIFeynman"])
+        AIFeynman = getattr(_mod, "AIFeynman", None)
+        if AIFeynman is not None:
+            break
+    except ImportError:
+        continue
 
 # --- Torch MLP with Dropout ---
 class TorchMLP(torch.nn.Module):
@@ -350,6 +362,60 @@ class KANWrapper:
         return y_prob
 
 
+class AIFeynmanWrapper(BaseEstimator, RegressorMixin):
+    def __init__(self, max_runtime=300, max_complexity=20, transformations=None,
+                 use_transformations=True, random_state=42):
+        self.max_runtime = max_runtime
+        self.max_complexity = max_complexity
+        self.transformations = transformations or ["sin", "cos", "exp", "log", "sqrt"]
+        self.use_transformations = use_transformations
+        self.random_state = random_state
+        self.model = None
+
+    def _filter_kwargs(self, kwargs):
+        if AIFeynman is None:
+            return {}
+        sig = inspect.signature(AIFeynman.__init__)
+        return {k: v for k, v in kwargs.items() if k in sig.parameters and k != "self"}
+
+    def fit(self, X, y):
+        if AIFeynman is None:
+            raise ImportError(
+                "AI Feynman 2.0 is not installed. Install the 'aifeynman' package to use AI Feynman 2.0."
+            )
+        init_kwargs = self._filter_kwargs({
+            "max_runtime": self.max_runtime,
+            "max_complexity": self.max_complexity,
+            "transformations": self.transformations,
+            "use_transformations": self.use_transformations,
+            "random_state": self.random_state,
+        })
+        self.model = AIFeynman(**init_kwargs)
+        if hasattr(self.model, "fit"):
+            self.model.fit(X, y)
+        elif hasattr(self.model, "fit_model"):
+            self.model.fit_model(X, y)
+        else:
+            raise AttributeError("AIFeynman class does not expose a fit method")
+        return self
+
+    def predict(self, X):
+        if self.model is None:
+            raise ValueError("AI Feynman model is not fitted")
+        if hasattr(self.model, "predict"):
+            return np.asarray(self.model.predict(X)).ravel()
+        if hasattr(self.model, "predict_from_features"):
+            return np.asarray(self.model.predict_from_features(X)).ravel()
+        raise AttributeError("AIFeynman class does not expose a predict method")
+
+    def __repr__(self):
+        return (
+            f"AIFeynmanWrapper(max_runtime={self.max_runtime}, "
+            f"max_complexity={self.max_complexity}, "
+            f"transformations={self.transformations})"
+        )
+
+
 # --- Model Factories ---
 def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_state=42):
     if task == 'classification':
@@ -368,6 +434,12 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'ExtraTrees': ExtraTreesRegressor(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBRegressor(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state),
             'MLP': MLPRegressorWrapper(hidden_layer_sizes=(256, 128, 64), dropout=0.1, activation='leaky_relu', random_state=random_state),
+            # 'AI Feynman 2.0': AIFeynmanWrapper(
+            #     max_runtime=300,
+            #     max_complexity=20,
+            #     transformations=['sin', 'cos', 'exp', 'log', 'sqrt'],
+            #     random_state=random_state
+            # ),
             'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
         }
 
