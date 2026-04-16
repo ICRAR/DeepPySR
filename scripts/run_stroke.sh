@@ -7,10 +7,10 @@
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/stroke.%j.log
 
 # Locate the project root from this script's location
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 
 # Use the project root and virtual environment
-cd "$PROJECT_ROOT"
+cd $PROJECT_ROOT
 if [ -e "$PROJECT_ROOT/.venv/bin/activate" ]; then
     source "$PROJECT_ROOT/.venv/bin/activate"
 else
