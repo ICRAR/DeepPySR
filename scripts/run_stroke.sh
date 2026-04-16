@@ -4,7 +4,7 @@
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
-#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/stroke.%j.log
+#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/stroke.log
 
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
