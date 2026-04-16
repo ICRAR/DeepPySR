@@ -4,8 +4,8 @@
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
-#SBATCH --output=scripts/stroke.%j.log
-#SBATCH --error=scripts/stroke.%j.err
+#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/stroke.%j.log
+#SBATCH --error=/scratch/pawsey0411/fchen1/DeepPySR/scripts/stroke.%j.err
 
 # Locate the project root from this script's location
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
