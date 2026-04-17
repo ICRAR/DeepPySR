@@ -10,6 +10,13 @@
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 
+# Force Julia to use the correct Python executable
+export PYTHON_JL_RUNTIME_PYTHON="$PROJECT_ROOT/.venv/bin/python"
+# Help juliacall find its own libraries
+export LD_LIBRARY_PATH="$PROJECT_ROOT/.venv/julia_env/pyjuliapkg/install/lib:$LD_LIBRARY_PATH"
+# Disable PyCall/PythonCall automatic updates during the run
+export JULIA_PYTHONCALL_EXE="@PyCall"
+
 # Use the project root and virtual environment
 cd $PROJECT_ROOT
 if [ -e "$PROJECT_ROOT/.venv/bin/activate" ]; then
