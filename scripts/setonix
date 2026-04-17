@@ -1,0 +1,8 @@
+export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
+export PYTHON_JULIAPKG_OFFLINE=no
+
+# Install the Julia dependencies again (this is usually fast)
+python -m juliapkg update
+# Try the check again
+python -m juliacall.check
+
