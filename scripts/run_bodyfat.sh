@@ -30,6 +30,9 @@ export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 set -e
 
 echo "Starting bodyfat test at $(date)"
+
+# Quick check: can Python actually see the Julia installation?
+python -c "import juliapkg; print(juliapkg.status())"
 python -u test/bodyfat/test_all_models_bodyfat.py
 STATUS=$?
 echo "Finished bodyfat test at $(date) with status $STATUS"
