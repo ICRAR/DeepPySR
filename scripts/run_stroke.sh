@@ -8,7 +8,7 @@
 
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
-#export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
+export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 
 # Use the project root and virtual environment
 cd $PROJECT_ROOT
