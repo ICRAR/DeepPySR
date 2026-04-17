@@ -8,14 +8,7 @@
 
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
-export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
-
-# Force Julia to use the correct Python executable
-export PYTHON_JL_RUNTIME_PYTHON="$PROJECT_ROOT/.venv/bin/python"
-# Help juliacall find its own libraries
-export LD_LIBRARY_PATH="$PROJECT_ROOT/.venv/julia_env/pyjuliapkg/install/lib:$LD_LIBRARY_PATH"
-# Disable PyCall/PythonCall automatic updates during the run
-export JULIA_PYTHONCALL_EXE="@PyCall"
+#export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 
 # Use the project root and virtual environment
 cd $PROJECT_ROOT
@@ -31,8 +24,6 @@ set -e
 
 echo "Starting bodyfat test at $(date)"
 
-# Quick check: can Python actually see the Julia installation?
-python -c "import juliapkg; print(juliapkg.status())"
 python -u test/bodyfat/test_all_models_bodyfat.py
 STATUS=$?
 echo "Finished bodyfat test at $(date) with status $STATUS"
