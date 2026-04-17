@@ -101,6 +101,9 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
         if task == 'classification':
             skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
             splits = skf.split(X, y)
+        elif stratify_by is not None:
+            skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+            splits = skf.split(X, stratify_by)
         else:
             skf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
             splits = skf.split(X, y)

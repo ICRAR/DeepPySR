@@ -154,10 +154,10 @@ def get_deeppysr_configs():
     configs = {}
     # vps_list = [25, 50, 75]
     # vpr_list = [50, 100, 150]
-    # aps_list = [0.1, 1.0, 10.0, 50.0]
-    vps_list = [25, 50, 75]
-    vpr_list = [50, 100, 150]
-    aps_list = [1.0, 10.0, 50.0]
+    # aps_list = [1.0, 10.0, 50.0]
+    vps_list = [25]
+    vpr_list = [100]
+    aps_list = [50.0,100]
     vpm = 0.7  # Fixed tuned value for variable_prune_max
 
     # # 1. stdsr: All parameters set to 0

@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import pandas as pd
 from DeepPySR.regressor import DeepPySRRegressor
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,9 @@ def main():
     task = 'regression'
     print(f'Task: {task}, dataset shape: {X.shape}')
 
+    # Bin the Age feature into 5 bins by percentile for stratified CV
+    age_bins = pd.qcut(X['Age'], q=5, labels=False, duplicates='drop')
+
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
 
@@ -41,6 +45,7 @@ def main():
         'n_splits': 5,
         'random_state': 42,
         'feature_selection': False,
+        'stratify_by': age_bins,
     }
 
     print('Evaluating Baseline Models...')
