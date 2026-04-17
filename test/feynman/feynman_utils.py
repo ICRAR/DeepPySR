@@ -16,14 +16,14 @@ equations = {
         'formula': '0.5 * m * (v**2 + u**2 + w**2)',
         'vars': {'m': (1, 5), 'v': (1, 5), 'u': (1, 5), 'w': (1, 5)}
     },
-    'I.14.3': {
-        'formula': 'm * g * z',
-        'vars': {'m': (1, 5), 'g': (1, 5), 'z': (1, 5)}
+    'I.9.18': {
+        'formula': 'G*m1*m2/((x2-x1)**2+(y2-y1)**2+(z2-z1)**2)',
+        'vars': {'m1': (1, 2), 'm2': (1, 2), 'G': (1, 2), 'x1': (3, 4), 'x2': (1, 2), 'y1': (3, 4), 'y2': (1, 2), 'z1': (3, 4), 'z2': (1, 2)}
     },
-    'I.25.13': {
-        'formula': 'q / C',
-        'vars': {'q': (1, 5), 'C': (1, 5)}
-    }
+    'I.32.17': {
+        'formula': '(1/2*epsilon*c*Ef**2)*(8*np.pi*r**2/3)*(omega**4/(omega**2-omega_0**2)**2)',
+        'vars': {'epsilon': (1, 2), 'c': (1, 2), 'Ef': (1, 2), 'r': (1, 2), 'omega': (1, 2), 'omega_0': (3, 5)}
+    },
 }
 
 def generate_feynman_data(eq_name, n_samples=1000, random_state=42):

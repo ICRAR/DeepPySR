@@ -260,11 +260,64 @@ def aggregate_feature_importance():
             plt.close()
             print(f"Combined feature importance plot saved to {plot_path}")
 
+def plot_best_models():
+    """
+    Create a plot with 2 rows (red and white wine) and 4 columns (r2, rmse, mae, complexity).
+    Each subplot shows metric values for the models, with R2/RMSE/MAE showing all models.
+    """
+    df = pd.read_csv(os.path.join(current_dir, 'wine_best_models_metrics.csv'))
+
+    wine_types = ['red', 'white']
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    models_to_include_for_complexity = ['Best DeepPySR', 'Interpretable DeepPySR', 'Best PySR', 'KANSym']
+    label_map = {
+        'Best DeepPySR': 'DeepPySR',
+        'Interpretable DeepPySR': 'InterpDeepPySR'
+    }
+    
+    fig, axes = plt.subplots(2, 4, figsize=(15, 7))
+
+    for i, wine in enumerate(wine_types):
+        wine_df_all = df[df['wine type'] == wine].copy()
+        wine_df_all = wine_df_all.sort_values('display_model')
+
+        wine_df_complexity = wine_df_all[wine_df_all['display_model'].isin(models_to_include_for_complexity)].copy()
+
+        for j, metric in enumerate(metrics):
+            ax = axes[i, j]
+
+            if metric == 'complexity':
+                plot_df = wine_df_complexity.copy()
+            else:
+                plot_df = wine_df_all.copy()
+
+            if plot_df.empty:
+                ax.text(0.5, 0.5, 'No data', ha='center', va='center', fontsize=12)
+                ax.set_title(f'{wine.capitalize()} Wine - {metric.upper()}')
+                ax.set_xlabel('Model', fontsize=8)
+                ax.set_ylabel(metric.upper())
+                ax.set_xticks([])
+                continue
+
+            plot_df['plot_label'] = plot_df['display_model'].replace(label_map)
+            ax.bar(plot_df['plot_label'], plot_df[metric])
+            ax.set_title(f'{wine.capitalize()} Wine - {metric.upper()}')
+            ax.set_xlabel('Model', fontsize=8)
+            ax.set_ylabel(metric.upper())
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha='center')
+
+    plt.tight_layout()
+    plot_path = os.path.join(current_dir, 'best_models_comparison.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Plot saved to {plot_path}")
+
 if __name__ == "__main__":
     # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.\
     # The r2 is calculated by applying this formula on the entire dataset, not the fold.
 
-    df = process_results()
-
-    save_results(df)
-    aggregate_feature_importance()
+    # df = process_results()
+    #
+    # save_results(df)
+    # aggregate_feature_importance()
+    plot_best_models()
