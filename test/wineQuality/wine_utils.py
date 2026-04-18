@@ -8,9 +8,9 @@ def load_wine_data(wine_type='red'):
     wine_type: 'red' or 'white'
     """
     if wine_type == 'red':
-        file_path = '/home/00101787/Projects/DeepPySR/test_data/Wine/wine+quality/winequality-red.csv'
+        file_path = os.path.join(os.path.dirname(__file__), '../../test_data/Wine/wine+quality/winequality-red.csv')
     elif wine_type == 'white':
-        file_path = '/home/00101787/Projects/DeepPySR/test_data/Wine/wine+quality/winequality-white.csv'
+        file_path = os.path.join(os.path.dirname(__file__), '../../test_data/Wine/wine+quality/winequality-white.csv')
     else:
         raise ValueError("wine_type must be 'red' or 'white'")
     
