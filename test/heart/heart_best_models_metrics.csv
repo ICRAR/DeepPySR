@@ -1,0 +1,10 @@
+model,accuracy,precision,recall,f1,auc,complexity,formula,display_model
+fullsr_vps25_vpr50_aps1.0_nit100_pop100_sz200_grid_r2w1.0_L0.001,0.9158249158249159,0.9516129032258065,0.8613138686131386,0.9042145593869731,0.5,43.0,"sin(2.12*sin((thal + oldpeak)*((sex + exang + log(slope + sin(sin(0.99*chol))))*(ca + cp + 1.93*sin((chol - 1.34)*log(trestbps)))/thalach**1.0 + cond(ca, 0.04))))",Best DeepPySR
+fullsr_vps50_vpr100_aps10.0_nit100_pop100_sz200_grid_r2w1.0_L0.01,0.8821548821548821,0.8923076923076924,0.8467153284671532,0.8689138576779026,0.5,33.0,"sin(thal*((slope + sin(chol + 0.03*thalach))*(ca + exang + cond(-1.0*fbs + sin(thal), sex))/thalach**1.0)**0.5)",Interpretable DeepPySR
+pysr_aps0.1_nit100_pop100_sz200_r2w1.0_L0.001,0.8888888888888888,0.8823529411764706,0.8759124087591241,0.8791208791208791,0.5,49.0,"sin(2.09*sin(2.87*thal*((ca + (cond(log(slope), exang) + cond(sin(thal), sex))**0.5)*(slope - 1.0*cond(sex, fbs) + sin(slope) + sin(0.99*chol)) - 1.0*sin(exp(cp)))/thalach**1.0))",Best PySR
+KAN,0.5387205387205387,0.0,0.0,0.0,0.5,,,KAN
+KANSym,0.5387205387205387,0.0,0.0,0.0,0.5,1.0,0.463094390928745,KANSym
+ExtraTrees,0.8282828282828283,0.8467741935483871,0.7664233576642335,0.8045977011494253,0.5,,,ExtraTrees
+MLP,0.7912457912457912,0.7737226277372263,0.7737226277372263,0.7737226277372263,0.5,,,MLP
+RandomForest,0.8148148148148148,0.8306451612903226,0.7518248175182481,0.789272030651341,0.5,,,RandomForest
+XGBoost,0.7946127946127947,0.7835820895522388,0.7664233576642335,0.7749077490774908,0.5,,,XGBoost
