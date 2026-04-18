@@ -316,8 +316,8 @@ if __name__ == "__main__":
     # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.\
     # The r2 is calculated by applying this formula on the entire dataset, not the fold.
 
-    # df = process_results()
-    #
-    # save_results(df)
-    # aggregate_feature_importance()
+    df = process_results()
+
+    save_results(df)
+    aggregate_feature_importance()
     plot_best_models()

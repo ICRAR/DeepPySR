@@ -1,7 +1,7 @@
 model,wine type,r2,rmse,mae,complexity,formula,display_model
-stdsr_vps0_vpr0_aps0_nit100_pop30_sz200_grid_r2w1.0_L0.001,red,0.28636915281512476,0.6819944473389392,0.5317037969816116,11.0,alcohol/pH**1.0 + log(sulphates) + 2.93,Best DeepPySR
-stdsr_vps0_vpr0_aps0_nit100_pop30_sz200_grid_r2w1.0_L0.001,red,0.28636915281512476,0.6819944473389392,0.5317037969816116,11.0,alcohol/pH**1.0 + log(sulphates) + 2.93,Interpretable DeepPySR
-pysr_aps0.1_nit100_pop30_sz200_r2w1.0_L0.001,red,0.0,5.693549887280285,5.6360225140712945,12.0,-1.0*volatile acidity + (sulphates + 6.61)*log(log(alcohol)),Best PySR
+fullsr_vps50_vpr50_aps50.0_nit100_pop100_sz200_grid_r2w1.0_L0.001,red,0.41125046636129536,0.6194543678670046,0.4819816262124833,50.0,-1.0*volatile acidity + exp((alcohol - 1.0*chlorides)**0.25) + sin(sin(sin(sin(total sulfur dioxide**0.25)*sin(log(residual sugar)*sin(sin(1.18*pH*(1.87 - 1.0*sulphates) + sin(sin(citric acid)) + 4.06))/chlorides**0.25)))),Best DeepPySR
+fullsr_vps75_vpr50_aps50.0_nit100_pop30_sz200_grid_r2w1.0_L0.005,red,0.38003737986849506,0.6356627816475053,0.49286674350278886,24.0,"-1.0*volatile acidity + 0.27*alcohol + cond(-1.0*chlorides*total sulfur dioxide + 6.64, log(sulphates) + 0.7) + 3.16",Interpretable DeepPySR
+pysr_aps50.0_nit100_pop100_sz200_r2w1.0_L0.001,red,0.40266432939343844,0.623954981657124,0.47770579059777174,55.0,"3.03*log(alcohol/pH**0.5)/density**1.0 + cond((0.83/volatile acidity**1.0 + pH)/(chlorides**1.0*sulphates**1.0) - 1.0*total sulfur dioxide, -1.0*volatile acidity + density + pH*(0.33 - 0.22/sulphates**1.0))",Best PySR
 KAN,red,0.3642727905987011,0.6436939561503868,0.5021307792995622,,,KAN
 KANSym,red,0.0,0.8073169068351721,0.6831626789172643,10.0,0.977357983589172*sin(0.337730118157846*x_11 - 0.0713188571281367) + 5.70588710904121,KANSym
 ElasticNet,red,0.32431600508734404,0.6636144703661327,0.5252268368462236,,,ElasticNet
@@ -9,9 +9,9 @@ ExtraTrees,red,0.3652192051841229,0.643214640305581,0.5113793989401905,,,ExtraTr
 MLP,red,0.40557350326373276,0.6224337188830448,0.45535051601000626,,,MLP
 RandomForest,red,0.3999967921384858,0.6253466355998478,0.48900519023496725,,,RandomForest
 XGBoost,red,0.3942849203914308,0.6283161523225023,0.4713632517198249,,,XGBoost
-srpsm_vps0_vpr0_aps1.0_nit100_pop30_sz200_grid_r2w1.0_L0.001,white,0.0,5.944242078113713,5.87790935075541,28.0,density*(2.45*fixed acidity/(residual sugar + free sulfur dioxide)**1.0 - 1.0*alcohol - 7.7)/(-1.0*volatile acidity - 2.71)**1.0,Best DeepPySR
-fullsr_vps25_vpr150_aps10.0_nit100_pop30_sz200_grid_r2w1.0_L0.01,white,0.0,5.944242078113713,5.87790935075541,23.0,0.36*alcohol + 2.98*exp(-1.0*volatile acidity - 5.54/(residual sugar**1.0*free sulfur dioxide**1.0)),Interpretable DeepPySR
-pysr_aps0.1_nit100_pop30_sz200_r2w1.0_L0.001,white,0.0,5.944242078113713,5.87790935075541,11.0,2.65*log(-5.21*volatile acidity + alcohol) + 0.1,Best PySR
+fullsr_vps75_vpr100_aps50.0_nit100_pop100_sz200_grid_r2w1.5_L0.001,white,0.33672892498049856,0.721203316568172,0.5644799751089051,58.0,"2.53*alcohol**0.5 - 2.53*sin(volatile acidity**0.5 + chlorides + (fixed acidity - 1.0*(residual sugar**0.5*(exp(exp(cond(cond(-1.0*volatile acidity + sin(fixed acidity), sin(residual sugar)), sin(volatile acidity*alcohol)) + sin(alcohol))) + 5.03))**0.5)/free sulfur dioxide**1.0) - 0.76",Best DeepPySR
+fullsr_vps75_vpr150_aps50.0_nit100_pop100_sz200_grid_r2w1.0_L0.01,white,0.30963846539147544,0.7357842357776543,0.5712765085997652,24.0,-1.0*volatile acidity - 8.18/(residual sugar + free sulfur dioxide)**1.0 + 1.31*sin(volatile acidity*(alcohol - 11.88)) + 6.86,Interpretable DeepPySR
+pysr_aps50.0_nit100_pop100_sz200_r2w1.0_L0.001,white,0.33984869181408384,0.719505188701745,0.5644747066285256,64.0,-1.32*volatile acidity + 0.42*alcohol - 1.32*(-1.0*fixed acidity*residual sugar/(volatile acidity**1.0*alcohol**1.0*(volatile acidity*alcohol*(alcohol - 1.0*sin(residual sugar) - 6.94) - 1.0*sin(1.55/volatile acidity**1.0))**1.0) + fixed acidity)/(residual sugar + free sulfur dioxide)**1.0 + 1.99,Best PySR
 KAN,white,0.32580564196692974,0.7271177440638276,0.5743061191915068,,,KAN
 KANSym,white,0.0,0.8890765590893592,0.6969324725926608,15.0,5.62109119491652 - 1.04775726795197*sin(0.959761197374348*sin(0.628959834575653*x_11 - 3.99063992500305) - 0.890858487221514),KANSym
 ElasticNet,white,0.23757305741939394,0.7732346433527195,0.6033467464116833,,,ElasticNet
