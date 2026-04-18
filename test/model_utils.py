@@ -481,6 +481,6 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "denoise": False, # Denoising can be very slow or get stuck, disabled for stability
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,
-        "niterations": 100,#100,
+        "niterations": 500,#100,
         "timeout_in_seconds": 3000, # 10 minute timeout per fit to prevent hanging
     }
