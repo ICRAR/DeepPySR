@@ -30,6 +30,7 @@ def main():
     deeppysr_configs = get_deeppysr_configs()
     pysr_configs = get_pysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
+    pysr_base_kwargs['niterations'] = 100
 
     nit = pysr_base_kwargs.get('niterations', 100)
     pop = pysr_base_kwargs.get('populations', 30)
