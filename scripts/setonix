@@ -6,3 +6,6 @@ python -m juliapkg update
 # Try the check again
 python -m juliacall.check
 
+------------------github---------------
+eval "$(ssh-agent -s)"
+ssh-add /scratch/pawsey0411/fchen1/.ssh/setonix
