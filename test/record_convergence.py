@@ -46,7 +46,7 @@ def train_iteratively(model_provider, X, y, n_iterations, output_dir, pysr_kwarg
             if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
                 del sys.modules[mod]
 
-    if model_provider == "pypysr":
+    if model_provider == "deeppysr":
         from pypysr import PySRRegressor
     else:
         if "juliacall" in sys.modules:
@@ -60,8 +60,6 @@ def train_iteratively(model_provider, X, y, n_iterations, output_dir, pysr_kwarg
         from pysr import PySRRegressor
 
     model_output_dir = os.path.join(output_dir, model_provider)
-    if os.path.exists(model_output_dir):
-        shutil.rmtree(model_output_dir)
     os.makedirs(model_output_dir, exist_ok=True)
 
     model = PySRRegressor(
@@ -94,13 +92,13 @@ def run_cv_convergence(test_name, X, y, task='regression', n_iterations=500):
     pysr_kwargs.update({"verbosity":0, "adaptive_parsimony_scaling":10.0})
     pysr_kwargs.pop("niterations", None)
     deeppysr_kwargs = pysr_kwargs.copy()
-    deeppysr_kwargs.update({"variable_prune_start": 25, "variable_prune_ramp": 50, "variable_prune_max": 0.7})
+    deeppysr_kwargs.update({"verbosity": 1, "variable_prune_start": 25, "variable_prune_ramp": 50, "variable_prune_max": 0.7})
 
     fold_dir = os.path.join(current_dir, test_name.replace(".", "_"))
     os.makedirs(fold_dir, exist_ok=True)
 
     # DeepPySR
-    dp_hist = train_iteratively("pypysr", X_values, y_values, n_iterations, fold_dir, deeppysr_kwargs)
+    dp_hist = train_iteratively("deeppysr", X_values, y_values, n_iterations, fold_dir, deeppysr_kwargs)
     dp_hist['Model'] = 'DeepPySR'
 
     # PySR

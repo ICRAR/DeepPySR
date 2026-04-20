@@ -1,3 +1,9 @@
+eval "$(ssh-agent -s)"
+ssh-add /scratch/pawsey0411/fchen1/.ssh/setonix
+
+----------------pawsey----------------
+source /scratch/pawsey0411/fchen1/DeepPySR/.venv/bin/activate
+
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 export PYTHON_JULIAPKG_OFFLINE=no
 rm -rf /scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env
@@ -5,11 +11,7 @@ rm -rf /scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env
 python -m juliapkg update
 # Try the check again
 python -m juliacall.check
-
-------------------github---------------
-eval "$(ssh-agent -s)"
-ssh-add /scratch/pawsey0411/fchen1/.ssh/setonix
----------------------------------------
+----------------------------------------
 
 stroke, diabetes are 100 nit, others are 500
 
