@@ -20,11 +20,6 @@ else
 fi
 
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
-export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
-export PYTHON_JULIAPKG_OFFLINE=no
-rm -rf /scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env
-# Install the Julia dependencies again (this is usually fast)
-python -m juliapkg update
 set -e
 
 echo "Starting heart test at $(date)"
