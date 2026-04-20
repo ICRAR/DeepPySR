@@ -1,0 +1,46 @@
+equation,model,r2,rmse,mae,complexity,formula,model_path
+I.6.2a,MLP,0.9953666664557891,0.004866673322290504,0.0035468204612756128,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/MLP
+I.6.2a,ExtraTrees,0.9915469139815523,0.006573445348042399,0.004986215268803649,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/ExtraTrees
+I.6.2a,RandomForest,0.9998253079668599,0.0009449785748726647,0.0006625738077315368,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/RandomForest
+I.6.2a,ElasticNet,0.40393112105442797,0.05519930837093802,0.04731295069217526,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/ElasticNet
+I.6.2a,XGBoost,0.9990552540174416,0.002197571121035221,0.0015474065435051438,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/XGBoost
+I.6.2a,KAN,0.0,0.07199355132836525,0.060558550138746475,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/KAN
+I.6.2a,KANSym,0.0,0.07192717150303016,0.06051583364936614,1.0,0.0736408597919095,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/baselines/KAN
+I.6.2a,DeepPySR,0.9999838366417393,0.0002874426525565482,0.00021607965572956303,10.0,0.4/exp(theta**2.0)**0.5,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/deeppysr/fullsr_vps50_vpr100_aps10.0_nit100_pop100_sz200_grid
+I.6.2a,PySR,0.9999838366417393,0.0002874426525565482,0.00021607965572956303,10.0,0.4/exp(theta**2.0)**0.5,/home/00101787/Projects/DeepPySR/test/feynman/results_I_6_2a_all/pysr/pysr_aps0.1_nit100_pop100_sz200
+I.8.14,MLP,0.9803188144745999,0.14096721598665043,0.10940763212108248,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/MLP
+I.8.14,ExtraTrees,0.6061689782205185,0.6305905472659172,0.5213820268499333,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/ExtraTrees
+I.8.14,RandomForest,0.6368928488451182,0.605494072869717,0.4988802751363547,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/RandomForest
+I.8.14,ElasticNet,0.0,1.0062824956628742,0.8380483079220099,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/ElasticNet
+I.8.14,XGBoost,0.9352718505155029,0.25564605230563037,0.19802644991610213,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/XGBoost
+I.8.14,KAN,0.1316847127693357,0.936334916332796,0.7619905446520256,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/KAN
+I.8.14,KANSym,0.0,1.0053101629958954,0.8388154188675043,1.0,2.11540666222572,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/baselines/KAN
+I.8.14,DeepPySR,1.0,0.0,0.0,20.0,((x1 - 1.0*x2)**2.0 + (y1 - 1.0*y2)**2.0)**0.5,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/deeppysr/fullsr_vps50_vpr150_aps50.0_nit100_pop100_sz200_grid
+I.8.14,PySR,1.0,0.0,0.0,20.0,((x1 - 1.0*x2)**2.0 + (y1 - 1.0*y2)**2.0)**0.5,/home/00101787/Projects/DeepPySR/test/feynman/results_I_8_14_all/pysr/pysr_aps10.0_nit100_pop100_sz200
+I.13.4,MLP,0.9945702632126764,1.9629927439831383,1.28169828537106,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/MLP
+I.13.4,ExtraTrees,0.8791517147899841,9.260822320503003,6.825977973465834,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/ExtraTrees
+I.13.4,RandomForest,0.9031992286912218,8.288362069571749,6.024091993262272,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/RandomForest
+I.13.4,ElasticNet,0.9102887288859689,7.979079841361188,5.883326170518114,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/ElasticNet
+I.13.4,XGBoost,0.9813224777768725,3.640733891082592,2.709578590946525,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/XGBoost
+I.13.4,KAN,0.9998496749664115,0.3266216440230282,0.2296326515574569,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/KAN
+I.13.4,KANSym,0.0,64.1744086531816,54.9785457408279,37.0,54.965217590332*sin(0.388151137979875*v + 4.50977856027976*sin(0.153600037097931*w - 7.48479986190796) + 7.28762623944363*sin(0.114960059523582*x_4 + 5.0064001083374) + 6.6433940738608*cos(0.124960049986839*u + 3.44687986373901) + 10.6056643906378) + 67.5568487644196,/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/baselines/KAN
+I.13.4,DeepPySR,1.0,2.2469334198890885e-16,7.105427357601002e-18,18.0,0.5*m*(v**2.0 + u**2.0 + w**2.0),/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/deeppysr/srpsm_vps0_vpr0_aps50.0_nit100_pop100_sz200_grid
+I.13.4,PySR,0.9996723387448,0.48221626065686396,0.3617319926777057,20.0,3.01*m*(exp(0.34*v) + exp(0.34*u) + exp(0.34*w) - 3.85),/home/00101787/Projects/DeepPySR/test/feynman/results_I_13_4_all/pysr/pysr_aps1.0_nit100_pop100_sz200
+I.9.18,MLP,0.9889028133272444,0.013581991633039968,0.008717346064053244,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/MLP
+I.9.18,ExtraTrees,0.6801504503468012,0.07291718338480857,0.053811631865124776,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/ExtraTrees
+I.9.18,RandomForest,0.7082621814694685,0.06963913665787942,0.05121684238402531,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/RandomForest
+I.9.18,ElasticNet,0.17712232612382295,0.11695657787296117,0.09041235215687055,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/ElasticNet
+I.9.18,XGBoost,0.9185581420492209,0.036794325766325776,0.02606651238105614,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/XGBoost
+I.9.18,KAN,0.0,0.1309491365265879,0.09831970073403047,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/KAN
+I.9.18,KANSym,0.0,0.3153382216411704,0.28777598434700274,1.0,0.0,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/baselines/KAN
+I.9.18,DeepPySR,0.9959706680402423,0.008184149179874966,0.005466428570878682,39.0,m1*m2*G/(-1.0*z2 + (1.52*m2 - 1.0*z2)*(-1.0*G + z1 + 0.56) + (y1 - 1.0*y2)**2.0)**1.0,/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/deeppysr/fullsr_vps50_vpr150_aps50.0_nit100_pop100_sz200_grid
+I.9.18,PySR,0.9964479022416228,0.007684214290662133,0.005354591713758852,51.0,0.75*m1*m2*G/((m2 - 0.51)**1.0*(-1.0*G - 1.0*sin(m2 - 1.0*z1 + z2)/y1**1.0 + y1/y2**0.5 + z1 - 1.0*z2)**1.0),/home/00101787/Projects/DeepPySR/test/feynman/results_I_9_18_all/pysr/pysr_aps10.0_nit100_pop100_sz200
+I.32.17,MLP,0.9475163206327194,1.101989466854892,0.38509200562585283,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/MLP
+I.32.17,ExtraTrees,0.6784915237719291,2.7274796575485416,1.109301588587777,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/ExtraTrees
+I.32.17,RandomForest,0.6652430028195124,2.7831085041209755,1.1756801494857068,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/RandomForest
+I.32.17,ElasticNet,0.4787920816832244,3.472728322985866,1.903884562284899,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/ElasticNet
+I.32.17,XGBoost,0.801763084598318,2.1416947510566753,0.9109004020555134,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/XGBoost
+I.32.17,KAN,0.9834167764396023,0.6194407675267799,0.17243384996376176,,,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/KAN
+I.32.17,KANSym,0.0,4.810876140359327,2.655769144466095,1.0,2.63364318013191,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/baselines/KAN
+I.32.17,DeepPySR,0.999766255022258,0.07354217175869192,0.04391437092540329,37.0,epsilon*c*Ef**2.0*r**2.0*omega*(omega**2.0/(-1.0*omega + omega_0)**2.0 - 0.06)/omega_0**1.0,/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/deeppysr/fullsr_vps50_vpr100_aps50.0_nit100_pop100_sz200_grid
+I.32.17,PySR,0.9995437067056133,0.10275130582269827,0.0699555191856497,36.0,epsilon*c*Ef**2.0*r**2.0*omega*(omega - 0.69)*(sin(0.34/(-1.0*omega + omega_0 - 0.81)**1.0) - 0.1),/home/00101787/Projects/DeepPySR/test/feynman/results_I_32_17_all/pysr/pysr_aps50.0_nit100_pop100_sz200
