@@ -28,15 +28,7 @@ def main():
     # os.makedirs(out_root_nocv_noftsl, exist_ok=True)
     
     file_path = '/home/00101787/Projects/DeepPySR/test_data/Health/diabetes+130-us+hospitals+for+years+1999-2008/diabetic_data.csv'
-    df = load_and_clean_data(file_path)
-    
-    # Extract encounter_id as ids for tracking
-    ids = df['encounter_id'] if 'encounter_id' in df.columns else None
-    
-    # Drop IDs and target from features
-    cols_to_drop = ['encounter_id', 'patient_nbr', 'readmitted']
-    X = df.drop(columns=[col for col in cols_to_drop if col in df.columns])
-    y = df['readmitted']
+    ids, X, y = load_and_clean_data(file_path)
     
     # Extra data to save: target as well
     extra_data = {'readmitted': y}

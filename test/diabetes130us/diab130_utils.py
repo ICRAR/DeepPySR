@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 
 def analyze_missingness(df, label="Missingness Analysis"):
     # Calculate missing values
@@ -21,8 +22,9 @@ def analyze_missingness(df, label="Missingness Analysis"):
 
     print("\nTotal rows:", len(df))
 
-def load_and_clean_data(file_path, threshold=10.0):
+def load_and_clean_data(threshold=10.0):
     # Load the data
+    file_path = os.path.join(os.path.dirname(__file__), '../../test_data/diabetes130us/diabetes130us.csv')
     df = pd.read_csv(file_path, na_values=['?', 'None','Unknown/Invalid'], low_memory=False)
 
     # Calculate missing percentage
@@ -69,7 +71,7 @@ def load_and_clean_data(file_path, threshold=10.0):
         print("No rows with NaN values found.")
 
     print("\nSample of processed data (first 10 rows, selected columns):")
-    return df_cleaned
+    return df_cleaned['encounter_id'], df_cleaned.drop(columns = ['encounter_id', 'patient_nbr', 'readmitted']), df_cleaned['readmitted']
 
 
 def preprocess_diabetes_data(df):
