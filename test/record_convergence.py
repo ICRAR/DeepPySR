@@ -82,14 +82,14 @@ def train_iteratively(model_provider, X, y, n_iterations, output_dir, pysr_kwarg
             break
     return pd.DataFrame(history)
 
-def run_cv_convergence(test_name, X, y, task='regression', n_iterations=500):
+def run_convergence(test_name, X, y, task='regression', n_iterations=500):
     print(f"\n{'='*60}\nDataset: {test_name} ({task})\n{'='*60}")
     
     X_values = X.values if hasattr(X, 'values') else X
     y_values = y.values if hasattr(y, 'values') else y
 
     pysr_kwargs = get_pysr_base_kwargs()
-    pysr_kwargs.update({"adaptive_parsimony_scaling":10.0})
+    pysr_kwargs.update({"adaptive_parsimony_scaling":10.0, "verbosity": 0,"save_to_file": False,})
     pysr_kwargs.pop("niterations", None)
     deeppysr_kwargs = pysr_kwargs.copy()
     deeppysr_kwargs.update({"variable_prune_start": 25, "variable_prune_ramp": 50, "variable_prune_max": 0.7})
@@ -131,7 +131,7 @@ def main():
     test_cases.append({'name': 'stroke/results_stroke_all/convergence', 'loader': load_stroke_data, 'task': 'classification','nit':100})
 
     # 6. Diabetes BRFSS (Classification)
-    test_cases.append({'name': 'diabetes/results_diabetes_all/convergence', 'loader': lambda: (load_diabetes_brfss_data()[0], load_diabetes_brfss_data()[1]), 'task': 'classification'})
+    test_cases.append({'name': 'diabetes/results_diabetes_all/convergence', 'loader': lambda: (load_diabetes_brfss_data()[0], load_diabetes_brfss_data()[1]), 'task': 'classification', 'nit':100})
 
     # 7. Diabetes 130US (Classification)
     test_cases.append({'name': 'diabetes130us/results_diabetes130us_all/convergence', 'loader': lambda: (load_diab130_data()[1], load_diab130_data()[2]), 'task': 'classification','nit':100})
@@ -145,7 +145,7 @@ def main():
         try:
             X, y = tc['loader']()
             n_iterations = tc.get('nit',500)
-            run_cv_convergence(tc['name'], X, y, task=tc['task'], n_iterations=n_iterations)
+            run_convergence(tc['name'], X, y, task=tc['task'], n_iterations=n_iterations)
         except Exception as e:
             print(f"Failed {tc['name']}: {e}")
 

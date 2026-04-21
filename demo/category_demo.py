@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import time, torch
 import kan as KAN
-from pysr import TemplateExpressionSpec
 from DeepPySR.regressor import DeepPySRRegressor
 from sklearn.metrics import r2_score
 import sympy
@@ -32,6 +31,7 @@ def run_deeppysr():
         "maxsize": 10,
         "model_selection": "best",
         "early_stop_condition": "f(loss, complexity) = (loss < 0.0001) && (complexity < 20)",
+        "save_to_file": False,
         "verbosity": 0,
         "denoise": True
     }

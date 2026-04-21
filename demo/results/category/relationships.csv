@@ -1,2 +1,2 @@
-layer,target,formula,involved,score,loss,complexity
-1,y,"Piecewise((x0**2 - 1.0, sin(2*c) > 0), (0.0, True)) - 1.0*sin((c - 1.0)*(1.07*c + x0))","c, x0",12.680554503537543,2.4868659e-14,21
+layer,target,formula,involved,score,r2,loss,complexity,pareto_r2_weight,pareto_lambda
+1,y,(-1.0*c + x0**2.0)*sin(1.48*c),"c, x0",0.9279572984944638,0.9363466094524525,0.25026916053603143,10,1.0,0.001
