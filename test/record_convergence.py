@@ -89,10 +89,10 @@ def run_cv_convergence(test_name, X, y, task='regression', n_iterations=500):
     y_values = y.values if hasattr(y, 'values') else y
 
     pysr_kwargs = get_pysr_base_kwargs()
-    pysr_kwargs.update({"verbosity":0, "adaptive_parsimony_scaling":10.0})
+    pysr_kwargs.update({"adaptive_parsimony_scaling":10.0})
     pysr_kwargs.pop("niterations", None)
     deeppysr_kwargs = pysr_kwargs.copy()
-    deeppysr_kwargs.update({"verbosity": 1, "variable_prune_start": 25, "variable_prune_ramp": 50, "variable_prune_max": 0.7})
+    deeppysr_kwargs.update({"variable_prune_start": 25, "variable_prune_ramp": 50, "variable_prune_max": 0.7})
 
     fold_dir = os.path.join(current_dir, test_name.replace(".", "_"))
     os.makedirs(fold_dir, exist_ok=True)
@@ -115,31 +115,31 @@ def main():
 
     # 1. Feynman (Regression)
     for eq in feynman_equations.keys():
-        test_cases.append({'name': f"feynman/results_{eq}_all", 'loader': lambda e=eq: load_feynman_data(e, n_samples=500), 'task': 'regression'})
+        test_cases.append({'name': f"feynman/results_{eq}_all/convergence", 'loader': lambda e=eq: load_feynman_data(e, n_samples=500), 'task': 'regression'})
 
     # 2. Heart (Classification)
-    test_cases.append({'name': 'heart/results_heart_all', 'loader': load_heart_cleveland_data, 'task': 'classification'})
+    test_cases.append({'name': 'heart/results_heart_all/convergence', 'loader': load_heart_cleveland_data, 'task': 'classification'})
 
     # 3. Wine (Regression)
-    test_cases.append({'name': 'wineQuality/results_red_all', 'loader': lambda: (load_wine_data('red').drop(columns=['quality']), load_wine_data('red')['quality']), 'task': 'regression'})
-    test_cases.append({'name': 'wineQuality/results_white_all', 'loader': lambda: (load_wine_data('white').drop(columns=['quality']), load_wine_data('white')['quality']), 'task': 'regression'})
+    test_cases.append({'name': 'wineQuality/results_red_all/convergence', 'loader': lambda: (load_wine_data('red').drop(columns=['quality']), load_wine_data('red')['quality']), 'task': 'regression'})
+    test_cases.append({'name': 'wineQuality/results_white_all/convergence', 'loader': lambda: (load_wine_data('white').drop(columns=['quality']), load_wine_data('white')['quality']), 'task': 'regression'})
 
     # 4. Bodyfat (Regression)
-    test_cases.append({'name': 'bodyfat/results_bodyfat_all', 'loader': load_bodyfat_data, 'task': 'regression'})
+    test_cases.append({'name': 'bodyfat/results_bodyfat_all/convergence', 'loader': load_bodyfat_data, 'task': 'regression'})
 
     # 5. Stroke (Classification)
-    test_cases.append({'name': 'stroke/results_stroke_all', 'loader': load_stroke_data, 'task': 'classification','nit':100})
+    test_cases.append({'name': 'stroke/results_stroke_all/convergence', 'loader': load_stroke_data, 'task': 'classification','nit':100})
 
     # 6. Diabetes BRFSS (Classification)
-    test_cases.append({'name': 'diabetes/results_diabetes_all', 'loader': lambda: (load_diabetes_brfss_data()[0], load_diabetes_brfss_data()[1]), 'task': 'classification'})
+    test_cases.append({'name': 'diabetes/results_diabetes_all/convergence', 'loader': lambda: (load_diabetes_brfss_data()[0], load_diabetes_brfss_data()[1]), 'task': 'classification'})
 
     # 7. Diabetes 130US (Classification)
-    test_cases.append({'name': 'diabetes130us/results_diabetes130us', 'loader': lambda: (load_diab130_data()[1], load_diab130_data()[2]), 'task': 'classification','nit':100})
+    test_cases.append({'name': 'diabetes130us/results_diabetes130us_all/convergence', 'loader': lambda: (load_diab130_data()[1], load_diab130_data()[2]), 'task': 'classification','nit':100})
 
     # 8. BMI (Regression)
-    test_cases.append({'name': 'bmi/results_bmi_all/longitudinal', 'loader': lambda: (load_bmi_agg_data()[1], load_bmi_agg_data()[2]), 'task': 'regression'})
+    test_cases.append({'name': 'bmi/results_bmi_all/longitudinal/convergence', 'loader': lambda: (load_bmi_agg_data()[1], load_bmi_agg_data()[2]), 'task': 'regression'})
     for age in [8, 10, 13, 16, 20, 23, 26]:
-        test_cases.append({'name': f"bmi/results_bmi_all/age_specific/age_{age}", 'loader': lambda a=age: (load_bmi_agg_data(age)[1], load_bmi_agg_data(age)[2]), 'task': 'regression'})
+        test_cases.append({'name': f"bmi/results_bmi_all/age_specific/age_{age}/convergence", 'loader': lambda a=age: (load_bmi_agg_data(age)[1], load_bmi_agg_data(age)[2]), 'task': 'regression'})
 
     for tc in test_cases:
         try:
