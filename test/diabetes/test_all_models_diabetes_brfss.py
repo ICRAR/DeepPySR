@@ -72,7 +72,7 @@ def main():
     print(f"\nEvaluating DeepPySR...")
     for cfg_name, cfg in deeppysr_configs.items():
         print(f"  Config: {cfg_name}...")
-        grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid_warm")
+        grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid")
 
         def deeppysr_factory(co=cfg, gout=grid_out):
             kwargs = pysr_base_kwargs.copy()

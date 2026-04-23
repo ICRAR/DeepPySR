@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-import pandas as pd
 from DeepPySR.regressor import DeepPySRRegressor
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,23 +9,20 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 from sklearn.base import clone
 from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, aggregate_results
-from bodyfat_utils import load_bodyfat_data
+from stroke_utils import load_stroke_data
 
 
 def main():
-    out_root = os.path.join(current_dir, 'results_bodyfat_all')
+    out_root = os.path.join(current_dir, 'results_stroke_all')
     os.makedirs(out_root, exist_ok=True)
 
     print('\n' + '='*50)
-    print('Processing BodyFat dataset')
+    print('Processing Stroke dataset')
     print('='*50)
 
-    X, y = load_bodyfat_data()
-    task = 'regression'
-    print(f'Task: {task}, dataset shape: {X.shape}')
-
-    # Bin the Age feature into 5 bins by percentile for stratified CV
-    age_bins = pd.qcut(X['Age'], q=5, labels=False, duplicates='drop')
+    X, y = load_stroke_data()
+    task = 'classification'
+    print(f'Task: {task}, dataset shape: {X.shape}, positive rate: {np.mean(y):.4f}')
 
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
@@ -34,6 +30,7 @@ def main():
     deeppysr_configs = get_deeppysr_configs()
     pysr_configs = get_pysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
+    pysr_base_kwargs['niterations'] = 100
 
     nit = pysr_base_kwargs.get('niterations', 100)
     pop = pysr_base_kwargs.get('populations', 30)
@@ -44,8 +41,9 @@ def main():
         'task': task,
         'n_splits': 5,
         'random_state': 42,
+        'stratify_by': y,
         'feature_selection': False,
-        'stratify_by': age_bins,
+        'use_smote': True
     }
 
     print('Evaluating Baseline Models...')
@@ -66,7 +64,7 @@ def main():
     print('Evaluating DeepPySR...')
     for cfg_name, cfg in deeppysr_configs.items():
         print(f'  Config: {cfg_name}...')
-        grid_out = os.path.join(out_root, 'deeppysr', f'{cfg_name}_{param_suffix}_grid')
+        grid_out = os.path.join(out_root, 'deeppysr', f'{cfg_name}_{param_suffix}_grid_warm')
 
         def deeppysr_factory(co=cfg, gout=grid_out):
             kwargs = pysr_base_kwargs.copy()
@@ -75,6 +73,7 @@ def main():
                 **kwargs,
                 max_layers=1,
                 output_dir=gout,
+                warm_start=True,
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
                 stopping_score=0.01,

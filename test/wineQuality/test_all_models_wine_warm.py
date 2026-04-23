@@ -93,7 +93,7 @@ def main():
         print(f"\nEvaluating DeepPySR...")
         for cfg_name, cfg in deeppysr_configs.items():
             print(f"  Config: {cfg_name}...")
-            grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid")
+            grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid_warm")
 
             def deeppysr_factory(co=cfg, gout=grid_out):
                 kwargs = pysr_base_kwargs.copy()
@@ -102,11 +102,13 @@ def main():
                 return DeepPySRRegressor(
                     **kwargs,
                     max_layers=1,
+                    warm_start=True,
                     output_dir=gout,
                     # model_provider=provider,
                     pareto_r2_weight=r2w_list,
                     pareto_lambda=lambda_list,
                     stopping_score = 0.01,
+
                 )
 
             if os.path.exists(os.path.join(grid_out, "overall_metrics.csv")):

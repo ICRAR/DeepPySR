@@ -212,7 +212,7 @@ def main():
     
     # Test pypysr
     try:
-        pypysr_hist = train_model("pypysr", X, y, n_iterations=20, output_dir=output_root)
+        pypysr_hist = train_model("pypysr", X, y, n_iterations=500, output_dir=output_root)
         results_list.append(pypysr_hist)
     except Exception as e:
         print(f"ERROR training pypysr: {e}")
@@ -221,7 +221,7 @@ def main():
     
     # Test pysr
     try:
-        pysr_hist = train_model("pysr", X, y, n_iterations=20, output_dir=output_root)
+        pysr_hist = train_model("pysr", X, y, n_iterations=500, output_dir=output_root)
         results_list.append(pysr_hist)
     except Exception as e:
         print(f"ERROR training pysr: {e}")
