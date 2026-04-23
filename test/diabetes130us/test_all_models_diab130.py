@@ -109,7 +109,7 @@ def main():
     # 2. DeepPySR Models (pypysr - Grid Search)
     print(f"Evaluating DeepPySR (pypysr) Models...")
     for cfg_name, cfg_overrides in deeppysr_configs.items():
-        full_cfg_name = f"{cfg_name}_{param_suffix}_grid"
+        full_cfg_name = f"{cfg_name}_{param_suffix}_grid_warm"
         deeppysr_out = os.path.join(out_root_noftsl, "deeppysr", full_cfg_name)
         if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
             continue

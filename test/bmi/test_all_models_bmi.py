@@ -96,7 +96,7 @@ def main():
                 setting_prefix = parts[0]
                 params_part = parts[1] if len(parts) > 1 else ""
                 
-                full_cfg_name = f"{setting_prefix}_{param_suffix}_{params_part}_grid"
+                full_cfg_name = f"{setting_prefix}_{param_suffix}_{params_part}_grid_warm"
                 deeppysr_out = os.path.join(run_out_root, "deeppysr", full_cfg_name)
                 if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
                     continue

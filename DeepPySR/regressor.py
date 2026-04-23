@@ -23,10 +23,12 @@ class DeepPySRRegressor:
         pareto_r2_weight = 1.0,
         batching = False,
         batch_size = 50,
+        warm_start=False,
         **pysr_kwargs
     ):
         self.model_provider = model_provider
         self.pypysr_path = pypysr_path or os.environ.get("PYPYSR_PATH")
+        self.warm_start = warm_start
         self.pysr_kwargs = pysr_kwargs
 
         self.decimal = 2
@@ -40,6 +42,10 @@ class DeepPySRRegressor:
         self.relationships_ = []
         self.equations_ = None
 
+        # Cached provider model for warm start reuse across repeated fit() calls
+        self._warm_start_provider_model = None
+        self._warm_start_provider_info = None
+
     def get_params(self, deep=True):
         params = {
             "max_layers": self.max_layers,
@@ -52,6 +58,7 @@ class DeepPySRRegressor:
             "pareto_r2_weight": self.pareto_r2_weight,
             "batching": self.batching,
             "batch_size": self.batch_size,
+            "warm_start": self.warm_start,
         }
         params.update(self.pysr_kwargs)
         return params
@@ -352,7 +359,35 @@ class DeepPySRRegressor:
                 except Exception:
                     print(f"[DeepPySR] Using standard pysr")
         
-        model = PySRRegressor(**params)
+        use_cached_model = False
+        # For pypysr, warm start is handled internally by PySRRegressor via its
+        # own _warm_state_ cache; we still cache the model object so that state
+        # is preserved across DeepPySR fit() calls.
+        if self.warm_start and self._warm_start_provider_model is not None:
+            prev = self._warm_start_provider_info or {}
+            current_info = {
+                "provider": self.model_provider,
+                "target_names": tuple(target_names),
+                "X_shape": X.shape,
+                "variable_names": tuple(v_names),
+            }
+            if prev == current_info:
+                use_cached_model = True
+
+        if use_cached_model:
+            model = self._warm_start_provider_model
+            if params.get("verbosity", 0) > 0:
+                print("[DeepPySR] Reusing underlying provider model for warm start.")
+        else:
+            model = PySRRegressor(**params)
+            if self.warm_start:
+                self._warm_start_provider_model = model
+                self._warm_start_provider_info = {
+                    "provider": self.model_provider,
+                    "target_names": tuple(target_names),
+                    "X_shape": X.shape,
+                    "variable_names": tuple(v_names),
+                }
 
         # Robustly handle y shape
         y_fit = np.array(y).astype(np.float64)
@@ -745,7 +780,6 @@ class DeepPySRRegressor:
                 raise e
 
         self.save_relationships()
-        print(self.relationships_)
         # Populate equations_ with the best relationship (highest R2 and highest score) for the root target
         if self.relationships_:
             root_name = self.target_name_[0] if isinstance(self.target_name_, list) else self.target_name_
