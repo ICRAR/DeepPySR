@@ -1,7 +1,8 @@
 import pandas as pd
 import os
 
-def aggregate_bmi_data(data_dir="/home/00101787/Projects/pgs/data/data_all/my1y5data/"):
+def aggregate_bmi_data():
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../test_data/Health/bmi'))
     ages = [8, 10, 13, 16, 20, 23, 26]
     age_mapping = {13: 14, 16: 17, 26: 27}
     all_data = []
