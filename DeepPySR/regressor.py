@@ -45,6 +45,8 @@ class DeepPySRRegressor:
         # Cached provider model for warm start reuse across repeated fit() calls
         self._warm_start_provider_model = None
         self._warm_start_provider_info = None
+        self._clear_pysr_modules()
+        self._setup_julia_environment()
 
     def get_params(self, deep=True):
         params = {
