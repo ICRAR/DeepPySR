@@ -478,7 +478,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "populations": 100,
         "population_size": 200,
         "ncycles_per_iteration": 200,
-        "verbosity": 1,
+        "verbosity": 0,
         "denoise": False, # Denoising can be very slow or get stuck, disabled for stability
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,
