@@ -361,6 +361,7 @@ def aggregate_results(base_dir, task='regression'):
     results = []
     for root, dirs, files in os.walk(base_dir):
         if 'overall_metrics.csv' in files:
+            # print(os.path.join(root, 'overall_metrics.csv'))
             metrics_df = pd.read_csv(os.path.join(root, 'overall_metrics.csv'))
             metrics = metrics_df.iloc[0].to_dict()
             metrics['path'] = root
