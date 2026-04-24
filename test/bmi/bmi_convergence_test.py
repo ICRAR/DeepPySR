@@ -14,6 +14,7 @@ sys.path.append(os.path.join(current_dir, ""))
 from sklearn.metrics import r2_score
 from model_utils import get_pysr_base_kwargs
 from bmi_utils import load_bmi_agg_data
+import matplotlib.pyplot as plt
 
 # Import DeepPySRRegressor which handles provider switching
 sys.path.insert(0, os.path.join(project_root, "../.."))
@@ -195,7 +196,50 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     return pd.DataFrame(history)
 
 
+def plot_convergence(combined_df, output_dir):
+    """
+    Creates a line plot for the loss across iterations and saves it.
+    Specifies model parameters in the text.
+    """
+    plt.figure(figsize=(12, 8))
+    
+    for model_name in combined_df['Model'].unique():
+        model_data = combined_df[combined_df['Model'] == model_name]
+        plt.plot(model_data['Iteration'], model_data['Loss'], label=f"{model_name.upper()}")
+    
+    plt.yscale('log')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss (MSE)')
+    plt.title('Loss Convergence Comparison')
+    plt.grid(True, which="both", ls="-", alpha=0.5)
+    plt.legend()
+    
+    # Model parameters to specify in text
+    # These are taken from the train_model function logic
+    params_text = (
+        "Model Parameters:\n"
+        "adaptive_parsimony_scaling: 50.0\n"
+        "variable_prune_start: 25\n"
+        "ramp: 100\n"
+        "max: 0.7\n"
+        "r2_weight (r2w): 1.5\n"
+        "lambda_complexity (lambda): 0.001"
+    )
+    
+    plt.figtext(0.75, 0.5, params_text, fontsize=10, 
+                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
+    
+    plt.tight_layout(rect=[0, 0, 0.75, 1])
+    
+    plot_path = os.path.join(output_dir, "loss_convergence.png")
+    plt.savefig(plot_path)
+    print(f"Convergence plot saved to: {plot_path}")
+    plt.close()
+
+
 def main():
+    type = ['longitudinal','age-specific']
+
     print("\n" + "="*70)
     print("BMI LONGITUDINAL CONVERGENCE TEST ")
     print("="*70)
@@ -205,7 +249,7 @@ def main():
     id, X, y = load_bmi_agg_data()
     print(f"Generated {len(X)} samples with {X.shape[1]} features")
     
-    output_root = os.path.join(current_dir, './convergence_results')
+    output_root = os.path.join(current_dir, './convergence_results/longitudinal/')
     os.makedirs(output_root, exist_ok=True)
     
     results_list = []
@@ -235,6 +279,9 @@ def main():
         print(f"\n{'='*70}")
         print(f"Results saved to: {output_file}")
         print(f"{'='*70}\n")
+        
+        # Generate convergence plot
+        plot_convergence(combined, output_root)
         
         # Print summary statistics
         print("CONVERGENCE SUMMARY STATISTICS\n")
