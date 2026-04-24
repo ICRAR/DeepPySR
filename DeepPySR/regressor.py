@@ -1,4 +1,4 @@
-import os
+import os, sys
 import csv
 import json
 import warnings
@@ -63,7 +63,29 @@ class DeepPySRRegressor:
         params.update(self.pysr_kwargs)
         return params
 
+    def _clear_pysr_modules(self):
+        """Clears pysr-related modules from sys.modules to allow switching between DeepPySR and PySR."""
+        pysr_related = [mod for mod in sys.modules.keys()
+                        if mod in ("pysr", "pypysr") or mod.startswith(("pysr.", "pypysr."))]
+        for mod in pysr_related:
+            del sys.modules[mod]
 
+    def _setup_julia_environment(self):
+        """Sets up the Julia environment for PySR."""
+        try:
+            import juliapkg
+            import juliacall
+            from juliacall import Main as jl
+
+            # Initialize Julia if not already initialized
+            jl.seval("using Pkg")
+            pysr_env = juliapkg.project()
+            jl.Pkg.activate(pysr_env)
+            print(f"Julia environment activated: {pysr_env}")
+        except Exception as e:
+            # Don't fail if Julia/juliapkg is not available,
+            # as PySR handles its own setup if needed
+            pass
     def predict(self, X):
         """
         Predict y from input X using the discovered symbolic hierarchy.
