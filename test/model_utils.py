@@ -192,6 +192,7 @@ def get_deeppysr_configs():
         for vpr in vpr_list:
             for aps in aps_list:
                 configs[f"fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
+                    "model_provider": "pypysr",
                     "adaptive_parsimony_scaling": aps,
                     "variable_prune_start": vps,
                     "variable_prune_ramp": vpr,
@@ -221,6 +222,7 @@ def get_pysr_configs():
     aps_list = [0.1, 1.0, 10.0, 50.0]
     for aps in aps_list:
         configs[f"pysr_aps{aps}"] = {
+            "model_provider": "pysr",
             "adaptive_parsimony_scaling": aps,
         }
     return configs

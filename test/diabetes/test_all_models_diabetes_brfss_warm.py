@@ -61,7 +61,7 @@ def main():
                 return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
             return clone(m)
             
-        model_out = os.path.join(out_root, "baselines", name)
+        model_out = os.path.join(out_root, "results_diabetes_brfss_all/baselines", name)
         if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
             print(f"  Skipping {name} (results exist)")
         else:
@@ -72,7 +72,7 @@ def main():
     print(f"\nEvaluating DeepPySR...")
     for cfg_name, cfg in deeppysr_configs.items():
         print(f"  Config: {cfg_name}...")
-        grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid_warm")
+        grid_out = os.path.join(out_root, "results_diabetes_brfss_all/deeppysr", f"{cfg_name}_{param_suffix}_grid_warm")
 
         def deeppysr_factory(co=cfg, gout=grid_out):
             kwargs = pysr_base_kwargs.copy()
@@ -98,7 +98,7 @@ def main():
     print(f"\nEvaluating PySR Comparison...")
     for cfg_name, cfg in pysr_configs.items():
         print(f"  Config: {cfg_name}...")
-        pysr_out = os.path.join(out_root, "pysr", f"{cfg_name}_{param_suffix}")
+        pysr_out = os.path.join(out_root, "results_diabetes_brfss_all/pysr", f"{cfg_name}_{param_suffix}")
 
         def deeppysr_pysr_factory(co=cfg):
             return DeepPySRRegressor(

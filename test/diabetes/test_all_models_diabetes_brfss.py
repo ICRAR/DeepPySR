@@ -53,36 +53,34 @@ def main():
     }
     
     # 1. Baseline Models
-    print(f"Evaluating Baseline Models...")
-    baseline_models = get_baseline_models(task=task, input_dim=X.shape[1])
-    for name, model_instance in baseline_models.items():
-        def baseline_factory(m=model_instance, n=name):
-            if n == 'KAN':
-                return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
-            return clone(m)
-            
-        model_out = os.path.join(out_root, "baselines", name)
-        if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
-            print(f"  Skipping {name} (results exist)")
-        else:
-            print(f"  {name}...")
-            run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
+    # print(f"Evaluating Baseline Models...")
+    # baseline_models = get_baseline_models(task=task, input_dim=X.shape[1])
+    # for name, model_instance in baseline_models.items():
+    #     def baseline_factory(m=model_instance, n=name):
+    #         if n == 'KAN':
+    #             return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
+    #         return clone(m)
+    #
+    #     model_out = os.path.join(out_root, "results_diabetes_brfss_all/baselines", name)
+    #     if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
+    #         print(f"  Skipping {name} (results exist)")
+    #     else:
+    #         print(f"  {name}...")
+    #         run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
 
     # 2. DeepPySR Grid Search
     print(f"\nEvaluating DeepPySR...")
     for cfg_name, cfg in deeppysr_configs.items():
         print(f"  Config: {cfg_name}...")
-        grid_out = os.path.join(out_root, "deeppysr", f"{cfg_name}_{param_suffix}_grid")
+        grid_out = os.path.join(out_root, "results_diabetes_brfss_all/deeppysr", f"{cfg_name}_{param_suffix}_grid")
 
         def deeppysr_factory(co=cfg, gout=grid_out):
             kwargs = pysr_base_kwargs.copy()
             kwargs.update(co)
-            provider = kwargs.pop('model_provider', 'pypysr')
             return DeepPySRRegressor(
                 **kwargs,
                 max_layers=1,
                 output_dir=gout,
-                # model_provider=provider,
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
                 stopping_score = 0.01,
@@ -97,7 +95,7 @@ def main():
     print(f"\nEvaluating PySR Comparison...")
     for cfg_name, cfg in pysr_configs.items():
         print(f"  Config: {cfg_name}...")
-        pysr_out = os.path.join(out_root, "pysr", f"{cfg_name}_{param_suffix}")
+        pysr_out = os.path.join(out_root, "results_diabetes_brfss_all/pysr", f"{cfg_name}_{param_suffix}")
 
         def deeppysr_pysr_factory(co=cfg):
             return DeepPySRRegressor(

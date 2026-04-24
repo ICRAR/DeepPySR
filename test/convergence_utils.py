@@ -3,30 +3,10 @@ import sys
 import numpy as np
 import pandas as pd
 import time
-from pathlib import Path
-
-# Add project root to path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
-sys.path.append(project_root)
-sys.path.append(os.path.join(current_dir, ""))
-
-from sklearn.metrics import r2_score
-from model_utils import get_pysr_base_kwargs
-from bmi_utils import load_bmi_agg_data
+import re
 import matplotlib.pyplot as plt
-
-# Import DeepPySRRegressor which handles provider switching
-sys.path.insert(0, os.path.join(project_root, "../.."))
 from DeepPySR.regressor import DeepPySRRegressor
-
-try:
-    import sympy
-    from sympy import sympify, symbols
-    from sympy.utilities.lambdify import lambdify
-except ImportError:
-    sympy = None
-
+from model_utils import get_pysr_base_kwargs
 
 def get_loss_from_equations(model):
     """
@@ -73,7 +53,6 @@ def get_loss_from_equations(model):
         print(f"Error extracting losses: {e}")
         return []
 
-
 def _clear_pysr_modules():
     """Clears pysr-related modules from sys.modules to allow switching between DeepPySR and PySR."""
     pysr_related = [mod for mod in sys.modules.keys() 
@@ -98,12 +77,51 @@ def _setup_julia_environment():
         # as PySR handles its own setup if needed
         pass
 
+def parse_model_string(model_str):
+    """
+    Parses hyperparameters from model string like:
+    fullsr_nit100_pop30_sz200_vps25_vpr100_aps50.0_grid_r2w1.5_L0.001
+    """
+    params = {}
+    
+    # Extract vps (variable_prune_start)
+    vps_match = re.search(r'_vps(\d+)', model_str)
+    if vps_match:
+        params['variable_prune_start'] = int(vps_match.group(1))
+        
+    # Extract vpr (variable_prune_ramp)
+    vpr_match = re.search(r'_vpr(\d+)', model_str)
+    if vpr_match:
+        params['variable_prune_ramp'] = int(vpr_match.group(1))
+        
+    # Extract aps (adaptive_parsimony_scaling)
+    aps_match = re.search(r'_aps([\d.]+)', model_str)
+    if aps_match:
+        params['adaptive_parsimony_scaling'] = float(aps_match.group(1))
+        
+    # Extract r2w (r2 weight)
+    r2w_match = re.search(r'_r2w([\d.]+)', model_str)
+    if r2w_match:
+        params['r2_weight'] = float(r2w_match.group(1))
+        
+    # Extract L (lambda_complexity)
+    l_match = re.search(r'_L([\d.]+)', model_str)
+    if l_match:
+        params['lambda'] = float(l_match.group(1))
+        
+    # Default vpm (variable_prune_max) if not in string, usually 0.7
+    params['variable_prune_max'] = 0.7
+    
+    return params
 
-def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence_results"):
+def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence_results", params=None):
     """
     Train model iteratively and record loss for each iteration.
     Uses DeepPySRRegressor with model_provider parameter for clean switching.
     """
+    if params is None:
+        params = {}
+        
     # Clear modules and setup environment to avoid conflicts when switching providers
     _clear_pysr_modules()
     _setup_julia_environment()
@@ -113,14 +131,17 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     # Use base kwargs from model_utils.py
     pysr_kwargs = get_pysr_base_kwargs()
     
-    # Apply requested overrides
-    pysr_kwargs["adaptive_parsimony_scaling"] = 50.0
+    # Apply requested overrides from params
+    if "adaptive_parsimony_scaling" in params:
+        pysr_kwargs["adaptive_parsimony_scaling"] = params["adaptive_parsimony_scaling"]
+    else:
+        pysr_kwargs["adaptive_parsimony_scaling"] = 50.0
     
     if model_provider == "pypysr":
         # Specific parameters for DeepPySR (pypysr)
-        pysr_kwargs["variable_prune_start"] = 25
-        pysr_kwargs["variable_prune_ramp"] = 100
-        pysr_kwargs["variable_prune_max"] = 0.7
+        pysr_kwargs["variable_prune_start"] = params.get("variable_prune_start", 25)
+        pysr_kwargs["variable_prune_ramp"] = params.get("variable_prune_ramp", 100)
+        pysr_kwargs["variable_prune_max"] = params.get("variable_prune_max", 0.7)
     
     model_output_dir = os.path.join(output_dir, f"{model_provider}_run")
     os.makedirs(model_output_dir, exist_ok=True)
@@ -129,8 +150,12 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     pysr_kwargs["niterations"] = 1
     pysr_kwargs["output_directory"] = model_output_dir
     
-    r2w_list = [1.5]
-    lambda_list = [0.001]
+    r2w = params.get("r2_weight", 1.5)
+    lambda_val = params.get("lambda", 0.001)
+    
+    r2w_list = [r2w]
+    lambda_list = [lambda_val]
+    
     # Create DeepPySRRegressor with the specified provider
     model = DeepPySRRegressor(
         model_provider=model_provider,
@@ -147,8 +172,6 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     print(f"\n{'='*70}")
     print(f"Training {model_provider.upper()} for {n_iterations} iterations")
 
-    variable_names = list(X.columns)
-    
     for outer_iter in range(1, n_iterations + 1):
         try:
             print(f"[{model_provider}] Iteration {outer_iter}/{n_iterations}...", end=' ', flush=True)
@@ -195,12 +218,14 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     
     return pd.DataFrame(history)
 
-
-def plot_convergence(combined_df, output_dir):
+def plot_convergence(combined_df, output_dir, title="Loss Convergence Comparison", filename="loss_convergence.png", params=None):
     """
     Creates a line plot for the loss across iterations and saves it.
     Specifies model parameters in the text.
     """
+    if params is None:
+        params = {}
+        
     plt.figure(figsize=(12, 8))
     
     for model_name in combined_df['Model'].unique():
@@ -210,105 +235,64 @@ def plot_convergence(combined_df, output_dir):
     plt.yscale('log')
     plt.xlabel('Iteration')
     plt.ylabel('Loss (MSE)')
-    plt.title('Loss Convergence Comparison')
+    plt.title(title)
     plt.grid(True, which="both", ls="-", alpha=0.5)
     plt.legend()
     
     # Model parameters to specify in text
-    # These are taken from the train_model function logic
-    params_text = (
-        "Model Parameters:\n"
-        "adaptive_parsimony_scaling: 50.0\n"
-        "variable_prune_start: 25\n"
-        "ramp: 100\n"
-        "max: 0.7\n"
-        "r2_weight (r2w): 1.5\n"
-        "lambda_complexity (lambda): 0.001"
-    )
+    params_text = "Model Parameters:\n"
+    params_text += f"adaptive_parsimony_scaling: {params.get('adaptive_parsimony_scaling', 'N/A')}\n"
+    params_text += f"variable_prune_start: {params.get('variable_prune_start', 'N/A')}\n"
+    params_text += f"ramp: {params.get('variable_prune_ramp', 'N/A')}\n"
+    params_text += f"max: {params.get('variable_prune_max', 'N/A')}\n"
+    params_text += f"r2_weight: {params.get('r2_weight', 'N/A')}\n"
+    params_text += f"lambda_complexity: {params.get('lambda', 'N/A')}"
     
     plt.figtext(0.75, 0.5, params_text, fontsize=10, 
                 bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
     
     plt.tight_layout(rect=[0, 0, 0.75, 1])
     
-    plot_path = os.path.join(output_dir, "loss_convergence.png")
+    plot_path = os.path.join(output_dir, filename)
     plt.savefig(plot_path)
     print(f"Convergence plot saved to: {plot_path}")
     plt.close()
 
-
-def main():
-    type = ['longitudinal','age-specific']
-
-    print("\n" + "="*70)
-    print("BMI LONGITUDINAL CONVERGENCE TEST ")
-    print("="*70)
-    
-    # Load bmi longitudinal data
-    print("Generating BMI longitudinal data...")
-    id, X, y = load_bmi_agg_data()
-    print(f"Generated {len(X)} samples with {X.shape[1]} features")
-    
-    output_root = os.path.join(current_dir, './convergence_results/longitudinal/')
+def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_iterations=500):
+    """
+    Runs convergence test for Best DeepPySR and Best PySR for a given type and age.
+    """
     os.makedirs(output_root, exist_ok=True)
     
     results_list = []
     
-    # Test pypysr
-    try:
-        pypysr_hist = train_model("pypysr", X, y, n_iterations=500, output_dir=output_root)
+    # Run DeepPySR (pypysr)
+    if 'Best DeepPySR' in model_params_dict:
+        print(f"\n--- Running DeepPySR convergence ---")
+        pypysr_params = model_params_dict['Best DeepPySR']
+        pypysr_hist = train_model("pypysr", X, y, n_iterations=n_iterations, 
+                                  output_dir=output_root, params=pypysr_params)
         results_list.append(pypysr_hist)
-    except Exception as e:
-        print(f"ERROR training pypysr: {e}")
-        import traceback
-        traceback.print_exc()
     
-    # Test pysr
-    try:
-        pysr_hist = train_model("pysr", X, y, n_iterations=500, output_dir=output_root)
+    # Run PySR (pysr)
+    if 'Best PySR' in model_params_dict:
+        print(f"\n--- Running PySR convergence ---")
+        pysr_params = model_params_dict['Best PySR']
+        pysr_hist = train_model("pysr", X, y, n_iterations=n_iterations, 
+                                output_dir=output_root, params=pysr_params)
         results_list.append(pysr_hist)
-    except Exception as e:
-        print(f"ERROR training pysr: {e}")
-        import traceback
-        traceback.print_exc()
-    
+        
     if results_list:
         combined = pd.concat(results_list, ignore_index=True)
-        output_file = os.path.join(output_root, "convergence_comparison.csv")
-        combined.to_csv(output_file, index=False)
-        print(f"\n{'='*70}")
-        print(f"Results saved to: {output_file}")
-        print(f"{'='*70}\n")
+        csv_file = os.path.join(output_root, f"convergence_{name}.csv")
+        combined.to_csv(csv_file, index=False)
         
-        # Generate convergence plot
-        plot_convergence(combined, output_root)
+        title = f"Loss Convergence - {name}"
+        filename = f"loss_convergence_{name}.png"
         
-        # Print summary statistics
-        print("CONVERGENCE SUMMARY STATISTICS\n")
+        # Use pypysr params for display text if available, otherwise pysr
+        display_params = model_params_dict.get('Best DeepPySR', model_params_dict.get('Best PySR', {}))
+        plot_convergence(combined, output_root, title=title, filename=filename, params=display_params)
         
-        for model in combined['Model'].unique():
-            model_data = combined[combined['Model'] == model]
-            print(f"\n{model.upper()}:")
-            print(f"  Iterations: {len(model_data)}")
-            print(f"  Final MSE: {model_data.iloc[-1]['Loss']:.6f}")
-            print(f"  Final R2: {model_data.iloc[-1]['R2']:.4f}")
-            print(f"  Final Complexity: {int(model_data.iloc[-1]['Complexity'])}")
-            print(f"  Best MSE (across all iterations): {model_data['Loss'].min():.6f}")
-            print(f"  Best R2 (across all iterations): {model_data['R2'].max():.4f}")
-            print(f"  Average Equation Length: {model_data['Complexity'].mean():.1f}")
-            print(f"  Num Equations per Iteration: {model_data['N_Equations'].mean():.0f}")
-            
-            # Show convergence trajectory
-            print(f"\n  Convergence (every 5 iterations):")
-            for idx in model_data.index:
-                if (idx + 1) % 5 == 0 or idx == len(model_data) - 1:
-                    row = model_data.loc[idx]
-                    print(f"    Iter {int(row['Iteration']):2d}: MSE={row['Loss']:.6f}, R2={row['R2']:.4f}, C={int(row['Complexity']):3d}")
-        
-        print(f"\n{'='*70}")
-        print("Full convergence table:")
-        print(f"{'='*70}\n")
-        print(combined.to_string(index=False))
-
-if __name__ == "__main__":
-    main()
+        return combined
+    return None
