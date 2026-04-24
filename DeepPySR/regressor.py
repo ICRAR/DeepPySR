@@ -45,8 +45,6 @@ class DeepPySRRegressor:
         # Cached provider model for warm start reuse across repeated fit() calls
         self._warm_start_provider_model = None
         self._warm_start_provider_info = None
-        self._clear_pysr_modules()
-        self._setup_julia_environment()
 
     def get_params(self, deep=True):
         params = {
@@ -65,29 +63,6 @@ class DeepPySRRegressor:
         params.update(self.pysr_kwargs)
         return params
 
-    def _clear_pysr_modules(self):
-        """Clears pysr-related modules from sys.modules to allow switching between DeepPySR and PySR."""
-        pysr_related = [mod for mod in sys.modules.keys()
-                        if mod in ("pysr", "pypysr") or mod.startswith(("pysr.", "pypysr."))]
-        for mod in pysr_related:
-            del sys.modules[mod]
-
-    def _setup_julia_environment(self):
-        """Sets up the Julia environment for PySR."""
-        try:
-            import juliapkg
-            import juliacall
-            from juliacall import Main as jl
-
-            # Initialize Julia if not already initialized
-            jl.seval("using Pkg")
-            pysr_env = juliapkg.project()
-            jl.Pkg.activate(pysr_env)
-            print(f"Julia environment activated: {pysr_env}")
-        except Exception as e:
-            # Don't fail if Julia/juliapkg is not available,
-            # as PySR handles its own setup if needed
-            pass
     def predict(self, X):
         """
         Predict y from input X using the discovered symbolic hierarchy.
@@ -305,10 +280,10 @@ class DeepPySRRegressor:
         # 2. Clear sys.modules to force re-import when switching providers
         # This is necessary because both providers might share sub-module names
         # or we want to ensure we're getting the one from the current sys.path.
-        if "pysr" in sys.modules or "pypysr" in sys.modules:
-            for mod in list(sys.modules.keys()):
-                if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
-                    del sys.modules[mod]
+        # if "pysr" in sys.modules or "pypysr" in sys.modules:
+        #     for mod in list(sys.modules.keys()):
+        #         if mod == 'pysr' or mod.startswith('pysr.') or mod == 'pypysr' or mod.startswith('pypysr.'):
+        #             del sys.modules[mod]
 
         # 2.1 Handle Julia environment switching
         # pypysr activates its own internal Julia environment, which can break standard pysr.
@@ -350,8 +325,8 @@ class DeepPySRRegressor:
                 if params.get("verbosity", 0) > 0:
                     print(f"[DeepPySR] Error importing pypysr: {e}")
                 # Try to force re-import if it failed due to already loaded julia packages
-                if "pypysr" in sys.modules:
-                    del sys.modules["pypysr"]
+                # if "pypysr" in sys.modules:
+                #     del sys.modules["pypysr"]
                 from pypysr import PySRRegressor
 
             if params.get("verbosity", 0) > 0:
