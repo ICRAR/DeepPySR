@@ -53,20 +53,20 @@ def main():
     }
     
     # 1. Baseline Models
-    # print(f"Evaluating Baseline Models...")
-    # baseline_models = get_baseline_models(task=task, input_dim=X.shape[1])
-    # for name, model_instance in baseline_models.items():
-    #     def baseline_factory(m=model_instance, n=name):
-    #         if n == 'KAN':
-    #             return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
-    #         return clone(m)
-    #
-    #     model_out = os.path.join(out_root, "results_diabetes_brfss_all/baselines", name)
-    #     if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
-    #         print(f"  Skipping {name} (results exist)")
-    #     else:
-    #         print(f"  {name}...")
-    #         run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
+    print(f"Evaluating Baseline Models...")
+    baseline_models = get_baseline_models(task=task, input_dim=X.shape[1])
+    for name, model_instance in baseline_models.items():
+        def baseline_factory(m=model_instance, n=name):
+            if n == 'KAN':
+                return KANWrapper(input_dim=X.shape[1], output_dim=1, hidden_dim=5, steps=200, update_grid=False, task=task)
+            return clone(m)
+
+        model_out = os.path.join(out_root, "results_diabetes_brfss_all/baselines", name)
+        if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
+            print(f"  Skipping {name} (results exist)")
+        else:
+            print(f"  {name}...")
+            run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
 
     # 2. DeepPySR Grid Search
     print(f"\nEvaluating DeepPySR...")
