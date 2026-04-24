@@ -16,21 +16,21 @@ python -m juliacall.check
 notes:
 stroke, diabetes, diabetes130us are 100 nit, others are 500
 
-| Dataset          | Machine   | nit | Status    |
-|:-----------------|:----------|:----|:----------|
-| BMI              | setonix   | 500 | running   |
-| BMI warm         | setonix   | 500 | running   |
-| feynman          | setonix   | 500 | running   |
-| feynman warm     | setonix   | 500 | running   |
-| heart            | setonix   | 500 | completed |
-| heart warm       | setonix   | 500 | running   |
-| stroke           | setonix   | 100 | running   |
-| stroke warm      | setonix   | 100 | running   |
-| bodyfat          | setonix   | 500 | completed |
-| bodyfat warm     | setonix   | 500 | running   |
-| wine             | setonix   | 500 | running   |
-| wine warm        | setonix   | 500 | running   |
-| diabetes         | a400      | 100 | running   |
-| diabetes warm    | setonix   | 100 | running   |
-| diabetes130      | dia-ml    | 100 | running   |
-| diabetes130 warm | setonix   | 100 | running   |
+| Dataset          | Machine  | nit | Status    |
+|:-----------------|:---------|:----|:----------|
+| BMI              | setonix  | 500 | running   |
+| BMI warm         | setonix  | 500 | running   |
+| feynman          | setonix  | 500 | running   |
+| feynman warm     | setonix  | 500 | running   |
+| heart            | setonix  | 500 | completed |
+| heart warm       | setonix  | 500 | running   |
+| stroke           | setonix  | 100 | running   |
+| stroke warm      | setonix  | 100 | running   |
+| bodyfat          | setonix  | 500 | completed |
+| bodyfat warm     | setonix  | 500 | running   |
+| wine             | setonix  | 500 | running   |
+| wine warm        | setonix  | 500 | running   |
+| diabetes         | a400 s   | 100 | running   |
+| diabetes warm    | setonix  | 100 | running   |
+| diabetes130      | dia-ml s | 100 | running   |
+| diabetes130 warm | setonix  | 100 | running   |
