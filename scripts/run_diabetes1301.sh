@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=bmi
+#SBATCH --job-name=diabetes130warm
 #SBATCH --account=pawsey0411
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
-#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/bmi.log
+#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/diabetes130warm.log
 
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
@@ -22,9 +22,9 @@ fi
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 set -e
 
-echo "Starting bmi test at $(date)"
+echo "Starting diabetes130 test at $(date)"
 
-python -u test/bmi/test_all_models_bmi.py
+python -u test/diabetes130us/test_all_models_diab130_warm.py
 STATUS=$?
-echo "Finished bmi test at $(date) with status $STATUS"
+echo "Finished diabetes130 test at $(date) with status $STATUS"
 exit $STATUS

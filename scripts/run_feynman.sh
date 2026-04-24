@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=bmi
+#SBATCH --job-name=feynman
 #SBATCH --account=pawsey0411
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
-#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/bmi.log
+#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/feynman.log
 
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
@@ -22,9 +22,9 @@ fi
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 set -e
 
-echo "Starting bmi test at $(date)"
+echo "Starting feynman test at $(date)"
 
-python -u test/bmi/test_all_models_bmi.py
+python -u test/feynman/test_all_models_feynman.py
 STATUS=$?
-echo "Finished bmi test at $(date) with status $STATUS"
+echo "Finished feynman test at $(date) with status $STATUS"
 exit $STATUS
