@@ -24,7 +24,7 @@ def analyze_missingness(df, label="Missingness Analysis"):
 
 def load_and_clean_data(threshold=10.0):
     # Load the data
-    file_path = os.path.join(os.path.dirname(__file__), '../../test_data/Health/diabetes130us/diabetes130us.csv')
+    file_path = os.path.join(os.path.dirname(__file__), '../../test_data/Health/diabetes+130-us+hospitals+for+years+1999-2008/diabetes130us.csv')
     df = pd.read_csv(file_path, na_values=['?', 'None','Unknown/Invalid'], low_memory=False)
 
     # Calculate missing percentage

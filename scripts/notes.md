@@ -30,7 +30,7 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 | bodyfat warm     | setonix  | 500 | running   |
 | wine             | setonix  | 500 | running   |
 | wine warm        | setonix  | 500 | running   |
-| diabetes         | a400 s   | 100 | running   |
+| diabetes         | a400   | 100 | running   |
 | diabetes warm    | setonix  | 100 | running   |
 | diabetes130      | dia-ml s | 100 | running   |
 | diabetes130 warm | setonix  | 100 | running   |
