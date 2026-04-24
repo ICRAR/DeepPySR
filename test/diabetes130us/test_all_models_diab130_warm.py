@@ -26,9 +26,8 @@ def main():
     os.makedirs(out_root_noftsl, exist_ok=True)
     # os.makedirs(out_root_nocv_ftsl, exist_ok=True)
     # os.makedirs(out_root_nocv_noftsl, exist_ok=True)
-    
-    file_path = '/home/00101787/Projects/DeepPySR/test_data/Health/diabetes+130-us+hospitals+for+years+1999-2008/diabetic_data.csv'
-    ids, X, y = load_and_clean_data(file_path)
+
+    ids, X, y = load_and_clean_data()
     
     # Extra data to save: target as well
     extra_data = {'readmitted': y}
