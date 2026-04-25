@@ -1,7 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=diabetes130warm
 #SBATCH --account=pawsey0411
-#SBATCH --time=1-00:00:00
+#SBATCH --time=4-00:00:00
+#SBATCH --partition=long
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/diabetes130warm.log

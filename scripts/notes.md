@@ -10,6 +10,8 @@ rm -rf /scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env
 python -m juliapkg update
 python -m juliacall.check
 
+----------------------------------------
+for file in *.sh; do sbatch "$file"; done
 
 
 # notes:
@@ -23,7 +25,7 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 | feynman warm     | setonix  | 500 | running   |
 | heart            | setonix  | 500 | completed |
 | heart warm       | setonix  | 500 | running   |
-| stroke           | setonix  | 100 | running   |
+| stroke           | setonix  | 100 | completed |
 | stroke warm      | setonix  | 100 | running   |
 | bodyfat          | setonix  | 500 | completed |
 | bodyfat warm     | setonix  | 500 | running   |
