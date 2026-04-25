@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=feynman1
+#SBATCH --job-name=feynmanwarm
 #SBATCH --account=pawsey0411
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
