@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=heart
 #SBATCH --account=pawsey0411
-#SBATCH --partition=long
-#SBATCH --time=4-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/heart.log

@@ -26,6 +26,8 @@ setup(
         "tqdm",
         "scipy",
         "imblearn",
+        "PyYAML",
+        "xgboost"
     ],
     author="FulingChen",
     description="A deep symbolic regression package based on PySR",
