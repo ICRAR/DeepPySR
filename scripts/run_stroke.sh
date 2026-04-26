@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=stroke
 #SBATCH --account=pawsey0411
+#SBATCH --partition=long
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
