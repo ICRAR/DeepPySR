@@ -9,7 +9,8 @@
 # Locate the project root from this script's location
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
-
+export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
+export PYTHON_JULIAPKG_OFFLINE=yes
 # Use the project root and virtual environment
 cd $PROJECT_ROOT
 if [ -e "$PROJECT_ROOT/.venv/bin/activate" ]; then
