@@ -211,7 +211,7 @@ def evaluate_formula(formula_str, X, model_type='deeppysr'):
 def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold', task='regression', model_type='deeppysr'):
     """
     Find the best formula by evaluating all fold-specific formulas on raw data.
-    Works for DeepPySR, PySR (prefix='relationships_fold') and KAN (prefix='formulas_fold').
+    Works for DeepPySR, PySR and KAN.
     Returns a dictionary of (r2w, lambda): (formula, complexity, metrics) for DeepPySR grid search,
     or just a single (formula, complexity, metrics) if no grid search info is found.
     """
@@ -229,6 +229,8 @@ def get_best_formula_from_raw(folder_path, X, y_true, prefix='relationships_fold
     if 'formulas' in prefix and model_type == 'kan':
         model_type = 'kan'
 
+    if model_type == 'pysr':
+        prefix = prefix.replace('relationships', 'formulas')
     pattern = os.path.join(folder_path, f"{prefix}*.csv")
     files = glob.glob(pattern)
 
