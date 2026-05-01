@@ -404,6 +404,8 @@ class AIFeynmanWrapper(BaseEstimator, RegressorMixin):
             f"transformations={self.transformations})"
         )
 
+from DeepPySR import DeepPySR
+from pysr import PySRRegressor
 
 # --- Model Factories ---
 def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_state=42):
@@ -470,5 +472,5 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,
         "niterations": 500,#100,
-        "timeout_in_seconds": 3000, # 10 minute timeout per fit to prevent hanging
+        # "timeout_in_seconds": 3000, # 10 minute timeout per fit to prevent hanging
     }

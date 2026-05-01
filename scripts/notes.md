@@ -24,24 +24,17 @@ julia --project=. -e 'using Pkg; Pkg.update(); Pkg.precompile()'
 # notes:
 stroke, diabetes, diabetes130us are 100 nit, others are 500
 
-| Dataset          | Machine | nit | Status    | Analysis |
-|:-----------------|:--------|:----|:----------|:---------|
-| BMI              | setonix | 500 | running   |          |
-| BMI warm         | setonix | 500 | running   |          |
-| feynman          | setonix | 500 | running   |          |
-| feynman warm     | setonix | 500 | running   |          |
-| heart            | setonix | 500 | completed | pysr     |
-| heart warm       | setonix | 500 | completed | ----     |
-| stroke           | setonix | 100 | completed | wait     |
-| stroke warm      | setonix | 100 | completed | ----     |
-| bodyfat          | setonix | 500 | completed | pysr     |
-| bodyfat warm     | setonix | 500 | completed | ----     |
-| wine             | setonix | 500 | completed |          |
-| wine warm        | setonix | 500 | running   |          |
-| diabetes         | a400    | 100 | completed | wait     |
-| diabetes warm    | setonix | 100 | completed | ----     |
+| Dataset          | Machine | nit | Status  |
+|:-----------------|:--------|:----|:--------|
+| BMI              | setonix | 500 | running |
+| feynman          | setonix | 500 | running |
+| heart            | setonix | 500 | pysr    |
+| stroke           | setonix | 100 | pysr,   |
+| bodyfat          | setonix | 500 | pysr    |
+| wine             | setonix | 500 | running |
+| diabetes         | setonix | 100 | wait    |
 
 
 # next step
-run pysr, analysis, run convergence
+rerun deeppysr, analysis, run convergence
 run on gwas
