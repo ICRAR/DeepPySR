@@ -12,6 +12,7 @@ export MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
 
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
+python -m juliapkg exe -- -e 'using Pkg; Pkg.status()'
 export PYTHON_JULIAPKG_OFFLINE=no
 
 cd $PROJECT_ROOT

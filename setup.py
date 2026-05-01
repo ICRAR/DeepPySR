@@ -27,7 +27,7 @@ setup(
         "scipy",
         "imblearn",
         "PyYAML",
-        "xgboost"
+        "xgboost",
     ],
     author="FulingChen",
     description="A deep symbolic regression package based on PySR",
