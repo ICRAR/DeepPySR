@@ -8,6 +8,7 @@
 
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
+export PYTHON_JULIAPKG_EXE="/scratch/pawsey0411/fchen/julia/bin/julialauncher"
 export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/mypysr.jl"
 #export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
 export PYTHON_JULIAPKG_OFFLINE=yes
