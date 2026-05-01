@@ -6,13 +6,19 @@
 #SBATCH --nodes=1
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/feynman_I_9_18_vps75.log
 
-PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
+export PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
+export MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
+#export PYTHONPATH="$PROJECT_ROOT:$MYPYSR_PATH:$PYTHONPATH"
+
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
-export PYTHON_JULIAPKG_OFFLINE=yes
+python -m juliapkg exe -- -e 'using Pkg; Pkg.status()'
+export PYTHON_JULIAPKG_OFFLINE=no
+
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+python -m juliapkg update
 set -e
 
 echo "Starting feynman_I_9_18_vps75 at $(date)"

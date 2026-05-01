@@ -13,13 +13,19 @@ TEMPLATE='#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/LOG_NAME.log
 
-PROJECT_ROOT="'$PROJECT_ROOT'"
+export PROJECT_ROOT="'$PROJECT_ROOT'"
+export MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
+#export PYTHONPATH="$PROJECT_ROOT:$MYPYSR_PATH:$PYTHONPATH"
+
 export JULIA_DEPOT_PATH="'$JULIA_DEPOT_PATH'"
 export PYTHON_JULIAPKG_PROJECT="'$PYTHON_JULIAPKG_PROJECT'"
-export PYTHON_JULIAPKG_OFFLINE=yes
+python -m juliapkg exe -- -e '\''using Pkg; Pkg.status()'\''
+export PYTHON_JULIAPKG_OFFLINE=no
+
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+python -m juliapkg update
 set -e
 
 echo "Starting JOB_NAME at $(date)"
