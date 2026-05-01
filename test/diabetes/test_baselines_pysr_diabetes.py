@@ -1,5 +1,10 @@
 import os
 import sys
+
+# Add parent directory to sys.path to import from test/
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
+
 import numpy as np
 import pandas as pd
 from pysr import PySRRegressor
@@ -7,9 +12,6 @@ from model_utils import (
     get_pysr_configs, get_baseline_models, 
     get_pysr_base_kwargs, KANWrapper
 )
-# Add parent directory to sys.path to import from test/
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results
@@ -21,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "results_diabetes_brfss_all")
+    out_root = os.path.join(current_dir, "../../archive/results/results_diabetes_brfss_all")
     os.makedirs(out_root, exist_ok=True)
     
     print(f"\n" + "="*50)

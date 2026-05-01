@@ -30,7 +30,8 @@ except ImportError:
 
 def main():
     # Load model metrics to get best models and their parameters
-    metrics_file = os.path.join(current_dir, 'results_bmi_all/bmi_best_models_metrics.csv')
+    metrics_file = os.path.join(current_dir,
+                                'results_bmi_all/bmi_best_models_metrics.csv')
     if not os.path.exists(metrics_file):
         print(f"ERROR: Metrics file not found at {metrics_file}")
         return

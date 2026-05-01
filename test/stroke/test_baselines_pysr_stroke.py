@@ -1,13 +1,16 @@
 import os
 import sys
+
+# Add parent directory to sys.path to import from test/
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
+
 import numpy as np
 from pysr import PySRRegressor
 from model_utils import (
     get_pysr_configs, get_baseline_models, 
     get_pysr_base_kwargs, KANWrapper
 )
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results

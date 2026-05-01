@@ -15,7 +15,7 @@ from eval_utils import run_cv, run_nocv, aggregate_results
 from diab130_utils import load_and_clean_data
 
 def main():
-    out_root = os.path.join(current_dir, "results_diab130_all")
+    out_root = os.path.join(current_dir, "../../archive/results/results_diab130_all")
     # out_root_nocv = os.path.join(current_dir, "results_diab130_nocv")
     out_root_ftsl = os.path.join(out_root, "ftsl")
     out_root_noftsl = os.path.join(out_root, "noftsl")

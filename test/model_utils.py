@@ -404,7 +404,7 @@ class AIFeynmanWrapper(BaseEstimator, RegressorMixin):
             f"transformations={self.transformations})"
         )
 
-from DeepPySR import DeepPySR
+from deeppysr import DeepPySR
 from pysr import PySRRegressor
 
 # --- Model Factories ---

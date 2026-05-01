@@ -17,7 +17,7 @@ from analysis_utils import calculate_metrics, get_best_formula_from_raw
 
 def process_results():
     all_data = []
-    base_dir = os.path.join(current_dir, "results_bodyfat_all")
+    base_dir = os.path.join(current_dir, "../../archive/results/results_bmi_all/results_bodyfat_all")
 
     X, y = load_bodyfat_data()
     task = 'regression'
@@ -192,7 +192,7 @@ def aggregate_feature_importance():
     Average across folds, percentage it.
     """
     importance_data = []
-    base_dir = os.path.join(current_dir, "results_bodyfat_all")
+    base_dir = os.path.join(current_dir, "../../archive/results/results_bmi_all/results_bodyfat_all")
 
     # Helper to process importance file
     def process_importance(path, model_name):
