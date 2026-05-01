@@ -19,7 +19,7 @@ setup(
         "matplotlib",
         "networkx",
         "pandas",
-        "pycirclize",
+        "pyCirclize",
         "torch",
         "pykan",
         "scikit-learn",
