@@ -2,14 +2,16 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from DeepPySR.regressor import DeepPySRRegressor
+from model_utils import (
+    get_deeppysr_configs, get_pysr_configs, get_baseline_models, 
+    get_pysr_base_kwargs, KANWrapper, DeepPySRRegressor, PySRRegressor
+)
 
 # Add parent directory to sys.path to import from test/
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, run_nocv, aggregate_results
 from wine_utils import load_wine_data
 

@@ -211,6 +211,15 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             
             if hasattr(model, 'formula') and model.formula is not None:
                 save_formulas(outdir, [{'fold': fold, 'formula': str(model.formula)}], fold=fold)
+            elif hasattr(model, 'get_best'): # PySRRegressor
+                try:
+                    best_row = model.get_best()
+                    formula = best_row['sympy_format'] if 'sympy_format' in best_row else best_row['equation']
+                    save_formulas(outdir, [{'fold': fold, 'formula': str(formula)}], fold=fold)
+                except:
+                    # Fallback for older pysr or if get_best fails
+                    if hasattr(model, 'equation_'):
+                        save_formulas(outdir, [{'fold': fold, 'formula': str(model.equation_)}], fold=fold)
             elif hasattr(model, 'relationships_'): # DeepPySR
                 model.save_relationships(filename=f"relationships_fold{fold}.csv")
 
@@ -316,8 +325,16 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
         # Save formula if available
         if hasattr(model, 'formula') and model.formula is not None:
             save_formulas(outdir, [{'fold': 'nocv', 'formula': str(model.formula)}], fold='nocv')
-        # elif hasattr(model, 'relationships_'): # DeepPySR
-        #     model.save_relationships(filename=f"relationships_nocv.csv")
+        elif hasattr(model, 'get_best'): # PySRRegressor
+            try:
+                best_row = model.get_best()
+                formula = best_row['sympy_format'] if 'sympy_format' in best_row else best_row['equation']
+                save_formulas(outdir, [{'fold': 'nocv', 'formula': str(formula)}], fold='nocv')
+            except:
+                if hasattr(model, 'equation_'):
+                    save_formulas(outdir, [{'fold': 'nocv', 'formula': str(model.equation_)}], fold='nocv')
+        elif hasattr(model, 'relationships_'): # DeepPySR
+            model.save_relationships(filename=f"relationships_nocv.csv")
 
         if hasattr(model, 'feature_importances_'):
             importance = model.feature_importances_

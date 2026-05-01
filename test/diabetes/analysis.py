@@ -82,22 +82,43 @@ def process_results():
             v_path = os.path.join(pysr_dir, variant)
             if not os.path.isdir(v_path): continue
 
-            res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
-
-            if isinstance(res, dict):
-                for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    acc, prec, rec, f1, auc = metrics
-                    model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                    all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
-            else:
-                formula, complexity, metrics = res
-                acc, prec, rec, f1, auc = metrics
-                if not formula:
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        df_pred = pd.read_csv(pred_file)
-                        acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+            # Use overall_metrics.csv for PySR if it exists
+            overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
+            if os.path.exists(overall_metrics_file):
+                df_metrics = pd.read_csv(overall_metrics_file)
+                acc = df_metrics['accuracy'].iloc[0]
+                prec = df_metrics['precision'].iloc[0]
+                rec = df_metrics['recall'].iloc[0]
+                f1 = df_metrics['f1'].iloc[0]
+                auc = df_metrics['auc'].iloc[0]
+                
+                # We still might want formula and complexity for display
+                res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
+                if isinstance(res, dict):
+                    # Pick the first one or best one for complexity/formula
+                    key = list(res.keys())[0]
+                    formula, complexity, _ = res[key]
+                else:
+                    formula, complexity, _ = res
+                
                 all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
+            else:
+                res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
+
+                if isinstance(res, dict):
+                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                        acc, prec, rec, f1, auc = metrics
+                        model_name = f"{variant}_r2w{r2w}_L{lamb}"
+                        all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
+                else:
+                    formula, complexity, metrics = res
+                    acc, prec, rec, f1, auc = metrics
+                    if not formula:
+                        pred_file = os.path.join(v_path, "predictions.csv")
+                        if os.path.exists(pred_file):
+                            df_pred = pd.read_csv(pred_file)
+                            acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                    all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
 
     # Create DataFrame and save
     result_df = pd.DataFrame(all_data, columns=['model', 'accuracy', 'precision', 'recall', 'f1', 'auc', 'complexity', 'formula'])

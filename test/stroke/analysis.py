@@ -5,21 +5,21 @@ import sys
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Add test/ and test/bmi to path to import load_bmi_agg_data
+# Add test/ to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if not current_dir:
     current_dir = "."
 sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
-from heart_utils import load_heart_cleveland_data
+from stroke_utils import load_stroke_data
 from analysis_utils import calculate_metrics, get_best_formula_from_raw
 
 def process_results():
     all_data = []
-    base_dir = os.path.join(current_dir, "results_heart_all")
+    base_dir = os.path.join(current_dir, "results_stroke_all")
 
-    X, y = load_heart_cleveland_data(binary=True)
+    X, y = load_stroke_data()
     task = 'classification'
 
     # Baselines (including KAN/KANSym)
@@ -177,7 +177,7 @@ def save_results(df):
     plot_df = pd.DataFrame(selected_data)
 
     # Save the plot data for the best models to CSV
-    plot_csv_path = os.path.join(current_dir, 'heart_best_models_metrics.csv')
+    plot_csv_path = os.path.join(current_dir, 'stroke_best_models_metrics.csv')
     plot_df.to_csv(plot_csv_path, index=False)
     print(f"Best models plot data saved to {plot_csv_path}")
 
@@ -194,7 +194,7 @@ def aggregate_feature_importance():
     Average across folds, percentage it.
     """
     importance_data = []
-    base_dir = os.path.join(current_dir, "results_heart_all")
+    base_dir = os.path.join(current_dir, "results_stroke_all")
 
     # Helper to process importance file
     def process_importance(path, model_name):
@@ -258,7 +258,7 @@ def plot_best_models():
     Create a plot with 1 row and 5 columns (accuracy, precision, recall, f1, complexity).
     Each subplot shows metric values for the models.
     """
-    df = pd.read_csv(os.path.join(current_dir, 'heart_best_models_metrics.csv'))
+    df = pd.read_csv(os.path.join(current_dir, 'stroke_best_models_metrics.csv'))
 
     metrics = ['accuracy', 'precision', 'recall', 'f1', 'complexity']
     models_to_include_for_complexity = ['Best DeepPySR', 'Interpretable DeepPySR', 'Best PySR', 'KANSym']
@@ -284,7 +284,7 @@ def plot_best_models():
 
         if plot_df.empty:
             ax.text(0.5, 0.5, 'No data', ha='center', va='center', fontsize=12)
-            ax.set_title(f'Heart Disease - {metric.upper()}')
+            ax.set_title(f'Stroke - {metric.upper()}')
             ax.set_xlabel('Model', fontsize=8)
             ax.set_ylabel(metric.upper())
             ax.set_xticks([])
@@ -292,7 +292,7 @@ def plot_best_models():
 
         plot_df['plot_label'] = plot_df['display_model'].replace(label_map)
         ax.bar(plot_df['plot_label'], plot_df[metric])
-        ax.set_title(f'Heart Disease - {metric.upper()}')
+        ax.set_title(f'Stroke - {metric.upper()}')
         ax.set_xlabel('Model', fontsize=8)
         ax.set_ylabel(metric.upper())
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha='center')

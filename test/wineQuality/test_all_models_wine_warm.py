@@ -2,7 +2,10 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from DeepPySR.regressor import DeepPySRRegressor
+from model_utils import (
+    get_deeppysr_configs, get_pysr_configs, get_baseline_models, 
+    get_pysr_base_kwargs, KANWrapper, DeepPySRRegressor, PySRRegressor
+)
 
 # Add parent directory to sys.path to import from test/
 current_dir = os.path.dirname(os.path.abspath(__file__))

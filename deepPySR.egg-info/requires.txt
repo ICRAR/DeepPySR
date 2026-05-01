@@ -1,9 +1,0 @@
-pysr
-numpy
-sympy
-matplotlib
-networkx
-pandas
-pycirclize
-torch
-pykan

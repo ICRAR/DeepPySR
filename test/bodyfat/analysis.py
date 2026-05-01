@@ -12,15 +12,15 @@ if not current_dir:
 sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
-from heart_utils import load_heart_cleveland_data
+from bodyfat_utils import load_bodyfat_data
 from analysis_utils import calculate_metrics, get_best_formula_from_raw
 
 def process_results():
     all_data = []
-    base_dir = os.path.join(current_dir, "results_heart_all")
+    base_dir = os.path.join(current_dir, "results_bodyfat_all")
 
-    X, y = load_heart_cleveland_data(binary=True)
-    task = 'classification'
+    X, y = load_bodyfat_data()
+    task = 'regression'
 
     # Baselines (including KAN/KANSym)
     baselines_dir = os.path.join(base_dir, "baselines")
@@ -35,21 +35,21 @@ def process_results():
                 df_pred = pd.read_csv(pred_file)
                 if model_name.lower() == 'kan':
                     # KAN
-                    acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
-                    all_data.append(['KAN', acc, prec, rec, f1, auc, np.nan, ""])
+                    r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                    all_data.append(['KAN',r2, rmse, mae, np.nan, ""])
 
                     # KANSym
                     if 'y_pred_kansym' in df_pred.columns:
                         # For KANSym, we need formula and complexity
                         # The user wants us to check all formulas and pick the best one
                         formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
-                        acc, prec, rec, f1, auc = metrics
+                        r2, rmse, mae = metrics
 
-                        all_data.append(['KANSym', acc, prec, rec, f1, auc, complexity, formula])
+                        all_data.append(['KANSym', r2, rmse, mae, complexity, formula])
                 else:
                     # Other baselines
-                    acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
-                    all_data.append([model_name, acc, prec, rec, f1, auc, np.nan, ""])
+                    r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                    all_data.append([model_name, r2, rmse, mae, np.nan, ""])
 
     # DeepPySR
     deeppysr_dir = os.path.join(base_dir, "deeppysr")
@@ -62,18 +62,18 @@ def process_results():
 
             if isinstance(res, dict):
                 for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    acc, prec, rec, f1, auc = metrics
+                    r2, rmse, mae = metrics
                     model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                    all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
+                    all_data.append([model_name, r2, rmse, mae, complexity, formula])
             else:
                 formula, complexity, metrics = res
-                acc, prec, rec, f1, auc = metrics
+                r2, rmse, mae = metrics
                 if not formula:
                     pred_file = os.path.join(v_path, "predictions.csv")
                     if os.path.exists(pred_file):
                         df_pred = pd.read_csv(pred_file)
-                        acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
-                all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
+                        r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                all_data.append([variant, r2, rmse, mae, complexity, formula])
 
     # PySR
     pysr_dir = os.path.join(base_dir, "pysr")
@@ -86,11 +86,9 @@ def process_results():
             overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
             if os.path.exists(overall_metrics_file):
                 df_metrics = pd.read_csv(overall_metrics_file)
-                acc = df_metrics['accuracy'].iloc[0]
-                prec = df_metrics['precision'].iloc[0]
-                rec = df_metrics['recall'].iloc[0]
-                f1 = df_metrics['f1'].iloc[0]
-                auc = df_metrics['auc'].iloc[0]
+                r2 = df_metrics['r2'].iloc[0]
+                rmse = df_metrics['rmse'].iloc[0]
+                mae = df_metrics['mae'].iloc[0]
                 
                 # We still might want formula and complexity for display
                 res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
@@ -101,27 +99,27 @@ def process_results():
                 else:
                     formula, complexity, _ = res
                 
-                all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
+                all_data.append([variant, r2, rmse, mae, complexity, formula])
             else:
                 res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
 
                 if isinstance(res, dict):
                     for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                        acc, prec, rec, f1, auc = metrics
+                        r2, rmse, mae = metrics
                         model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                        all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
+                        all_data.append([model_name, r2, rmse, mae, complexity, formula])
                 else:
                     formula, complexity, metrics = res
-                    acc, prec, rec, f1, auc = metrics
+                    r2, rmse, mae = metrics
                     if not formula:
                         pred_file = os.path.join(v_path, "predictions.csv")
                         if os.path.exists(pred_file):
                             df_pred = pd.read_csv(pred_file)
-                            acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
-                    all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
+                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                    all_data.append([variant, r2, rmse, mae, complexity, formula])
 
     # Create DataFrame and save
-    result_df = pd.DataFrame(all_data, columns=['model', 'accuracy', 'precision', 'recall', 'f1', 'auc', 'complexity', 'formula'])
+    result_df = pd.DataFrame(all_data, columns=['model', 'r2', 'rmse', 'mae', 'complexity', 'formula'])
     result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
     return result_df
@@ -136,24 +134,24 @@ def save_results(df):
     # DeepPySR variants
     deeppysr_df = df[df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
     if not deeppysr_df.empty:
-        best_deeppysr = deeppysr_df.loc[deeppysr_df['f1'].idxmax()].copy()
+        best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
         best_deeppysr['display_model'] = 'Best DeepPySR'
         selected_data.append(best_deeppysr)
 
         interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 35]
         if not interp_deeppysr_df.empty:
-            interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['f1'].idxmax()].copy()
+            interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
             interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
             selected_data.append(interp_deeppysr)
             interpretable_formulas.append({
                 'model': interp_deeppysr['model'],
-                'formula': interp_deeppysr['formula'], 'f1': interp_deeppysr['f1'], 'complexity': interp_deeppysr['complexity']
+                'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
             })
 
     # PySR variants
     pysr_df = df[df['model'].str.contains('pysr', na=False)]
     if not pysr_df.empty:
-        best_pysr = pysr_df.loc[pysr_df['f1'].idxmax()].copy()
+        best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
         best_pysr['display_model'] = 'Best PySR'
         selected_data.append(best_pysr)
 
@@ -177,7 +175,7 @@ def save_results(df):
     plot_df = pd.DataFrame(selected_data)
 
     # Save the plot data for the best models to CSV
-    plot_csv_path = os.path.join(current_dir, 'heart_best_models_metrics.csv')
+    plot_csv_path = os.path.join(current_dir, 'bodyfat_best_models_metrics.csv')
     plot_df.to_csv(plot_csv_path, index=False)
     print(f"Best models plot data saved to {plot_csv_path}")
 
@@ -194,7 +192,7 @@ def aggregate_feature_importance():
     Average across folds, percentage it.
     """
     importance_data = []
-    base_dir = os.path.join(current_dir, "results_heart_all")
+    base_dir = os.path.join(current_dir, "results_bodyfat_all")
 
     # Helper to process importance file
     def process_importance(path, model_name):
@@ -255,19 +253,19 @@ def aggregate_feature_importance():
 
 def plot_best_models():
     """
-    Create a plot with 1 row and 5 columns (accuracy, precision, recall, f1, complexity).
+    Create a plot with 1 row and 5 columns (r2, rmse, mae, complexity).
     Each subplot shows metric values for the models.
     """
-    df = pd.read_csv(os.path.join(current_dir, 'heart_best_models_metrics.csv'))
+    df = pd.read_csv(os.path.join(current_dir, 'bodyfat_best_models_metrics.csv'))
 
-    metrics = ['accuracy', 'precision', 'recall', 'f1', 'complexity']
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
     models_to_include_for_complexity = ['Best DeepPySR', 'Interpretable DeepPySR', 'Best PySR', 'KANSym']
     label_map = {
         'Best DeepPySR': 'DeepPySR',
         'Interpretable DeepPySR': 'InterpDeepPySR'
     }
 
-    fig, axes = plt.subplots(1, 5, figsize=(20, 6))
+    fig, axes = plt.subplots(1, 4, figsize=(20, 6))
 
     df_all = df.copy()
     df_all = df_all.sort_values('display_model')
@@ -284,7 +282,7 @@ def plot_best_models():
 
         if plot_df.empty:
             ax.text(0.5, 0.5, 'No data', ha='center', va='center', fontsize=12)
-            ax.set_title(f'Heart Disease - {metric.upper()}')
+            ax.set_title(f'Body Fat - {metric.upper()}')
             ax.set_xlabel('Model', fontsize=8)
             ax.set_ylabel(metric.upper())
             ax.set_xticks([])
@@ -292,7 +290,7 @@ def plot_best_models():
 
         plot_df['plot_label'] = plot_df['display_model'].replace(label_map)
         ax.bar(plot_df['plot_label'], plot_df[metric])
-        ax.set_title(f'Heart Disease - {metric.upper()}')
+        ax.set_title(f'Body Fat - {metric.upper()}')
         ax.set_xlabel('Model', fontsize=8)
         ax.set_ylabel(metric.upper())
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha='center')
@@ -304,8 +302,8 @@ def plot_best_models():
     print(f"Plot saved to {plot_path}")
 
 if __name__ == "__main__":
-    # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest f1.
-    # The f1 is calculated by applying this formula on the entire dataset, not the fold.
+    # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.
+    # The r2 is calculated by applying this formula on the entire dataset, not the fold.
 
     df = process_results()
 

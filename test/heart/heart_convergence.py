@@ -52,7 +52,7 @@ def main():
     
     # Load longitudinal data
     X, y = load_heart_cleveland_data(binary=True)
-    run_convergence_comparison(X, y, models, output_root, name='Heart')
+    run_convergence_comparison(X, y, models, output_root, name='Heart', task='classification')
 
 if __name__ == "__main__":
     main()

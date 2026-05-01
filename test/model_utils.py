@@ -1,4 +1,5 @@
 import os
+import sys
 import inspect
 import numpy as np
 import torch
@@ -8,7 +9,6 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, Rando
 from xgboost import XGBClassifier, XGBRegressor
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from kan import KAN
-from DeepPySR.regressor import DeepPySRRegressor
 from sklearn.base import BaseEstimator, RegressorMixin, ClassifierMixin
 
 # Optional AI Feynman 2.0 support.
@@ -192,28 +192,13 @@ def get_deeppysr_configs():
         for vpr in vpr_list:
             for aps in aps_list:
                 configs[f"fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
-                    "model_provider": "pypysr",
+                    "model_provider": "deeppysr",
                     "adaptive_parsimony_scaling": aps,
                     "variable_prune_start": vps,
                     "variable_prune_ramp": vpr,
                     "variable_prune_max": vpm,
                 }
 
-    # # 5. v2fullsr: pypysrdev1 with all 4 parameters
-    # for vps in vps_list:
-    #     for vpr in vpr_list:
-    #         for aps in aps_list:
-    #             configs[f"v2fullsr_vps{vps}_vpr{vpr}_aps{aps}"] = {
-    #                 "model_provider": "pypysrdev1",
-    #                 "adaptive_parsimony_scaling": aps,
-    #                 "variable_prune_start": vps,
-    #                 "variable_prune_ramp": vpr,
-    #                 "variable_prune_max": vpm,
-    #                 "use_mdl": True,
-    #                 "use_nsga2": True,
-    #                 "use_lexicase": True,
-    #                 "use_hotspot_protection": True,
-    #             }
     return configs
 
 # --- PySR Configs ---
@@ -222,7 +207,7 @@ def get_pysr_configs():
     aps_list = [0.1, 1.0, 10.0, 50.0]
     for aps in aps_list:
         configs[f"pysr_aps{aps}"] = {
-            "model_provider": "pysr",
+            # "model_provider": "pysr",
             "adaptive_parsimony_scaling": aps,
         }
     return configs
@@ -470,7 +455,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
     return {
         "parallelism": parallelism,
         "maxsize": 40,
-        "binary_operators": ["+", "*", "/", "-", "cond(x,y) = x > 0 ? y : y*0"],
+        "binary_operators": ["+", "*", "/", "-", "cond"],
         "extra_sympy_mappings": {
             'cond': sympy_cond,
         },
@@ -480,7 +465,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "populations": 100,
         "population_size": 200,
         "ncycles_per_iteration": 200,
-        "verbosity": 0,
+        "verbosity": 1,
         "denoise": False, # Denoising can be very slow or get stuck, disabled for stability
         "turbo": False, # Disabled to avoid LoopVectorization warnings that clutter output
         "procs": default_procs,

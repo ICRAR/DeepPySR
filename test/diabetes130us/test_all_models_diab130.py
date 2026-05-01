@@ -2,14 +2,15 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from DeepPySR.regressor import DeepPySRRegressor
-
+from model_utils import (
+    get_deeppysr_configs, get_pysr_configs, get_baseline_models, 
+    get_pysr_base_kwargs, KANWrapper, DeepPySRRegressor, PySRRegressor
+)
 # Add parent directory to sys.path to import from test/
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, run_nocv, aggregate_results
 from diab130_utils import load_and_clean_data
 
@@ -121,6 +122,7 @@ def main():
             provider = kwargs.pop('model_provider', 'pypysr')
             return DeepPySRRegressor(
                 max_layers=1,
+                warm_start=True,
                 output_dir=deeppysr_out,
                 model_provider=provider,
                 pareto_r2_weight=r2w_list,
@@ -144,13 +146,7 @@ def main():
         def deeppysr_pysr_factory(co=cfg_overrides):
             kwargs = pysr_base_kwargs.copy()
             kwargs.update(co)
-            return DeepPySRRegressor(
-                max_layers=1,
-                output_dir=deeppysr_pysr_out,
-                # model_provider='pysr',
-                pareto_r2_weight=r2w_list,
-                pareto_lambda=lambda_list,
-                stopping_score = 0.01,
+            return PySRRegressor(
                 **kwargs
             )
 
@@ -247,13 +243,7 @@ def main():
             def deeppysr_pysr_factory_ftsl(co=cfg_overrides):
                 kwargs = pysr_base_kwargs.copy()
                 kwargs.update(co)
-                return DeepPySRRegressor(
-                    max_layers=1,
-                    output_dir=deeppysr_pysr_out,
-                    # model_provider='pysr',
-                    pareto_r2_weight=r2w_list,
-                    pareto_lambda=lambda_list,
-                    stopping_score = 0.01,
+                return PySRRegressor(
                     **kwargs
                 )
             run_cv(deeppysr_pysr_factory_ftsl, X, y, outdir=deeppysr_pysr_out, scaler=False, **cv_ftsl_kwargs)

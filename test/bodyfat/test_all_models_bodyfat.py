@@ -1,14 +1,20 @@
 import os
 import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+test_root = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.extend([project_root, test_root])
+
 import numpy as np
 import pandas as pd
-from DeepPySR.regressor import DeepPySRRegressor
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
+from deeppysr import DeepPySR
+from pysr import PySRRegressor
+from model_utils import (
+    get_deeppysr_configs, get_pysr_configs, get_baseline_models, 
+    get_pysr_base_kwargs, KANWrapper
+)
 
 from sklearn.base import clone
-from model_utils import get_deeppysr_configs, get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from eval_utils import run_cv, aggregate_results
 from bodyfat_utils import load_bodyfat_data
 
@@ -66,14 +72,15 @@ def main():
     print('Evaluating DeepPySR...')
     for cfg_name, cfg in deeppysr_configs.items():
         print(f'  Config: {cfg_name}...')
-        grid_out = os.path.join(out_root, 'deeppysr', f'{cfg_name}_{param_suffix}_grid')
+        grid_out = os.path.join(out_root, 'deeppysr1', f'{cfg_name}_{param_suffix}_grid')
 
         def deeppysr_factory(co=cfg, gout=grid_out):
             kwargs = pysr_base_kwargs.copy()
             kwargs.update(co)
-            return DeepPySRRegressor(
+            return DeepPySR(
                 **kwargs,
                 max_layers=1,
+                warm_start=True,
                 output_dir=gout,
                 pareto_r2_weight=r2w_list,
                 pareto_lambda=lambda_list,
@@ -91,14 +98,9 @@ def main():
         pysr_out = os.path.join(out_root, 'pysr', f'{cfg_name}_{param_suffix}')
 
         def deeppysr_pysr_factory(co=cfg):
-            return DeepPySRRegressor(
+            return PySRRegressor(
                 **pysr_base_kwargs,
                 **co,
-                max_layers=1,
-                output_dir=pysr_out,
-                pareto_r2_weight=r2w_list,
-                pareto_lambda=lambda_list,
-                stopping_score=0.01,
             )
 
         if os.path.exists(os.path.join(pysr_out, 'overall_metrics.csv')):
