@@ -91,8 +91,8 @@ for wine in red white; do
     create_script "wine_baselines_${wine}" "test/wineQuality/test_baselines_pysr_wine.py --wine_type ${wine}"
 done
 
-# Diabetes, Heart, Stroke Baselines
-for dataset in diabetes heart stroke; do
+# Diabetes, Heart, Stroke, Bodyfat Baselines
+for dataset in diabetes heart stroke bodyfat; do
     create_script "${dataset}_baselines" "test/${dataset}/test_baselines_pysr_${dataset}.py"
 done
 
