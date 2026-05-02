@@ -63,8 +63,8 @@ for wine in red white; do
     done
 done
 
-# Diabetes, Heart, Stroke
-for dataset in diabetes heart stroke; do
+# Diabetes, Heart, Stroke, Bodyfat
+for dataset in diabetes heart stroke bodyfat; do
     for vps in 25 50 75; do
         create_script "${dataset}_vps${vps}" "test/${dataset}/test_all_models_${dataset}.py --vps ${vps}"
     done
