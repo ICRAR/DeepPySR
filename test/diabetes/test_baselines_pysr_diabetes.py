@@ -23,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "../../archive/results/results_diabetes_brfss_all")
+    out_root = os.path.join(current_dir, "results_diabetes_all")
     os.makedirs(out_root, exist_ok=True)
     
     print(f"\n" + "="*50)
