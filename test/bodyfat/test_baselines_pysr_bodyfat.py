@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, '../../archive/results/results_bmi_all/results_bodyfat_all')
+    out_root = os.path.join(current_dir, 'results_bodyfat_all')
     os.makedirs(out_root, exist_ok=True)
 
     print('\n' + '='*50)
