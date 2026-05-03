@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=diabetes_baselines
+#SBATCH --job-name=diabetes_vps50_vpr150_aps1.0
 #SBATCH --account=pawsey0411
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --nodes=1
-#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/diabetes_baselines.log
+#SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/diabetes_vps50_vpr150_aps1.0.log
 
 export PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 export MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
@@ -21,7 +21,7 @@ export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 python -m juliapkg update
 set -e
 
-echo "Starting diabetes_baselines at $(date)"
-python -u test/diabetes/test_baselines_pysr_diabetes.py --model_group baselines
-echo "Finished diabetes_baselines at $(date)"
+echo "Starting diabetes_vps50_vpr150_aps1.0 at $(date)"
+python -u test/diabetes/test_all_models_diabetes.py --vps 50 --vpr 150 --aps 1.0
+echo "Finished diabetes_vps50_vpr150_aps1.0 at $(date)"
 

@@ -63,8 +63,17 @@ for wine in red white; do
     done
 done
 
-# Diabetes, Heart, Stroke, Bodyfat
-for dataset in diabetes heart stroke bodyfat; do
+# Diabetes (Full Parallelization: one script per config)
+for vps in 25 50 75; do
+    for vpr in 50 100 150; do
+        for aps in 1.0 10.0 50.0; do
+            create_script "diabetes_vps${vps}_vpr${vpr}_aps${aps}" "test/diabetes/test_all_models_diabetes.py --vps ${vps} --vpr ${vpr} --aps ${aps}"
+        done
+    done
+done
+
+# Heart, Stroke, Bodyfat
+for dataset in heart stroke bodyfat; do
     for vps in 25 50 75; do
         create_script "${dataset}_vps${vps}" "test/${dataset}/test_all_models_${dataset}.py --vps ${vps}"
     done
@@ -92,7 +101,12 @@ for wine in red white; do
 done
 
 # Diabetes, Heart, Stroke, Bodyfat Baselines
-for dataset in diabetes heart stroke bodyfat; do
+create_script "diabetes_baselines" "test/diabetes/test_baselines_pysr_diabetes.py --model_group baselines"
+for aps in 0.1 1.0 10.0 50.0; do
+    create_script "diabetes_pysr_aps${aps}" "test/diabetes/test_baselines_pysr_diabetes.py --model_group pysr --aps ${aps}"
+done
+
+for dataset in heart stroke bodyfat; do
     create_script "${dataset}_baselines" "test/${dataset}/test_baselines_pysr_${dataset}.py"
 done
 

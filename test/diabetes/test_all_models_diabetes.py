@@ -22,6 +22,8 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--vps', type=int, default=None)
+    parser.add_argument('--vpr', type=int, default=None)
+    parser.add_argument('--aps', type=float, default=None)
     args = parser.parse_args()
 
     out_root = os.path.join(current_dir, "results_diabetes_all")
@@ -45,6 +47,11 @@ def main():
     deeppysr_configs = get_deeppysr_configs()
     if args.vps is not None:
         deeppysr_configs = {k: v for k, v in deeppysr_configs.items() if f"vps{args.vps}_" in k}
+    if args.vpr is not None:
+        deeppysr_configs = {k: v for k, v in deeppysr_configs.items() if f"vpr{args.vpr}_" in k}
+    if args.aps is not None:
+        # Match aps value in string, handle potential float formatting
+        deeppysr_configs = {k: v for k, v in deeppysr_configs.items() if f"aps{args.aps}" in k or f"aps{float(args.aps)}" in k}
 
     pysr_configs = get_pysr_configs()
     pysr_base_kwargs = get_pysr_base_kwargs()
