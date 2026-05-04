@@ -99,6 +99,8 @@ def main():
                 return PySRRegressor(
                     **pysr_base_kwargs,
                     **co,
+                    batching=True,
+                    batch_size=500
                 )
 
             if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
