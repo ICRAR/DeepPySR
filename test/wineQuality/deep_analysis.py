@@ -33,7 +33,7 @@ def main():
     print("RED WINE DEEP ANALYSIS")
     print("="*70)
 
-    red_metrics = metrics_df[metrics_df['type'] == 'red']
+    red_metrics = metrics_df[metrics_df['wine type'] == 'red']
     red_models = get_best_interpretable_params(red_metrics, model_type='Best DeepPySR')
 
     df_red = load_wine_data('red')
