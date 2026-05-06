@@ -32,7 +32,7 @@ def main():
     print("RED WINE CONVERGENCE TESTS")
     print("="*70)
     
-    red_metrics = metrics_df[metrics_df['type'] == 'red']
+    red_metrics = metrics_df[metrics_df['wine type'] == 'red']
     red_models = {}
     for _, row in red_metrics.iterrows():
         if row['display_model'] in ['Best DeepPySR', 'Best PySR']:
@@ -51,7 +51,7 @@ def main():
     print("WHITE WINE CONVERGENCE TESTS")
     print("="*70)
     
-    white_metrics = metrics_df[metrics_df['type'] == 'white']
+    white_metrics = metrics_df[metrics_df['wine type'] == 'white']
     white_models = {}
     for _, row in white_metrics.iterrows():
         if row['display_model'] in ['Best DeepPySR', 'Best PySR']:
