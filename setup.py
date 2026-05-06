@@ -28,6 +28,7 @@ setup(
         "imblearn",
         "PyYAML",
         "xgboost",
+        "statsmodels",
     ],
     author="FulingChen",
     description="A deep symbolic regression package based on PySR",
