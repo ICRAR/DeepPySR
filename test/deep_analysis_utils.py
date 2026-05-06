@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 import numpy as np
 
-def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_iterations=500, n_layers=3):
+def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_iterations=500, n_layers=3, task='regression'):
     """
     Run deep analysis using DeepPySRRegressor with provided parameters.
     Trains on the entire dataset provided.
@@ -12,6 +12,7 @@ def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_i
         os.makedirs(output_root, exist_ok=True)
 
     from deeppysr import DeepPySR
+    from eval_utils import calculate_metrics, save_predictions
 
     results = []
 
@@ -37,6 +38,38 @@ def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_i
         regressor = DeepPySR(**model_params)
         regressor.fit(X, y)
         
+        # Predict outcomes
+        y_pred = regressor.predict(X)
+        y_prob = None
+        
+        if task == 'classification':
+            if hasattr(regressor, 'predict_proba'):
+                y_prob = regressor.predict_proba(X)
+                if y_prob.ndim > 1:
+                    if y_prob.shape[1] == 2:
+                        y_prob = y_prob[:, 1]
+                
+                if y_prob.ndim == 1:
+                    y_pred_rounded = np.round(y_prob).astype(int)
+                else:
+                    y_pred_rounded = np.argmax(y_prob, axis=1)
+            else:
+                y_prob = np.clip(y_pred, 0, 1)
+                y_pred_rounded = np.round(y_prob).astype(int)
+            
+            # Use rounded predictions for metrics
+            metrics_y_pred = y_pred_rounded
+        else:
+            metrics_y_pred = y_pred
+
+        # Evaluate
+        metrics = calculate_metrics(y, metrics_y_pred, y_prob=y_prob, task=task)
+        
+        # Save metrics and predictions
+        pd.DataFrame([metrics]).to_csv(os.path.join(output_root, "metrics.csv"), index=False)
+        save_predictions(output_root, y, metrics_y_pred, y_prob=y_prob)
+        print(f"    Saved metrics.csv and predictions.csv to {output_root}")
+
         # Plot relationships using deeppysr's built-in plot functions
         try:
             print(f"    Generating plots for {model_display_name}...")

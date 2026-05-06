@@ -461,7 +461,7 @@ def get_pysr_base_kwargs(os_cpu_count=None):
         "extra_sympy_mappings": {
             'cond': sympy_cond,
         },
-        "warm_start": True,
+        # "warm_start": True,
         "unary_operators": ["exp", "log", "sin", "sqrt"],
         "parsimony": 0.001,
         "populations": 100,

@@ -45,7 +45,7 @@ def main():
     if os.path.exists(os.path.join(output_root, 'relationships.csv')):
         print(f"Skipping diabetes analysis as results already exist in {output_root}")
     else:
-        run_deep_analysis(X, y, best_models, output_root, name='Diabetes', n_iterations=500, n_layers=3)
+        run_deep_analysis(X, y, best_models, output_root, name='Diabetes', n_iterations=500, n_layers=3, task='classification')
 
 if __name__ == "__main__":
     main()

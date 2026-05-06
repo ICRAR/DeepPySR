@@ -24,15 +24,15 @@ julia --project=. -e 'using Pkg; Pkg.update(); Pkg.precompile()'
 # notes:
 stroke, diabetes, diabetes130us are 100 nit, others are 500
 
-| Dataset   | Machine | nit | cvtrain | analysis | deep | convergence | stats | 
-|:----------|:--------|:----|:--------|:---------|:-----|:------------|:------|
-| BMI       | setonix | 500 | finish  |
-| feynman   | setonix | 500 | finish  |
-| heart     | setonix | 500 | finish  |
-| stroke    | setonix | 100 | finish  |
-| bodyfat   | setonix | 500 | finish  |
-| wine      | setonix | 500 | finish  |
-| diabetes  | setonix | 100 | finish  |
+| Dataset   | Machine | nit | cvtrain | analysis | deep | convergence | stats  | 
+|:----------|:--------|:----|:--------|:---------|:-----|:------------|:-------|
+| BMI       | setonix | 500 | finish  | finish   |      |       |  |
+| feynman   | setonix | 500 | finish  |          |      |             |        |
+| heart     | setonix | 500 | finish  |          |      |             |        |
+| stroke    | setonix | 100 | finish  |          |      |             |        |
+| bodyfat   | setonix | 500 | finish  |          |      |             |        |
+| wine      | setonix | 500 | finish  |          |      |             |        |
+| diabetes  | setonix | 100 | finish  |          |      |             |        |
 
 
 steps: cv train -> analysis -> deep, convergence -> stats
