@@ -21,7 +21,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_group', type=str, choices=['baselines', 'pysr', 'all'], default='pysr',
+    parser.add_argument('--model_group', type=str, choices=['baselines', 'pysr', 'all'], default='all',
                         help='Which group of models to run: baselines, pysr, or all')
     parser.add_argument('--aps', type=float, default=50.0,
                         help='Adaptive parsimony scaling for PySR (if model_group is pysr)')

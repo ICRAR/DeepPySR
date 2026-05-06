@@ -30,22 +30,15 @@ def process_results():
             if not os.path.isdir(model_path):
                 continue
 
-            # Use overall_metrics.csv for all baselines if it exists
+            # Use overall_metrics.csv/overall_metrics_sym.csv if they exist
             overall_metrics_file = os.path.join(model_path, "overall_metrics.csv")
-            use_overall = False
-            if os.path.exists(overall_metrics_file):
-                df_metrics = pd.read_csv(overall_metrics_file)
-                acc_o = df_metrics['accuracy'].iloc[0]
-                prec_o = df_metrics['precision'].iloc[0]
-                rec_o = df_metrics['recall'].iloc[0]
-                f1_o = df_metrics['f1'].iloc[0]
-                auc_o = df_metrics['auc'].iloc[0]
-                use_overall = True
+            overall_metrics_sym_file = os.path.join(model_path, "overall_metrics_sym.csv")
 
             if model_name.lower() == 'kan':
                 # KAN
-                if use_overall:
-                    acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
+                if os.path.exists(overall_metrics_file):
+                    df_metrics = pd.read_csv(overall_metrics_file)
+                    acc, prec, rec, f1, auc = df_metrics['accuracy'].iloc[0], df_metrics['precision'].iloc[0], df_metrics['recall'].iloc[0], df_metrics['f1'].iloc[0], df_metrics['auc'].iloc[0]
                 else:
                     pred_file = os.path.join(model_path, "predictions.csv")
                     if os.path.exists(pred_file):
@@ -56,32 +49,20 @@ def process_results():
                 all_data.append(['KAN', acc, prec, rec, f1, auc, np.nan, ""])
 
                 # KANSym
-                overall_metrics_sym_file = os.path.join(model_path, "overall_metrics_sym.csv")
-                use_overall_sym = False
                 if os.path.exists(overall_metrics_sym_file):
                     df_metrics_sym = pd.read_csv(overall_metrics_sym_file)
-                    acc_s = df_metrics_sym['accuracy'].iloc[0]
-                    prec_s = df_metrics_sym['precision'].iloc[0]
-                    rec_s = df_metrics_sym['recall'].iloc[0]
-                    f1_s = df_metrics_sym['f1'].iloc[0]
-                    auc_s = df_metrics_sym['auc'].iloc[0]
-                    use_overall_sym = True
+                    acc, prec, rec, f1, auc = df_metrics_sym['accuracy'].iloc[0], df_metrics_sym['precision'].iloc[0], df_metrics_sym['recall'].iloc[0], df_metrics_sym['f1'].iloc[0], df_metrics_sym['auc'].iloc[0]
+                else:
+                    _, _, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
+                    acc, prec, rec, f1, auc = metrics
 
-                pred_file = os.path.join(model_path, "predictions.csv")
-                if os.path.exists(pred_file):
-                    df_pred = pd.read_csv(pred_file)
-                    if 'y_pred_kansym' in df_pred.columns:
-                        # For KANSym, we need formula and complexity
-                        formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
-                        acc, prec, rec, f1, auc = metrics
-                        if use_overall_sym:
-                            acc, prec, rec, f1, auc = acc_s, prec_s, rec_s, f1_s, auc_s
-
-                        all_data.append(['KANSym', acc, prec, rec, f1, auc, complexity, formula])
+                formula, complexity, _ = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
+                all_data.append(['KANSym', acc, prec, rec, f1, auc, complexity, formula])
             else:
                 # Other baselines
-                if use_overall:
-                    acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
+                if os.path.exists(overall_metrics_file):
+                    df_metrics = pd.read_csv(overall_metrics_file)
+                    acc, prec, rec, f1, auc = df_metrics['accuracy'].iloc[0], df_metrics['precision'].iloc[0], df_metrics['recall'].iloc[0], df_metrics['f1'].iloc[0], df_metrics['auc'].iloc[0]
                 else:
                     pred_file = os.path.join(model_path, "predictions.csv")
                     if os.path.exists(pred_file):
@@ -100,35 +81,25 @@ def process_results():
 
             # Use overall_metrics.csv for DeepPySR if it exists
             overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
-            use_overall = False
             if os.path.exists(overall_metrics_file):
                 df_metrics = pd.read_csv(overall_metrics_file)
-                acc_o = df_metrics['accuracy'].iloc[0]
-                prec_o = df_metrics['precision'].iloc[0]
-                rec_o = df_metrics['recall'].iloc[0]
-                f1_o = df_metrics['f1'].iloc[0]
-                auc_o = df_metrics['auc'].iloc[0]
+                acc, prec, rec, f1, auc = df_metrics['accuracy'].iloc[0], df_metrics['precision'].iloc[0], df_metrics['recall'].iloc[0], df_metrics['f1'].iloc[0], df_metrics['auc'].iloc[0]
                 use_overall = True
+            else:
+                use_overall = False
 
             res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='deeppysr')
 
             if isinstance(res, dict):
                 for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    acc, prec, rec, f1, auc = metrics
-                    if use_overall:
-                        acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
+                    if not use_overall:
+                        acc, prec, rec, f1, auc = metrics
                     model_name = f"{variant}_r2w{r2w}_L{lamb}"
                     all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
             else:
                 formula, complexity, metrics = res
-                acc, prec, rec, f1, auc = metrics
-                if use_overall:
-                    acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
-                elif not formula:
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        df_pred = pd.read_csv(pred_file)
-                        acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                if not use_overall:
+                    acc, prec, rec, f1, auc = metrics
                 all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
 
     # PySR
@@ -140,35 +111,25 @@ def process_results():
 
             # Use overall_metrics.csv for PySR if it exists
             overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
-            use_overall = False
             if os.path.exists(overall_metrics_file):
                 df_metrics = pd.read_csv(overall_metrics_file)
-                acc_o = df_metrics['accuracy'].iloc[0]
-                prec_o = df_metrics['precision'].iloc[0]
-                rec_o = df_metrics['recall'].iloc[0]
-                f1_o = df_metrics['f1'].iloc[0]
-                auc_o = df_metrics['auc'].iloc[0]
+                acc, prec, rec, f1, auc = df_metrics['accuracy'].iloc[0], df_metrics['precision'].iloc[0], df_metrics['recall'].iloc[0], df_metrics['f1'].iloc[0], df_metrics['auc'].iloc[0]
                 use_overall = True
+            else:
+                use_overall = False
             
             res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
 
             if isinstance(res, dict):
                 for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    acc, prec, rec, f1, auc = metrics
-                    if use_overall:
-                        acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
+                    if not use_overall:
+                        acc, prec, rec, f1, auc = metrics
                     model_name = f"{variant}_r2w{r2w}_L{lamb}"
                     all_data.append([model_name, acc, prec, rec, f1, auc, complexity, formula])
             else:
                 formula, complexity, metrics = res
-                acc, prec, rec, f1, auc = metrics
-                if use_overall:
-                    acc, prec, rec, f1, auc = acc_o, prec_o, rec_o, f1_o, auc_o
-                elif not formula:
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        df_pred = pd.read_csv(pred_file)
-                        acc, prec, rec, f1, auc = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                if not use_overall:
+                    acc, prec, rec, f1, auc = metrics
                 all_data.append([variant, acc, prec, rec, f1, auc, complexity, formula])
 
     # Create DataFrame and save

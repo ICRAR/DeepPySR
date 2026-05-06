@@ -17,7 +17,7 @@ from analysis_utils import calculate_metrics, get_best_formula_from_raw
 
 def process_results():
     all_data = []
-    base_dir = os.path.join(current_dir, "../../archive/results/results_bmi_all/results_bodyfat_all")
+    base_dir = os.path.join(current_dir, "results_bodyfat_all")
 
     X, y = load_bodyfat_data()
     task = 'regression'
@@ -30,20 +30,15 @@ def process_results():
             if not os.path.isdir(model_path):
                 continue
 
-            # Use overall_metrics.csv for all baselines if it exists
+            # Use overall_metrics.csv/overall_metrics_sym.csv if they exist
             overall_metrics_file = os.path.join(model_path, "overall_metrics.csv")
-            use_overall = False
-            if os.path.exists(overall_metrics_file):
-                df_metrics = pd.read_csv(overall_metrics_file)
-                r2_o = df_metrics['r2'].iloc[0]
-                rmse_o = df_metrics['rmse'].iloc[0]
-                mae_o = df_metrics['mae'].iloc[0]
-                use_overall = True
+            overall_metrics_sym_file = os.path.join(model_path, "overall_metrics_sym.csv")
 
             if model_name.lower() == 'kan':
                 # KAN
-                if use_overall:
-                    r2, rmse, mae = r2_o, rmse_o, mae_o
+                if os.path.exists(overall_metrics_file):
+                    df_metrics = pd.read_csv(overall_metrics_file)
+                    r2, rmse, mae = df_metrics['r2'].iloc[0], df_metrics['rmse'].iloc[0], df_metrics['mae'].iloc[0]
                 else:
                     pred_file = os.path.join(model_path, "predictions.csv")
                     if os.path.exists(pred_file):
@@ -54,30 +49,20 @@ def process_results():
                 all_data.append(['KAN', r2, rmse, mae, np.nan, ""])
 
                 # KANSym
-                overall_metrics_sym_file = os.path.join(model_path, "overall_metrics_sym.csv")
-                use_overall_sym = False
                 if os.path.exists(overall_metrics_sym_file):
                     df_metrics_sym = pd.read_csv(overall_metrics_sym_file)
-                    r2_s = df_metrics_sym['r2'].iloc[0]
-                    rmse_s = df_metrics_sym['rmse'].iloc[0]
-                    mae_s = df_metrics_sym['mae'].iloc[0]
-                    use_overall_sym = True
+                    r2, rmse, mae = df_metrics_sym['r2'].iloc[0], df_metrics_sym['rmse'].iloc[0], df_metrics_sym['mae'].iloc[0]
+                else:
+                    _, _, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
+                    r2, rmse, mae = metrics
 
-                pred_file = os.path.join(model_path, "predictions.csv")
-                if os.path.exists(pred_file):
-                    df_pred = pd.read_csv(pred_file)
-                    if 'y_pred_kansym' in df_pred.columns:
-                        # For KANSym, we need formula and complexity
-                        formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
-                        r2, rmse, mae = metrics
-                        if use_overall_sym:
-                            r2, rmse, mae = r2_s, rmse_s, mae_s
-
-                        all_data.append(['KANSym', r2, rmse, mae, complexity, formula])
+                formula, complexity, _ = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold', model_type='kan', task=task)
+                all_data.append(['KANSym', r2, rmse, mae, complexity, formula])
             else:
                 # Other baselines
-                if use_overall:
-                    r2, rmse, mae = r2_o, rmse_o, mae_o
+                if os.path.exists(overall_metrics_file):
+                    df_metrics = pd.read_csv(overall_metrics_file)
+                    r2, rmse, mae = df_metrics['r2'].iloc[0], df_metrics['rmse'].iloc[0], df_metrics['mae'].iloc[0]
                 else:
                     pred_file = os.path.join(model_path, "predictions.csv")
                     if os.path.exists(pred_file):
@@ -96,33 +81,25 @@ def process_results():
 
             # Use overall_metrics.csv for DeepPySR if it exists
             overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
-            use_overall = False
             if os.path.exists(overall_metrics_file):
                 df_metrics = pd.read_csv(overall_metrics_file)
-                r2_o = df_metrics['r2'].iloc[0]
-                rmse_o = df_metrics['rmse'].iloc[0]
-                mae_o = df_metrics['mae'].iloc[0]
+                r2, rmse, mae = df_metrics['r2'].iloc[0], df_metrics['rmse'].iloc[0], df_metrics['mae'].iloc[0]
                 use_overall = True
+            else:
+                use_overall = False
 
             res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='deeppysr')
 
             if isinstance(res, dict):
                 for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    r2, rmse, mae = metrics
-                    if use_overall:
-                        r2, rmse, mae = r2_o, rmse_o, mae_o
+                    if not use_overall:
+                        r2, rmse, mae = metrics
                     model_name = f"{variant}_r2w{r2w}_L{lamb}"
                     all_data.append([model_name, r2, rmse, mae, complexity, formula])
             else:
                 formula, complexity, metrics = res
-                r2, rmse, mae = metrics
-                if use_overall:
-                    r2, rmse, mae = r2_o, rmse_o, mae_o
-                elif not formula:
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        df_pred = pd.read_csv(pred_file)
-                        r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                if not use_overall:
+                    r2, rmse, mae = metrics
                 all_data.append([variant, r2, rmse, mae, complexity, formula])
 
     # PySR
@@ -134,33 +111,25 @@ def process_results():
 
             # Use overall_metrics.csv for PySR if it exists
             overall_metrics_file = os.path.join(v_path, "overall_metrics.csv")
-            use_overall = False
             if os.path.exists(overall_metrics_file):
                 df_metrics = pd.read_csv(overall_metrics_file)
-                r2_o = df_metrics['r2'].iloc[0]
-                rmse_o = df_metrics['rmse'].iloc[0]
-                mae_o = df_metrics['mae'].iloc[0]
+                r2, rmse, mae = df_metrics['r2'].iloc[0], df_metrics['rmse'].iloc[0], df_metrics['mae'].iloc[0]
                 use_overall = True
+            else:
+                use_overall = False
             
             res = get_best_formula_from_raw(v_path, X, y, task=task, model_type='pysr')
 
             if isinstance(res, dict):
                 for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                    r2, rmse, mae = metrics
-                    if use_overall:
-                        r2, rmse, mae = r2_o, rmse_o, mae_o
+                    if not use_overall:
+                        r2, rmse, mae = metrics
                     model_name = f"{variant}_r2w{r2w}_L{lamb}"
                     all_data.append([model_name, r2, rmse, mae, complexity, formula])
             else:
                 formula, complexity, metrics = res
-                r2, rmse, mae = metrics
-                if use_overall:
-                    r2, rmse, mae = r2_o, rmse_o, mae_o
-                elif not formula:
-                    pred_file = os.path.join(v_path, "predictions.csv")
-                    if os.path.exists(pred_file):
-                        df_pred = pd.read_csv(pred_file)
-                        r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'], task=task)
+                if not use_overall:
+                    r2, rmse, mae = metrics
                 all_data.append([variant, r2, rmse, mae, complexity, formula])
 
     # Create DataFrame and save
@@ -237,7 +206,7 @@ def aggregate_feature_importance():
     Average across folds, percentage it.
     """
     importance_data = []
-    base_dir = os.path.join(current_dir, "../../archive/results/results_bmi_all/results_bodyfat_all")
+    base_dir = os.path.join(current_dir, "results_bodyfat_all")
 
     # Helper to process importance file
     def process_importance(path, model_name):
