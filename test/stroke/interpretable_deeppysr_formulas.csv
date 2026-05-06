@@ -1,0 +1,2 @@
+model,formula,f1,complexity
+fullsr_vps25_vpr150_aps50.0_nit100_pop100_sz200_grid_r2w1.0_L0.01,"cond(work_type, sin((sin(3.14*hypertension) + sin(3.14*Residence_type))**0.25 + sin(0.02*age - 1.0*sin(31.44*age))))",0.25727069351230425,27.0

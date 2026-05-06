@@ -1,0 +1,37 @@
+STATS ANALYSIS: Age Specific - Age 20
+Features: ['y5_bmiz', 'breastfed_any', 'agebirth_m_y', 'mode_delivery', 'hhincome_0', 'm_wt1', 'SUM_PGS002853', 'y5_a6']
+======================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.403
+Model:                            OLS   Adj. R-squared:                  0.392
+Method:                 Least Squares   F-statistic:                     36.42
+Date:                Tue, 05 May 2026   Prob (F-statistic):           5.13e-44
+Time:                        21:19:59   Log-Likelihood:                -1212.0
+No. Observations:                 441   AIC:                             2442.
+Df Residuals:                     432   BIC:                             2479.
+Df Model:                           8                                         
+Covariance Type:            nonrobust                                         
+=================================================================================
+                    coef    std err          t      P>|t|      [0.025      0.975]
+---------------------------------------------------------------------------------
+const             3.5442      4.197      0.844      0.399      -4.706      11.794
+y5_bmiz           0.9043      0.393      2.303      0.022       0.133       1.676
+breastfed_any     0.0223      0.045      0.491      0.623      -0.067       0.111
+agebirth_m_y     -0.0862      0.035     -2.481      0.013      -0.155      -0.018
+mode_delivery     0.3742      0.180      2.078      0.038       0.020       0.728
+hhincome_0        0.2384      0.192      1.239      0.216      -0.140       0.617
+m_wt1             0.0808      0.015      5.338      0.000       0.051       0.111
+SUM_PGS002853     2.7685      0.605      4.572      0.000       1.578       3.959
+y5_a6             0.9043      0.221      4.096      0.000       0.470       1.338
+==============================================================================
+Omnibus:                       93.793   Durbin-Watson:                   1.924
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              213.599
+Skew:                           1.090   Prob(JB):                     4.15e-47
+Kurtosis:                       5.621   Cond. No.                     1.74e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 1.74e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.

@@ -20,7 +20,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--vps', type=int, default=None)
+    parser.add_argument('--vps', type=int, default=75)
     args = parser.parse_args()
 
     out_root = os.path.join(current_dir, 'results_bodyfat_all')

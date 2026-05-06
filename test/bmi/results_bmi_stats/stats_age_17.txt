@@ -1,0 +1,33 @@
+STATS ANALYSIS: Age Specific - Age 17
+Features: ['marry', 'y5_bmiz', 'y1_a4', 'mo_grav']
+======================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.357
+Model:                            OLS   Adj. R-squared:                  0.351
+Method:                 Least Squares   F-statistic:                     60.32
+Date:                Tue, 05 May 2026   Prob (F-statistic):           1.63e-40
+Time:                        21:19:58   Log-Likelihood:                -1138.1
+No. Observations:                 440   AIC:                             2286.
+Df Residuals:                     435   BIC:                             2307.
+Df Model:                           4                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+const         40.7345      5.541      7.351      0.000      29.843      51.626
+marry          0.2617      0.284      0.922      0.357      -0.296       0.820
+y5_bmiz        2.7186      0.177     15.384      0.000       2.371       3.066
+y1_a4         -0.4080      0.116     -3.525      0.000      -0.635      -0.180
+mo_grav        0.2017      0.100      2.023      0.044       0.006       0.398
+==============================================================================
+Omnibus:                      111.069   Durbin-Watson:                   1.861
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              267.177
+Skew:                           1.265   Prob(JB):                     9.62e-59
+Kurtosis:                       5.859   Cond. No.                     1.72e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 1.72e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.

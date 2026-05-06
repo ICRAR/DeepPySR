@@ -21,7 +21,8 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--setting', type=str, default=None, choices=['longitudinal', 'age_specific'])
+
+    parser.add_argument('--setting', type=str, default='longitudinal', choices=['longitudinal', 'age_specific'])
     parser.add_argument('--age', type=int, default=None)
     args = parser.parse_args()
 
@@ -54,6 +55,7 @@ def main():
             runs = []
             for age in ages:
                 ids, X, y = load_bmi_agg_data(age=age)
+
                 if not X.empty:
                     runs.append((f"age_{age}", ids, X, y))
             run_out_root_base = os.path.join(out_root, setting)

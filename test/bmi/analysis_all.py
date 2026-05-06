@@ -255,7 +255,7 @@ def plot_results(df):
 
             # 2. Interpretable DeepPySR (highest overall R2 with complexity < 25)
             if not deeppysr_long.empty:
-                interp_candidates = deeppysr_long[deeppysr_long['complexity'] < 25].groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
+                interp_candidates = deeppysr_long[deeppysr_long['complexity'] < 30].groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
                 best_interp_name = None
                 best_interp_r2 = -np.inf
                 for _, row in interp_candidates.iterrows():
@@ -337,7 +337,7 @@ def plot_results(df):
                     best_deeppysr['display_model'] = 'Best DeepPySR'
                     selected_data.append(best_deeppysr)
 
-                    interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 25]
+                    interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 30]
                     if not interp_deeppysr_df.empty:
                         interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
                         interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
@@ -665,4 +665,4 @@ if __name__ == "__main__":
     plot_results(df)
 
     plot_settings_comparison(df)
-    # aggregate_feature_importance()
+    aggregate_feature_importance()

@@ -1,8 +1,8 @@
 model,r2,rmse,mae,complexity,formula,display_model
-fullsr_vps25_vpr150_aps10.0_nit500_pop100_sz200_grid_r2w1.5_L0.001,0.7945587444191797,3.7856505096328124,3.046839962996678,56.0,"(385.96*Abdomen/Wrist**0.5 + cond(-1.0*sin(6513.79/Forearm**1.0 + Hip - 1.0*sin(sin(Weight))), 321.96) - 6573.94)/Hip**1.0 + sin(6538.99*Chest) - 2.28*sin(7214.26/Weight**1.0 - sin(6551.08*Neck))",Best DeepPySR
-fullsr_vps75_vpr150_aps1.0_nit500_pop100_sz200_grid_r2w1.5_L0.005,0.7722068397582988,3.986272899111268,3.205862282098234,33.0,-1.0*Wrist + Abdomen + exp(-1.0*sin(140.47*Abdomen) + sin(120.24*Knee)) - 52.96/sin(221.83/Weight**1.0)**1.0,Interpretable DeepPySR
-pysr_aps10.0_nit500_pop100_sz200,0.6933853088922395,4.624802243806229,3.7488127283493022,27.0,"(1.204217 - 0.0013281872*Weight)*(Abdomen + Piecewise((3.7956274, sin((Abdomen + 0.99919355)*sin(Weight - 1*(-0.62244135))) > 0), (0, True))) - 71.68336",Best PySR
-KAN,0.0,8.533515072157066,6.556149843253968,,,KAN
+fullsr_vps75_vpr150_aps10.0_nit500_pop100_sz200_grid_r2w2.0_L0.001,0.793779138141766,3.7928265811735145,3.021057537489145,54.0,(-279.43*Wrist + Abdomen**2.0 + 279.43*exp(sin(4883.13/Weight**1.0) + sin(0.52*Height))*sin(1589.11*Abdomen) - 279.43*sin(exp(Thigh)*sin(Knee)))/Weight**1.0 - 1.0*sin(1259.4*Neck + sin(Ankle)),Best DeepPySR
+fullsr_vps25_vpr150_aps1.0_nit500_pop100_sz200_grid_r2w2.0_L0.005,0.7721930850884192,3.986393247413334,3.205056760737932,34.0,Abdomen - 543.39*(-1.0*Wrist + sin(11.63*Weight) - 1.0*sin(738.74*Neck + sin(0.39*Weight)))/(Weight - 515.23)**1.0 - 43.49,Interpretable DeepPySR
+pysr_aps50.0_nit500_pop100_sz200,0.7021436586106475,4.558270696636434,3.755858315204766,29.0,-Wrist + Abdomen - (Weight*Weight*0.000332104 + sin((Weight*Weight - (-1)*1.2647516/Age)*(-50.99455))*2.395171 + 44.403008),Best PySR
+KAN,0.0,8.406022784361419,6.29152501547619,,,KAN
 KANSym,0.0,8.368160330263116,6.874091165784805,1.0,18.6329026222229,KANSym
 ElasticNet,0.6928872224242106,4.6285571465034625,3.7472878073725253,,,ElasticNet
 ExtraTrees,0.645787498956605,4.970826780218657,4.006169265760556,,,ExtraTrees

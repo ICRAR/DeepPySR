@@ -1,9 +1,9 @@
 model,accuracy,precision,recall,f1,auc,complexity,formula,display_model
-fullsr_vps25_vpr100_aps1.0_nit500_pop100_sz200_grid_warm_r2w1.5_L0.01,0.9124579124579124,0.9111111111111111,0.8978102189781022,0.9044117647058824,0.5,45.0,"sin(cp**0.5*sin((sin(0.99*chol) + 1.56)*sin((0.28*sex + log(slope))*(cond(ca, 1.27) + sin(exang + cond(sin(exp(age**0.5)), 0.85*ca + thal - 0.85*exang))))))",Best DeepPySR
-fullsr_vps25_vpr50_aps1.0_nit500_pop100_sz200_grid_r2w1.0_L0.01,0.8821548821548821,0.8863636363636364,0.8540145985401459,0.8698884758364313,0.5,30.0,"cond((0.51*thal + (sex + slope)*(ca + exang)**0.5)/sin(exp(sin(slope*cp)))**1.0 - 7.76, 0.85) + 0.1",Interpretable DeepPySR
-pysr_aps1.0_nit500_pop100_sz200,0.7878787878787878,0.7642857142857142,0.781021897810219,0.7725631768953068,0.8281706204379562,58.0,"Piecewise((0.9518662, ITE(sin(0.490561474588548*chol) > 0, sin(-sqrt((ca + exang + 0.88608843)*log(sex + slope*thal - 1.3538251)) + 2.035853 + 5.327642/sin(cp)) < 0, sin(-sqrt((ca + 0.88608843)*log(sex + slope*thal - 1.3538251)) + 2.035853 + 5.327642/sin(cp)) < 0)), (0, True))",Best PySR
+fullsr_vps25_vpr150_aps50.0_nit500_pop100_sz200_grid_r2w1.0_L0.001,0.9090909090909091,0.9296875,0.8686131386861314,0.8981132075471698,0.5,47.0,"sin(cp**0.5*sin(0.05*thal*log((slope - 1.0*sin(sex + chol))*(slope*(ca + exang) + cond(sex - 1.0*fbs, age*ca - 1.0*sin(3.07*chol) + 0.92)) + 0.96)))",Best DeepPySR
+fullsr_vps50_vpr150_aps50.0_nit500_pop100_sz200_grid_r2w1.0_L0.01,0.8922558922558923,0.9133858267716536,0.8467153284671532,0.8787878787878788,0.5,34.0,"sin(2.06*sin((sin(3.18*slope*cp) + 0.19)*(sex*ca + 0.23*oldpeak - 0.23*sin(0.98*chol) + sin(cond(oldpeak, thal) + 0.25))))",Interpretable DeepPySR
+pysr_aps1.0_nit500_pop100_sz200,0.8047138047138047,0.7925925925925926,0.781021897810219,0.7867647058823529,0.863366788321168,27.0,"Piecewise((sin(18.985981/(thal + 9.11294967098333*sin((ca + exang)/slope))), sex + slope*sqrt(cp + restecg) - 2.9158123 > 0), (0, True))",Best PySR
 KAN,0.5387205387205387,0.0,0.0,0.0,0.5,,,KAN
-KANSym,0.5387205387205387,0.0,0.0,0.0,0.5,1.0,0.463094390928745,KANSym
+KANSym,0.5387205387205387,0.0,0.0,0.0,0.5,1.0,0.461623594164848,KANSym
 ExtraTrees,0.8282828282828283,0.8467741935483871,0.7664233576642335,0.8045977011494253,0.5,,,ExtraTrees
 MLP,0.7912457912457912,0.7737226277372263,0.7737226277372263,0.7737226277372263,0.5,,,MLP
 RandomForest,0.8148148148148148,0.8306451612903226,0.7518248175182481,0.789272030651341,0.5,,,RandomForest

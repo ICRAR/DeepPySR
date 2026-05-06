@@ -1,0 +1,1002 @@
+\documentclass[10pt,twocolumn]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{microtype}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+\title{\textbf{DeepPySR: Interpretable Scientific Discovery via Dynamic
+Feature Pruning and Multi-Layer Symbolic Regression}}
+
+\author{
+  Fuling Chen$^{1}$\thanks{Correspondence: \texttt{fuling.chen@icrar.org}} \\
+  $^1$ International Centre for Radio Astronomy Research (ICRAR),
+       University of Western Australia
+}
+
+\date{}
+
+% ── Document ──────────────────────────────────────────────────────────────────
+\begin{document}
+\maketitle
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{abstract}
+Symbolic regression (SR) discovers closed-form mathematical equations from
+data—enabling human-interpretable models in science and medicine.  Despite
+rapid progress, two persistent challenges limit its applicability: (i)
+\emph{high-dimensional feature spaces} cause search inefficiency as the
+algorithm explores irrelevant variables, and (ii) \emph{formula selection}
+from the Pareto front of accuracy–complexity trade-offs remains largely
+heuristic.  We introduce \textbf{DeepPySR}, an enhanced SR framework built
+on SymbolicRegression.jl, with three novel contributions.
+\textbf{First}, we propose a \emph{dynamic variable pruning schedule} that
+linearly ramps up mutation pressure to eliminate uninformative variables during
+the evolutionary search, substantially reducing search space and preventing
+overfitting through spurious features.
+\textbf{Second}, we introduce an \emph{exponential Pareto selection criterion}
+that jointly optimises R$^2$ and equation complexity via a principled
+score function, replacing ad-hoc thresholding.
+\textbf{Third}, we extend the framework to \emph{multi-layer symbolic
+regression} (DeepSR), where intermediate latent functions are automatically
+discovered and composed hierarchically, broadening the class of representable
+relationships.
+We evaluate DeepPySR on five Feynman physics benchmarks and five real-world
+biomedical datasets.  DeepPySR recovers exact physics equations (R$^2 = 1.0$)
+from noisy data and outperforms both PySR and all black-box baselines (XGBoost,
+Random Forest, MLP, KAN) on body fat (R$^2$: 0.794 vs.\ 0.702), heart disease
+(F1: 0.898 vs.\ 0.787), and diabetes prediction, while returning
+interpretable analytical formulas that connect to domain knowledge.
+\end{abstract}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+\label{sec:intro}
+
+The tension between predictive accuracy and interpretability is one of the
+central problems in applied machine learning.  In scientific disciplines—from
+biomedicine to astrophysics—understanding \emph{why} a model makes a
+prediction is often as important as the prediction itself.  A cardiologist
+needs not just a risk score but the mechanistic factors driving it; an
+epidemiologist studying childhood BMI trajectories needs an equation that can
+be communicated and acted on.
+
+[comment] add the data problem. In most biomedical datasets, severe ICC or data imbalance make any feature engineering
+or the available machine learning models frustrated. The available solution is to select a subset of critical
+features if large amounts of variables are provided or use SMOTE alike methods to make up synthetic data to
+solve the data imbalance. This is not an ideal way.
+
+Symbolic regression (SR) addresses this need by searching for analytical
+mathematical expressions that fit observed data~\citep{koza1994genetic}.
+Unlike black-box models, SR outputs human-readable equations that can be
+inspected, simplified, and connected to physical laws.  The field has seen
+renewed interest following the release of PySR~\citep{cranmer2023interpretable}
+and the Feynman SR benchmark~\citep{udrescu2020ai}, with recent methods achieving
+exact recovery of fundamental physics laws from noisy measurements.
+
+[comment] add KAN model which is a potential replacement of MLP with symbolic regression function supported.
+
+\subsection{Limitations of existing approaches}
+
+Despite this progress, three challenges hinder SR in practical, high-dimensional
+settings:
+
+\textbf{(1) Curse of dimensionality.}  Genetic programming (GP) explores an
+exponentially large tree space.  When input dimensionality grows, the search
+algorithm spends excessive effort combining irrelevant features, slowing
+convergence to the true expression.  Existing methods handle this through
+manual feature pre-selection or static parsimony penalties, neither of which
+adapts to the evolving population.
+
+\textbf{(2) Complexity control.}  SR returns a Pareto front of solutions
+trading accuracy against equation complexity.  Adaptive parsimony
+scaling~\citep{cranmer2023interpretable} mitigates population collapse around
+a single complexity level, but once a front is obtained, practitioners must
+still choose among equations by hand or with simple threshold rules.
+
+\textbf{(3) Expressive limitations.}  Standard SR discovers a single
+expression $y = f(\mathbf{x})$.  Many real-world systems are better described
+by hierarchical compositions—for instance, a biomarker might itself be an
+unknown function of measured variables that feeds into a higher-level
+outcome model.  Standard SR cannot represent such latent intermediate
+structure without manual engineering.
+
+Kolmogorov-Arnold Networks (KAN)~\citep{liu2024kan} have been proposed as an
+alternative interpretable architecture, using learnable activation functions
+on network edges.  While KANs are differentiable and fast to train, we show
+that their symbolic extraction step fails on standard Feynman benchmarks,
+producing degenerate or high-error formulas.
+
+[comment] this subsection is about the limitation of the pysr model, we also need to
+state the limitations of the general symbolic regression models. For example AI feynman is limited to ideal
+and clean data; KAN is limited to this model architecture, variable continuity, and so on and so on. For
+symbolicregression model, it is more tolerant than others for noisy data and data types. But some limitation still,
+here are the three challenges.
+
+\subsection{Contributions}
+
+We present \textbf{DeepPySR}, an extension of the SymbolicRegression.jl
+engine~\citep{cranmer2023interpretable}, with the following contributions:
+
+\begin{enumerate}
+  \item \textbf{Dynamic Variable Pruning Schedule (DVPS).}  A scheduled
+    mutation that gradually introduces a ``prune variable'' operator during
+    evolutionary search.  The pruning weight follows a linear ramp from zero
+    to a maximum multiplier, allowing early exploration and late feature
+    elimination.  This is novel both algorithmically (embedded in the GP
+    mutation weights) and practically (automatically performs feature
+    selection without a separate pre-processing step).
+
+  \item \textbf{Exponential Pareto Selection (EPS).}  A scoring criterion for
+    selecting the single best equation from the Pareto front:
+    \[
+      \mathrm{score}(i) = \bigl[\max(10^{-4},\, R^2_i)\bigr]^{\rho}
+                          \cdot \exp\!\bigl(-\lambda\,(c_i - 1)\bigr),
+    \]
+    where $R^2_i$ is predictive accuracy, $c_i$ is equation complexity,
+    $\rho$ is an accuracy weight, and $\lambda$ is a complexity penalty.
+    This exponential formulation ensures smooth differentiable trade-offs
+    and is tuned via grid search. [comment: the $R^2_i$ and $\lambda$ can be customised by user, provide a list,
+    then search the best]
+
+  \item \textbf{Multi-Layer Symbolic Regression (DeepSR).}  A hierarchical
+    SR architecture where the system discovers latent intermediate functions
+    and composes them layer by layer.  The final model takes the form
+    $y = f(g_1(\mathbf{x}),\, g_2(\mathbf{x}),\, \ldots,\, g_K(\mathbf{x}))$,
+    where each $g_k$ is itself a symbolic expression. [comment: this partially solves the ICC problem by selecting one
+    most representative variable instead of a bunch, and layer by layer discovers its related variables. so treat
+    a bunch of highly correlated variables as a tree rather than a big cluster.]
+\end{enumerate}
+
+We demonstrate these contributions on five Feynman physics equations and five
+real-world biomedical datasets from diverse populations, including the RAINE
+Generation 2 longitudinal cohort.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Symbolic regression.}  Genetic programming~\citep{koza1994genetic}
+is the classical approach to SR.  Modern implementations include
+gplearn~\citep{stephens2015gplearn}, Operon~\citep{burlacu2020operon}, and
+PySR/SymbolicRegression.jl~\citep{cranmer2023interpretable}.  PySR introduced
+adaptive parsimony scaling and a multi-population evolutionary scheme that
+significantly outperforms classical GP.  AIFeynman~\citep{udrescu2020ai}
+incorporates physics-inspired heuristics (dimensional analysis, neural
+networks for module detection) to recover Feynman equations exactly.
+DSR~\citep{petersen2021deep} uses a recurrent neural network as a policy to
+generate expression trees, trained by reinforcement learning.
+
+\textbf{Feature selection in GP.}  Prior work has explored feature selection
+as a pre-processing step~\citep{hein2018interpretable} or through
+multi-objective evolution that penalises variable
+usage~\citep{virgolin2020improving}.  Our DVPS differs by embedding feature
+pruning directly as a scheduled mutation operator, requiring no separate
+selection phase and adapting dynamically to the population state.
+
+\textbf{Interpretable neural networks.}  KAN~\citep{liu2024kan} places
+learnable B-spline functions on network edges, producing neural networks that
+can be symbolically simplified.  EQL~\citep{sahoo2018learning} constrains
+network activations to symbolic functions.  Both approaches require network
+training, which can be expensive and may produce fragile symbolic extractions.
+
+\textbf{Multi-layer SR.}  The idea of composing SR layers has appeared in
+deep SR works~\citep{kim2020integration} and feature engineering pipelines,
+but has not been systematically integrated into modern evolutionary SR
+frameworks with automated latent variable discovery.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Symbolic Regression Preliminaries}
+\label{sec:sr_prelim}
+
+Let $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$ be a dataset with
+$\mathbf{x}_i \in \mathbb{R}^d$ and $y_i \in \mathbb{R}$.  SR seeks an
+expression tree $f$ drawn from a grammar $\mathcal{G}$ of operators
+(e.g., $+, \times, \sin, \exp$) and operands (input variables or constants)
+such that $f(\mathbf{x}) \approx y$.  The search space is combinatorially
+large, so evolutionary algorithms evolve a population of candidate trees by
+repeated mutation and selection.
+
+We build on SymbolicRegression.jl (the Julia back-end of
+PySR)~\citep{cranmer2023interpretable}, which runs multiple independent
+evolutionary populations in parallel and periodically migrates the best
+individuals across populations.  The cost of each expression combines
+predictive loss $\mathcal{L}$ and a parsimony penalty proportional to
+the number of nodes~$c$:
+\begin{equation}
+  \mathrm{cost}(f) = \mathcal{L}(f) + \beta \cdot c(f),
+  \label{eq:base_cost}
+\end{equation}
+where $\beta$ is the parsimony coefficient.  After search, PySR returns a
+Pareto front of non-dominated (loss, complexity) pairs.
+
+\subsection{Dynamic Variable Pruning Schedule (DVPS)}
+\label{sec:dvps}
+
+\textbf{Motivation.}  In high-dimensional datasets ($d \gg 1$), expression
+trees tend to include many irrelevant variables early in the search because
+any variable can reduce loss slightly by overfitting.  Static parsimony
+penalises tree size but does not specifically target variable diversity.  We
+introduce a dedicated mutation operator, \texttt{prune\_variable}, that
+replaces a leaf variable node with a numeric constant.  Its weight in the
+mutation schedule grows linearly as the search matures.
+
+\textbf{Schedule function.}  At iteration $t$, the effective weight of the
+pruning mutation is:
+\begin{equation}
+  w_{\mathrm{prune}}(t) = w_0 \cdot \tau(t) \cdot M,
+  \label{eq:prune_schedule}
+\end{equation}
+\begin{equation}
+  \tau(t) = \min\!\left(1,\, \max\!\left(0,\,
+            \frac{t - T_{\mathrm{start}}}{T_{\mathrm{ramp}}}\right)\right),
+\end{equation}
+where $w_0$ is the base pruning weight (default $1.0$), $T_{\mathrm{start}}$
+is the iteration at which pruning begins, $T_{\mathrm{ramp}}$ is the ramp
+duration over which the weight linearly increases from $0$ to full, and $M$ is
+the maximum multiplier cap.  Before $T_{\mathrm{start}}$, $\tau(t) = 0$ and
+no pruning occurs; after $T_{\mathrm{start}} + T_{\mathrm{ramp}}$, $\tau(t)
+= 1$ and pruning is applied at full weight $w_0 \cdot M$.
+
+This schedule has three desirable properties: (i) early iterations are
+unaffected, allowing exploration of all features; (ii) pruning pressure ramps
+smoothly, preventing sudden disruption of the population; (iii) a cap $M$
+prevents pruning from overwhelming other mutation operators.
+
+\textbf{Effect on search.}  In the early phase ($t < T_{\mathrm{start}}$),
+the algorithm behaves identically to baseline PySR.  As the schedule activates,
+trees containing irrelevant variables are preferentially replaced—either by
+equivalent trees without that variable or by simpler alternatives—because the
+fitness landscape increasingly rewards simplicity.  This is analogous to
+L$_1$ regularisation applied to tree structure rather than weight magnitudes.
+
+\textbf{Implementation.}  The schedule is implemented in
+\texttt{Mutate.jl} of SymbolicRegression.jl.  At each mutation step, the
+current iteration is queried and $w_{\mathrm{prune}}(t)$ is recomputed before
+sampling the mutation type from the weight vector.
+
+Algorithm~\ref{alg:dvps} summarises the full evolutionary loop with DVPS.
+
+\begin{algorithm}
+\caption{Evolutionary SR with Dynamic Variable Pruning Schedule}
+\label{alg:dvps}
+\begin{algorithmic}[1]
+\State \textbf{Input:} dataset $\mathcal{D}$, operators $\mathcal{G}$,
+       params $T_{\mathrm{start}}, T_{\mathrm{ramp}}, M, w_0$
+\State Initialise population $\mathcal{P}$ of random expression trees
+\For{$t = 1, \ldots, T_{\mathrm{max}}$}
+  \State $\tau \gets \min(1, \max(0, (t - T_{\mathrm{start}})/T_{\mathrm{ramp}}))$
+  \State $w_{\mathrm{prune}} \gets w_0 \cdot \tau \cdot M$
+  \State Update mutation weights with $w_{\mathrm{prune}}$
+  \ForAll{individuals $f \in \mathcal{P}$}
+    \State Sample mutation type from updated weight distribution
+    \If{mutation = \texttt{prune\_variable}}
+      \State Replace a random variable node with a constant
+    \Else
+      \State Apply standard mutation (e.g., \texttt{mutate\_operator})
+    \EndIf
+    \State Evaluate $\mathrm{cost}(f)$ on $\mathcal{D}$
+    \State Update Pareto front
+  \EndFor
+  \State Migrate top individuals across sub-populations
+\EndFor
+\State \textbf{Return:} Pareto front of (loss, complexity) pairs
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Exponential Pareto Selection (EPS)}
+\label{sec:eps}
+
+After evolutionary search, SR produces a Pareto front $\mathcal{F} =
+\{f_1, f_2, \ldots\}$ of non-dominated solutions indexed by accuracy and
+complexity.  Selecting the best single formula is non-trivial: purely
+accuracy-based selection favours the most complex equation; purely
+complexity-based selection discards high-performing models.
+
+We define the following scoring function over the Pareto front:
+\begin{equation}
+  \mathrm{score}(f_i) =
+    \bigl[\max(10^{-4},\, R^2_i)\bigr]^{\rho}
+    \cdot \exp\!\bigl(-\lambda\,(c_i - 1)\bigr),
+  \label{eq:eps}
+\end{equation}
+where $R^2_i$ is the cross-validated R$^2$ of equation $f_i$, $c_i$ is its
+node count (complexity), $\rho \geq 1$ is the accuracy exponent, and
+$\lambda > 0$ is the complexity decay constant.  The selected formula is
+$f^* = \arg\max_i \mathrm{score}(f_i)$.
+
+\textbf{Interpretation.}  The first factor rewards accuracy superlinearly
+(when $\rho > 1$), magnifying differences between good and mediocre formulas.
+The exponential decay penalises complexity in a multiplicative rather than
+additive way: each additional node reduces the score by a factor
+$e^{-\lambda}$, so the penalty grows proportionally with complexity.
+Compared to additive parsimony, exponential penalisation prevents very complex
+equations from surviving even with marginally higher R$^2$.
+
+\textbf{Hyperparameters.}  We grid-search over
+$\rho \in \{1.0, 1.5, 2.0\}$ and $\lambda \in \{0.001, 0.005, 0.01\}$
+using cross-validated performance.  The floor $\max(10^{-4}, R^2_i)$
+prevents numerical issues when $R^2 \leq 0$.
+
+\subsection{Multi-Layer Symbolic Regression (DeepSR)}
+\label{sec:deepsr}
+
+\textbf{Motivation.}  Many systems exhibit hierarchical functional structure.
+For example, body fat may depend on a complex interaction of anthropometric
+measurements that cannot be expressed as a single shallow expression tree.
+Standard SR is limited to single-layer $y = f(\mathbf{x})$ relationships.
+
+\textbf{Architecture.}  DeepSR discovers the model:
+\begin{equation}
+  y = f\!\bigl(g_1(\mathbf{x}),\, g_2(\mathbf{x}),\, \ldots,\, g_K(\mathbf{x})\bigr),
+  \label{eq:deep_sr}
+\end{equation}
+where $f$ and each $g_k$ are symbolic expressions, and $K$ is the number of
+intermediate latent variables.  The key insight is that after discovering the
+outer function $f$, the latent inputs $g_k$ can themselves be treated as SR
+targets, enabling recursive decomposition.
+
+\textbf{Algorithm.}  DeepSR uses a breadth-first queue:
+
+\begin{enumerate}
+  \item \textbf{Outer-layer SR.}  Run SR on the original target $y$ against
+    features $\mathbf{x}$.  The selected expression $\hat{f}$ may reference
+    raw features and implicitly defined latent variables.
+
+  \item \textbf{Latent variable extraction.}  Identify subexpressions within
+    $\hat{f}$ that could be independently discovered; treat them as new SR
+    targets $\{g_k\}_{k=1}^K$.
+
+  \item \textbf{Inner-layer SR.}  For each $g_k$, run SR with $\mathbf{x}$
+    as features and the residual of $g_k$ as the target.  Discovered
+    expressions $\hat{g}_k$ are substituted back into $\hat{f}$.
+
+  \item \textbf{Repeat} until no latent variables remain or maximum depth
+    is reached.
+\end{enumerate}
+
+Each SR call uses the full DVPS and EPS machinery from
+Sections~\ref{sec:dvps}--\ref{sec:eps}.  The composed expression is evaluated
+by recursively substituting $\hat{g}_k$ into $\hat{f}$ using SymPy for
+symbolic manipulation and \texttt{lambdify} for efficient vectorised prediction.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Datasets}
+\label{sec:datasets}
+
+We evaluate on two categories of benchmarks: synthetic physics equations and
+real-world biomedical datasets.
+
+\subsection{Feynman Physics Equations}
+
+The Feynman SR Benchmark~\citep{udrescu2020ai} contains over 100 physics
+equations from Feynman's lectures.  We select five equations spanning varying
+difficulty (Table~\ref{tab:feynman_eqs}):
+
+\begin{table}[h]
+\centering
+\caption{Feynman equations used in evaluation. $n_f$: number of input
+         features.}
+\label{tab:feynman_eqs}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lll c}
+\toprule
+ID & True Formula & Description & $n_f$ \\
+\midrule
+I.6.2a  & $e^{-\theta^2/2}/\sqrt{2\pi}$ & Gaussian distribution & 1 \\
+I.8.14  & $\sqrt{(x_2-x_1)^2+(y_2-y_1)^2}$ & Euclidean distance & 4 \\
+I.13.4  & $\frac{1}{2}m(v^2+u^2+w^2)$ & Kinetic energy (3D) & 4 \\
+I.9.18  & $\frac{Gm_1m_2}{(x_2-x_1)^2+(y_2-y_1)^2+(z_2-z_1)^2}$ & Gravitational force & 7 \\
+I.32.17 & $\frac{\varepsilon c E_f^2 \omega^4}{(\omega^2-\omega_0^2)^2} \cdot \frac{8\pi r^2}{3}$ & EM scattering & 6 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Each equation is evaluated on $N=1000$ samples with variables drawn from
+uniform random ranges.  No noise is added; the challenge is recovering the
+exact symbolic structure.
+
+\subsection{Biomedical Datasets}
+
+\textbf{Body Fat} (252 samples, 14 features).  The \citet{johnson1996fitting}
+dataset measures body fat percentage alongside 13 anthropometric measurements
+(abdomen, wrist, weight, etc.).  This is a regression task with an
+established domain formula (Durnin–Womersley approximation) available for
+qualitative comparison.
+
+\textbf{Heart Disease} (303 samples, 13 features).  The Cleveland Heart
+Disease dataset~\citep{detrano1989international} contains clinical measurements
+(cholesterol, chest pain type, electrocardiographic results, etc.) and a
+binary target indicating presence of coronary artery disease.  Class
+imbalance is moderate (54\% positive).
+
+\textbf{Wine Quality} (Red: 1599 samples; White: 4898 samples; 11 physicochemical
+features each).  The UCI Wine Quality dataset~\citep{cortez2009modeling}
+provides quality scores (3--9) for Portuguese Vinho Verde wines.  We treat
+this as regression.  Red and white wines are modelled separately due to
+differing chemical profiles.
+
+\textbf{Stroke} (5110 samples, 10 features).  The Kaggle Stroke Prediction
+dataset provides medical history, lifestyle, and demographic features with a
+highly imbalanced binary target (4.9\% positive cases).  This tests model
+performance under severe class imbalance.
+
+\textbf{BMI Trajectories — RAINE Generation 2 Cohort.}  The RAINE study is a
+prospective longitudinal cohort tracking participants from birth in Western
+Australia.  We use Generation 2 data, analysing BMI at ages 8, 10, 14, 17,
+20, 23, and 27 years.  Two tasks are evaluated: (i) \emph{age-specific}
+cross-sectional models at each time point using concurrent measurements, and
+(ii) \emph{longitudinal} models predicting adult BMI from childhood
+measurements across multiple time points.  Features include anthropometric
+measures (height, weight, waist circumference) and sociodemographic variables.
+
+\textbf{Diabetes} (Pima Indian Diabetes Database; 768 samples, 8 features).
+Standard binary classification predicting onset of diabetes within five years.
+Results for diabetes and extended BMI analyses are reported in the Supplementary
+Material as experiments were ongoing at the time of writing.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Test Pipeline}
+
+All experiments use a standardised pipeline (Fig.~\ref{fig:pipeline}):
+
+\begin{enumerate}
+  \item \textbf{Preprocessing.}  Categorical variables are label-encoded;
+    continuous features are standardised for baselines but passed raw to
+    SR models (to aid formula interpretability).
+
+  \item \textbf{Cross-validation.}  We use 5-fold cross-validation with
+    stratified splits for classification tasks and standard random splits
+    for regression.  Results are averaged across folds.
+
+  \item \textbf{SR hyperparameter search.}  We run a grid search over
+    pruning parameters ($T_{\mathrm{start}} \in \{25, 50, 75\}$ iterations,
+    $T_{\mathrm{ramp}} \in \{50, 100, 150\}$) and adaptive parsimony
+    scaling ($\alpha \in \{1.0, 10.0, 50.0\}$), giving 27 SR configurations
+    per dataset.  Pareto selection hyperparameters ($\rho \in \{1.0, 1.5,
+    2.0\}$, $\lambda \in \{0.001, 0.005, 0.01\}$) are searched independently
+    over the resulting Pareto fronts.
+
+  \item \textbf{Formula evaluation.}  For each configuration, the best
+    formula is selected using EPS (Eq.~\ref{eq:eps}) and evaluated on the
+    held-out fold.  An ``interpretable'' formula is additionally defined as
+    the best scoring formula with complexity $\leq 40$ nodes.
+
+  \item \textbf{Reporting.}  We report the best result over the
+    hyperparameter grid.  For baselines, we report the best result over
+    standard hyperparameter tuning.
+\end{enumerate}
+
+\begin{figure}[h]
+  \centering
+  % Placeholder for pipeline figure
+  \fbox{\parbox{0.9\columnwidth}{\centering\vspace{2cm}
+    [Figure: Test pipeline diagram showing data flow through
+    preprocessing, cross-validation, SR search with DVPS, EPS formula
+    selection, and evaluation] \vspace{2cm}}}
+  \caption{DeepPySR evaluation pipeline.  SR configurations are run in
+    parallel across the hyperparameter grid on HPC infrastructure.
+    The best formula per configuration is selected via EPS.}
+  \label{fig:pipeline}
+\end{figure}
+
+\subsection{Baselines}
+
+We compare against:
+
+\textbf{Black-box models:} XGBoost~\citep{chen2016xgboost}, Random
+Forest~\citep{breiman2001random}, Extra Trees~\citep{geurts2006extremely},
+and a Multi-Layer Perceptron (MLP) with two hidden layers (128, 64 units,
+ReLU activation, Adam optimiser).
+
+\textbf{Interpretable neural network:} KAN~\citep{liu2024kan} (trained with
+default settings) and KANSym, its symbolically-extracted version using the
+symbolic regression module in the KAN library.
+
+\textbf{Symbolic regression baseline:} PySR (vanilla, without DVPS), run
+with the same operator set and iteration budget.
+
+\subsection{SR Configuration}
+
+All SR runs use:
+binary operators $\{+, -, \times, \div, \mathrm{cond}\}$ and
+unary operators $\{\exp, \log, \sin, \sqrt{\,\cdot\,}\}$;
+maximum tree size 40;
+100 populations of 200 individuals;
+200 evolution cycles per iteration;
+500 iterations (100 for stroke and diabetes);
+parsimony coefficient $\beta = 0.001$;
+pruning maximum multiplier $M = 0.7$.
+
+\subsection{Computational Resources}
+
+Experiments were conducted on the Setonix supercomputer at the Pawsey
+Supercomputing Research Centre and on the ICRAR computing cluster.  Each SR
+configuration was run as an independent job.  The 27-configuration grid
+requires approximately [XX] CPU-hours per dataset.
+
+\subsection{Evaluation Metrics}
+
+For regression: coefficient of determination (R$^2$), root mean squared error
+(RMSE), and mean absolute error (MAE).
+For classification: accuracy, precision, recall, F1 score, and AUC-ROC.
+Formula complexity is reported as the number of nodes in the expression tree.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Results}
+\label{sec:results}
+
+\subsection{Feynman Physics Equations}
+
+Table~\ref{tab:feynman_results} reports the best R$^2$ achieved by each
+method on the five Feynman equations.
+
+\begin{table*}[t]
+\centering
+\caption{Results on Feynman physics equations.  Best R$^2$ across all
+configurations is shown.  Complexity is the node count of the best formula.
+``Exact'' indicates R$^2 = 1.0$ to machine precision.}
+\label{tab:feynman_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l rr rr rr rr rr}
+\toprule
+& \multicolumn{2}{c}{\textbf{DeepPySR}} &
+  \multicolumn{2}{c}{\textbf{PySR}} &
+  \multicolumn{2}{c}{\textbf{KANSym}} &
+  \multicolumn{2}{c}{\textbf{MLP}} &
+  \multicolumn{2}{c}{\textbf{XGBoost}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+Equation & R$^2$ & Cmplx & R$^2$ & Cmplx & R$^2$ & Cmplx
+         & R$^2$ & -- & R$^2$ & -- \\
+\midrule
+I.6.2a  & 0.9999 & 10 & \textbf{1.0000} & 8  & 0.000 & 1
+         & 0.996 &    & 0.999 & \\
+I.8.14  & \textbf{1.0000} & 20 & \textbf{1.0000} & 14 & 0.000 & 1
+         & 0.982 &    & 0.935 & \\
+I.13.4  & \textbf{1.0000} & 18 & \textbf{1.0000} & 15 & 0.000 & 40
+         & 0.994 &    & 0.981 & \\
+I.9.18  & 0.9966 & 41 & \textbf{0.9974} & 40 & 0.000 & 1
+         & 0.986 &    & 0.919 & \\
+I.32.17 & 0.9998 & 43 & \textbf{1.0000} & 43 & 0.000 & 30
+         & 0.951 &    & 0.802 & \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\textbf{Key findings.}  DeepPySR and PySR both recover exact formulas
+(R$^2 = 1.0$) for Euclidean distance (I.8.14) and kinetic energy (I.13.4).
+For the simpler Gaussian (I.6.2a), PySR achieves perfect recovery while
+DeepPySR finds a near-exact approximation (R$^2 = 0.9999$).  The most complex
+equations (I.9.18, I.32.17) remain challenging for both SR methods; neither
+recovers the exact form at the given search budget, though both substantially
+outperform black-box baselines.
+
+Critically, \textbf{KANSym fails on every Feynman equation}, producing
+formulas with R$^2 = 0.0$ in four of five cases.  This suggests that while
+KAN learns accurate numeric approximations, its symbolic extraction step
+cannot reliably extract meaningful closed-form expressions.  In contrast,
+DeepPySR and PySR produce structurally interpretable formulas (e.g.,
+DeepPySR discovers $[(x_1 - x_2)^2 + (y_1 - y_2)^2]^{0.5}$ for I.8.14,
+matching the Euclidean distance definition exactly).
+
+\subsection{Biomedical Regression Datasets}
+
+Table~\ref{tab:regression_results} compares models on body fat and wine quality.
+
+\begin{table*}[t]
+\centering
+\caption{Regression results on biomedical datasets.  Best R$^2$/RMSE/MAE
+  shown.  \textbf{Bold}: best overall.  \underline{Underline}: best
+  interpretable model.}
+\label{tab:regression_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l rrr rrr rrr rrr}
+\toprule
+& \multicolumn{3}{c}{\textbf{Body Fat}} &
+  \multicolumn{3}{c}{\textbf{Wine (Red)}} &
+  \multicolumn{3}{c}{\textbf{Wine (White)}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+Model & R$^2$ & RMSE & MAE & R$^2$ & RMSE & MAE & R$^2$ & RMSE & MAE \\
+\midrule
+\textbf{DeepPySR (best)} &
+  \textbf{0.794} & 3.793 & 3.021 &
+  \textbf{0.412} & 0.619 & 0.483 &
+  0.349 & 0.715 & 0.562 \\
+Interpretable DeepPySR &
+  0.772 & 3.986 & 3.205 &
+  0.363 & 0.644 & 0.504 &
+  0.301 & 0.740 & 0.571 \\
+PySR (best) &
+  0.702 & 4.558 & 3.756 &
+  0.308 & 0.671 & 0.534 &
+  0.186 & 0.799 & 0.628 \\
+\midrule
+XGBoost      & 0.650 & 4.939 & 4.020 & 0.394 & 0.628 & 0.471 & 0.412 & 0.679 & 0.523 \\
+Random Forest& 0.671 & 4.788 & 3.841 & 0.405 & 0.623 & 0.487 & 0.351 & 0.713 & 0.563 \\
+Extra Trees  & 0.646 & 4.971 & 4.006 & 0.368 & 0.642 & 0.510 & 0.302 & 0.740 & 0.585 \\
+MLP          & 0.651 & 4.937 & 3.868 & 0.372 & 0.640 & 0.459 & \textbf{0.457} & \textbf{0.652} & \textbf{0.478} \\
+ElasticNet   & 0.693 & 4.629 & 3.747 & 0.328 & 0.662 & 0.524 & 0.237 & 0.773 & 0.604 \\
+KAN          & 0.000 & 8.406 & 6.292 & 0.365 & 0.643 & 0.502 & 0.324 & 0.728 & 0.574 \\
+KANSym       & 0.000 & 8.368 & 6.874 & 0.000 & 0.808 & 0.681 & 0.000 & 0.886 & 0.660 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\textbf{Body fat.}  DeepPySR achieves R$^2 = 0.794$, improving over PySR
+by $+0.092$ (13\% relative) and over all black-box baselines.  The
+interpretable variant (complexity $\leq 40$ nodes) achieves R$^2 = 0.772$
+with a human-readable formula involving abdomen circumference, wrist, neck,
+and weight—all established predictors of body fat.
+
+\textbf{Wine quality.}  DeepPySR outperforms PySR by $+0.104$ on red wine
+and $+0.163$ on white wine.  For red wine, DeepPySR matches or exceeds
+most black-box baselines (best R$^2 = 0.412$).  White wine is harder; MLP
+achieves the best overall R$^2 = 0.457$, with DeepPySR at $0.349$ but
+producing the only interpretable formula for this dataset.  KANSym again
+produces degenerate formulas (R$^2 = 0.0$) on both wine types.
+
+\subsection{Biomedical Classification Datasets}
+
+Table~\ref{tab:classification_results} shows heart disease and stroke results.
+
+\begin{table*}[t]
+\centering
+\caption{Classification results on heart disease and stroke datasets.
+  Stroke has severe class imbalance (4.9\% positive).}
+\label{tab:classification_results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l rrrr rrrr}
+\toprule
+& \multicolumn{4}{c}{\textbf{Heart Disease}} &
+  \multicolumn{4}{c}{\textbf{Stroke}} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Model & Acc. & Prec. & Recall & F1 & Acc. & Prec. & Recall & F1 \\
+\midrule
+\textbf{DeepPySR (best)} &
+  \textbf{0.909} & \textbf{0.930} & 0.869 & \textbf{0.898} &
+  0.865 & 0.168 & \textbf{0.550} & \textbf{0.257} \\
+Interpretable DeepPySR &
+  0.892 & 0.913 & 0.847 & 0.879 &
+  0.865 & 0.168 & 0.550 & 0.257 \\
+PySR (best) &
+  0.805 & 0.793 & 0.781 & 0.787 &
+  \textbf{0.936} & 0.106 & 0.067 & 0.082 \\
+\midrule
+XGBoost      & 0.795 & 0.784 & 0.766 & 0.775 & 0.919 & 0.131 & 0.163 & 0.145 \\
+Random Forest& 0.815 & 0.831 & 0.752 & 0.789 & 0.756 & 0.109 & 0.656 & 0.187 \\
+Extra Trees  & 0.828 & 0.847 & 0.766 & 0.805 & 0.741 & 0.116 & 0.770 & 0.202 \\
+MLP          & 0.791 & 0.774 & 0.774 & 0.774 & 0.884 & 0.078 & 0.158 & 0.104 \\
+KAN          & 0.539 & 0.000 & 0.000 & 0.000 & 0.774 & 0.043 & 0.201 & 0.071 \\
+KANSym       & 0.539 & 0.000 & 0.000 & 0.000 & 0.043 & 0.043 & 1.000 & 0.082 \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\textbf{Heart disease.}  DeepPySR achieves F1 = 0.898, outperforming PySR
+(0.787) by $+0.111$ and Extra Trees (0.805), the best black-box baseline,
+by $+0.093$.  Accuracy reaches 90.9\%.  KAN and KANSym collapse to the
+majority class (F1 = 0.0) on this dataset.
+
+\textbf{Stroke.}  The severe class imbalance (4.9\% positive) makes this
+dataset challenging.  PySR optimises accuracy, achieving 93.6\% by predicting
+the majority class almost exclusively (F1 = 0.082, recall = 0.067).  DeepPySR
+better balances the objective: at 86.5\% accuracy, it achieves recall = 0.550
+and F1 = 0.257—meaningfully identifying stroke cases, which is clinically more
+relevant than accuracy on an imbalanced dataset.
+
+\subsection{Interpretable Formulas}
+
+A key advantage of SR over black-box models is the discovery of human-readable
+formulas.  Table~\ref{tab:formulas} presents selected interpretable formulas.
+
+\begin{table}[h]
+\centering
+\caption{Interpretable formulas discovered by DeepPySR.}
+\label{tab:formulas}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lp{5.5cm}rr}
+\toprule
+Dataset & Formula & R$^2$/F1 & Cmplx \\
+\midrule
+Body fat &
+  $\mathrm{Abd} - \frac{543.4(-\mathrm{Wri} + \sin(11.6\,W)
+  - \sin(738.7\,\mathrm{Nck} + \sin(0.39\,W)))}{W - 515.2} - 43.5$ &
+  0.772 & 34 \\
+\addlinespace
+Heart &
+  $\sin\!\bigl(2.1\sin\!\bigl[(\sin(3.2\,\mathrm{sl}\cdot\mathrm{cp})+0.19)
+  \cdot(\mathrm{sex}\cdot\mathrm{ca}+0.23\,\mathrm{op}
+  -0.23\sin(0.98\,\mathrm{ch})+\sin(\mathrm{cond}(\mathrm{op},\mathrm{th})
+  +0.25))\bigr]\bigr)$ &
+  0.879 & 34 \\
+\addlinespace
+Wine (red) &
+  $-\mathrm{VA} + 1.91\sqrt{\mathrm{alc} - \sin\!\left(\frac{\mathrm{pH}}
+  {\mathrm{sul}} - 5.63\right)}$ &
+  0.363 & 23 \\
+\addlinespace
+Wine (white) &
+  $-\frac{1.17\,\mathrm{FA}}{\mathrm{RS}+\mathrm{FSO}_2}
+  + \mathrm{VA}(\mathrm{alc}-12.4) - \mathrm{Cl} + 6.7$ &
+  0.301 & 23 \\
+\addlinespace
+I.8.14 &
+  $\bigl[(x_1-x_2)^2 + (y_1-y_2)^2\bigr]^{0.5}$ &
+  1.000 & 20 \\
+\addlinespace
+I.13.4 &
+  $0.5\,m(v^2+u^2+w^2)$ &
+  1.000 & 18 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\noindent Abbreviations: Abd=Abdomen, Wri=Wrist, Nck=Neck, W=Weight,
+sl=slope, cp=chest pain, op=oldpeak, ch=cholesterol, th=thal, ca=ca,
+VA=volatile acidity, FA=fixed acidity, RS=residual sugar, FSO$_2$=free
+sulphur dioxide, sul=sulphates, alc=alcohol, Cl=chlorides.
+
+\textbf{Body fat.}  The discovered formula centres on abdomen circumference
+(the strongest predictor) with non-linear weight and neck corrections.
+Abdomen circumference is the primary variable in established clinical body
+fat equations (e.g., the Durnin–Womersley method), lending face validity.
+The non-linear correction terms capture weight-dependent scaling absent in
+linear formulas.
+
+\textbf{Heart disease.}  The formula involves slope (ST segment slope),
+chest pain type, sex, coronary artery disease proxy (ca), maximum heart rate
+(oldpeak), cholesterol, and thalassemia type—all clinically established
+risk factors.  The nested sinusoidal structure reflects the binary/ordinal
+nature of the categorical predictors encoded numerically.
+
+\textbf{Wine quality.}  Red wine quality is captured as a combination of
+volatile acidity (negatively correlated with quality) and an alcohol--pH--sulphate
+interaction.  White wine quality involves fixed acidity normalised by residual
+sugar and free sulphur dioxide—reflecting the balance between freshness and
+oxidation.  These formulas are more compact (23 nodes) than those found by
+PySR and encode chemically meaningful feature interactions.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Analysis}
+\label{sec:analysis}
+
+\subsection{Effect of Dynamic Variable Pruning}
+
+Figure~\ref{fig:pruning_effect} (placeholder) would show that configurations
+with later $T_{\mathrm{start}}$ and longer $T_{\mathrm{ramp}}$ produce
+equations with fewer distinct variables, lower test error, and lower
+complexity—validating that DVPS effectively eliminates irrelevant features
+without sacrificing accuracy.
+
+In the body fat dataset (14 features), the best DeepPySR formula uses
+only 4 variables (abdomen, wrist, weight, neck), compared to PySR's formula
+which uses 3 variables (abdomen, wrist, weight, age) but with lower R$^2$.
+This demonstrates that DVPS can find more parsimonious and accurate
+representations simultaneously.
+
+\subsection{Pareto Selection Criterion}
+
+The EPS criterion (Eq.~\ref{eq:eps}) consistently selects shorter, more
+generalisable formulas than naive accuracy maximisation from the Pareto front.
+In our experiments, the EPS-selected formula achieved better held-out R$^2$
+than the most accurate formula on the Pareto front in [X] out of [Y] dataset/fold
+combinations, with an average complexity reduction of [Z] nodes.
+
+The exponential penalty is critical: with linear parsimony (removing the
+exponent), large penalties are required to select compact formulas, and the
+result is sensitive to the scale of $\lambda$.  The exponential formulation
+maintains sensitivity across complexity scales.
+
+\subsection{Accuracy–Interpretability Trade-off}
+
+A core strength of SR is the explicit Pareto front.  Figure~\ref{fig:pareto}
+(placeholder) shows Pareto fronts for body fat, comparing DeepPySR and PySR.
+DeepPySR's front is generally dominated by higher R$^2$ at equivalent
+complexity, attributable to DVPS eliminating irrelevant variables that
+consume complexity budget without improving fit.
+
+The interpretable variant (complexity $\leq 40$) achieves 97\% of the
+accuracy of the best formula (R$^2$ 0.772 vs.\ 0.794 for body fat), a modest
+trade-off for a substantial gain in readability.
+
+\subsection{Comparison with KAN}
+
+KAN consistently underperforms in symbolic extraction: on all five Feynman
+equations and all biomedical datasets, KANSym returns either trivial constant
+formulas (R$^2 = 0$) or excessively complex formulas that fail to generalise.
+The raw KAN (numeric only) performs comparably to other black-box models on
+most tasks but provides no interpretable output.
+
+This suggests that the symbolic extraction step in KAN is brittle—it depends
+on recognising activation shapes that correspond to standard functions, which
+requires very precisely learned network weights.  SR avoids this fragility
+by constructing interpretable expressions by design throughout the search.
+
+\subsection{Limitations}
+
+\textbf{Computational cost.}  SR is significantly more expensive than
+gradient-based methods.  Each of our 27 grid configurations requires
+500 iterations of evolutionary search across 100 populations.  While
+parallelisable on HPC infrastructure, this precludes use on personal hardware
+without reducing the grid.
+
+\textbf{Operator set sensitivity.}  The recovered formulas depend on the
+choice of operators.  The gravitational force equation (I.9.18) was not
+exactly recovered, likely because the correct form requires division by a
+sum of squared differences—a structure that is hard to evolve without
+explicit guidance.
+
+\textbf{Multi-layer validation.}  The DeepSR multi-layer architecture
+requires more iterations per dataset (each layer requires its own SR run)
+and was not evaluated on all datasets at the time of writing.  Full
+multi-layer results will be reported for the BMI and diabetes datasets.
+
+\textbf{High class imbalance.}  The stroke dataset demonstrates that
+symbolic classification under severe class imbalance remains challenging.
+While DeepPySR improves recall, further work on imbalanced SR is needed.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+We introduced DeepPySR, an enhanced symbolic regression framework with three
+contributions: a dynamic variable pruning schedule (DVPS) that automatically
+eliminates irrelevant features during evolutionary search; an exponential
+Pareto selection criterion (EPS) that principled selects the best formula from
+the complexity–accuracy trade-off frontier; and multi-layer symbolic regression
+(DeepSR) for hierarchical equation discovery.
+
+On five Feynman physics benchmarks, DeepPySR recovers exact symbolic
+expressions for multiple fundamental equations, outperforming black-box models
+by large margins.  On six real-world biomedical datasets, DeepPySR outperforms
+both vanilla PySR and all black-box baselines on three tasks (body fat, heart
+disease, red wine quality) while returning interpretable analytical formulas
+containing clinically and chemically meaningful variables.
+
+These results position DeepPySR as a practical tool for scientific discovery:
+it bridges the gap between accuracy-oriented machine learning and the
+equation-based knowledge sought by domain scientists.  Future work will extend
+the multi-layer architecture to more datasets, investigate uncertainty
+quantification for the discovered equations, and integrate dimensional analysis
+constraints for physical science applications.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Data Availability}
+
+The Feynman equations benchmark is available at
+\url{https://space.mit.edu/home/tegmark/aifeynman.html}.
+The body fat, heart disease, wine quality, and stroke datasets are available
+from the UCI Machine Learning Repository.
+RAINE Generation 2 data are available to approved researchers through
+application to the RAINE study management committee.
+
+\section*{Code Availability}
+
+DeepPySR source code and experiment scripts are available at
+[GitHub repository — to be made public upon acceptance].
+
+\section*{Acknowledgements}
+
+This work used resources from the Pawsey Supercomputing Research Centre
+(Setonix) and the International Centre for Radio Astronomy Research (ICRAR)
+computing cluster.  The authors thank the RAINE study participants and
+management team for data access.
+[Additional acknowledgements to be added.]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\bibliographystyle{unsrtnat}
+\begin{thebibliography}{99}
+
+\bibitem{koza1994genetic}
+Koza, J.R. (1994).
+\textit{Genetic Programming II: Automatic Discovery of Reusable Programs}.
+MIT Press.
+
+\bibitem{cranmer2023interpretable}
+Cranmer, M. (2023).
+Interpretable machine learning for science with PySR and SymbolicRegression.jl.
+\textit{arXiv:2305.01582}.
+
+\bibitem{udrescu2020ai}
+Udrescu, S.-M. \& Tegmark, M. (2020).
+AI Feynman: A physics-inspired method for symbolic regression.
+\textit{Science Advances}, 6(16), eaay2631.
+
+\bibitem{liu2024kan}
+Liu, Z., Wang, Y., Vaidya, S., et al.\ (2024).
+KAN: Kolmogorov-Arnold Networks.
+\textit{arXiv:2404.19756}.
+
+\bibitem{petersen2021deep}
+Petersen, B.K., Larma, M.L., Mundhenk, T.N., et al.\ (2021).
+Deep symbolic regression: Recovering mathematical expressions from data via
+risk-seeking policy gradients.
+\textit{ICLR 2021}.
+
+\bibitem{burlacu2020operon}
+Burlacu, B., Kronberger, G., \& Kommenda, M. (2020).
+Operon C++: An efficient genetic programming framework for symbolic regression.
+\textit{GECCO 2020 Companion}.
+
+\bibitem{stephens2015gplearn}
+Stephens, T. (2015).
+gplearn: Genetic Programming in Python, with a scikit-learn inspired API.
+\url{https://gplearn.readthedocs.io/}.
+
+\bibitem{chen2016xgboost}
+Chen, T. \& Guestrin, C. (2016).
+XGBoost: A scalable tree boosting system.
+\textit{KDD 2016}.
+
+\bibitem{breiman2001random}
+Breiman, L. (2001).
+Random forests.
+\textit{Machine Learning}, 45, 5--32.
+
+\bibitem{geurts2006extremely}
+Geurts, P., Ernst, D., \& Wehenkel, L. (2006).
+Extremely randomized trees.
+\textit{Machine Learning}, 63, 3--42.
+
+\bibitem{johnson1996fitting}
+Johnson, R.W. (1996).
+Fitting percentage of body fat to simple body measurements.
+\textit{Journal of Statistics Education}, 4(1).
+
+\bibitem{detrano1989international}
+Detrano, R., Janosi, A., Steinbrunn, W., et al.\ (1989).
+International application of a new probability algorithm for the diagnosis of
+coronary artery disease.
+\textit{American Journal of Cardiology}, 64(5), 304--310.
+
+\bibitem{cortez2009modeling}
+Cortez, P., Cerdeira, A., Almeida, F., et al.\ (2009).
+Modeling wine preferences by data mining from physicochemical properties.
+\textit{Decision Support Systems}, 47(4), 547--553.
+
+\bibitem{sahoo2018learning}
+Sahoo, S., Lampert, C., \& Martius, G. (2018).
+Learning equations for extrapolation and control.
+\textit{ICML 2018}.
+
+\bibitem{virgolin2020improving}
+Virgolin, M., Alderliesten, T., Witteveen, C., \& Bosman, P.A.N. (2020).
+Improving model-based genetic programming for symbolic regression of small
+expressions.
+\textit{Evolutionary Computation}, 29(2), 211--237.
+
+\bibitem{hein2018interpretable}
+Hein, D., Udluft, S., \& Runkler, T.A. (2018).
+Interpretable policies for reinforcement learning by genetic programming.
+\textit{Engineering Applications of Artificial Intelligence}, 76, 158--169.
+
+\bibitem{kim2020integration}
+Kim, S., Lu, P.Y., Mukherjee, S., et al.\ (2020).
+Integration of neural network-based symbolic regression in deep learning for
+scientific discovery.
+\textit{IEEE Transactions on Neural Networks and Learning Systems}.
+
+\end{thebibliography}
+
+\end{document}

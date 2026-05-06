@@ -1,2 +1,2 @@
 model,formula,r2,complexity
-fullsr_vps75_vpr150_aps1.0_nit500_pop100_sz200_grid_r2w1.5_L0.005,-1.0*Wrist + Abdomen + exp(-1.0*sin(140.47*Abdomen) + sin(120.24*Knee)) - 52.96/sin(221.83/Weight**1.0)**1.0,0.7722068397582988,33.0
+fullsr_vps25_vpr150_aps1.0_nit500_pop100_sz200_grid_r2w2.0_L0.005,Abdomen - 543.39*(-1.0*Wrist + sin(11.63*Weight) - 1.0*sin(738.74*Neck + sin(0.39*Weight)))/(Weight - 515.23)**1.0 - 43.49,0.7721930850884192,34.0

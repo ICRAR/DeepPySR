@@ -1,0 +1,31 @@
+STATS ANALYSIS: Age Specific - Age 23
+Features: ['agebirth_m_y', 'SUM_PGS002853', 'y5_a6', 'y1_bmifa']
+======================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.322
+Model:                            OLS   Adj. R-squared:                  0.313
+Method:                 Least Squares   F-statistic:                     38.16
+Date:                Tue, 05 May 2026   Prob (F-statistic):           3.90e-26
+Time:                        21:19:59   Log-Likelihood:                -925.95
+No. Observations:                 327   AIC:                             1862.
+Df Residuals:                     322   BIC:                             1881.
+Df Model:                           4                                         
+Covariance Type:            nonrobust                                         
+=================================================================================
+                    coef    std err          t      P>|t|      [0.025      0.975]
+---------------------------------------------------------------------------------
+const             0.2296      3.071      0.075      0.940      -5.812       6.271
+agebirth_m_y     -0.0540      0.040     -1.341      0.181      -0.133       0.025
+SUM_PGS002853     3.8609      0.728      5.306      0.000       2.429       5.292
+y5_a6             1.4423      0.157      9.190      0.000       1.134       1.751
+y1_bmifa         -0.2637      0.270     -0.976      0.330      -0.795       0.268
+==============================================================================
+Omnibus:                      107.125   Durbin-Watson:                   1.971
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              331.750
+Skew:                           1.471   Prob(JB):                     9.15e-73
+Kurtosis:                       6.961   Cond. No.                         475.
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.

@@ -184,8 +184,8 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     lambda_list = [lambda_val]
     
     if model_provider == "deeppysr":
-        from model_utils import DeepPySRRegressor
-        model = DeepPySRRegressor(
+        from deeppysr import DeepPySR
+        model = DeepPySR(
             max_layers=1,
             pareto_r2_weight=r2w_list,
             pareto_lambda=lambda_list,  # Single layer for regression comparison
@@ -193,7 +193,7 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
             **pysr_kwargs
         )
     else:
-        from model_utils import PySRRegressor
+        from pysr import PySRRegressor
         model = PySRRegressor(
             warm_start=True,
             **pysr_kwargs

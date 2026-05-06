@@ -1,0 +1,31 @@
+STATS ANALYSIS: Age Specific - Age 14
+Features: ['y5_bmiz', 'edu_m_0', 'SUM_PGS002313', 'sex']
+======================================================================
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.462
+Model:                            OLS   Adj. R-squared:                  0.459
+Method:                 Least Squares   F-statistic:                     116.2
+Date:                Tue, 05 May 2026   Prob (F-statistic):           2.01e-71
+Time:                        21:19:57   Log-Likelihood:                -1357.4
+No. Observations:                 545   AIC:                             2725.
+Df Residuals:                     540   BIC:                             2746.
+Df Model:                           4                                         
+Covariance Type:            nonrobust                                         
+=================================================================================
+                    coef    std err          t      P>|t|      [0.025      0.975]
+---------------------------------------------------------------------------------
+const            21.2119      0.633     33.494      0.000      19.968      22.456
+y5_bmiz           2.4454      0.142     17.199      0.000       2.166       2.725
+edu_m_0           0.3087      0.159      1.939      0.053      -0.004       0.621
+SUM_PGS002313     2.6086      0.365      7.155      0.000       1.892       3.325
+sex               0.8936      0.252      3.549      0.000       0.399       1.388
+==============================================================================
+Omnibus:                      128.354   Durbin-Watson:                   1.896
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              302.001
+Skew:                           1.214   Prob(JB):                     2.64e-66
+Kurtosis:                       5.721   Cond. No.                         17.0
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
