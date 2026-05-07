@@ -434,7 +434,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
         }
 
-def get_pysr_base_kwargs(os_cpu_count=None):
+def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):
     if os_cpu_count is None:
         try:
             os_cpu_count = os.cpu_count() or 2
@@ -453,11 +453,13 @@ def get_pysr_base_kwargs(os_cpu_count=None):
     # For multithreading, procs should be 0 as it uses Julia threads instead.
     default_procs = 0 if parallelism == "multithreading" else 0
     
+    cond_op = "cond(x,y) = x > 0 ? y : 0f0" if use_explicit_cond else "cond"
+
     # niterations 100 might be too slow for many runs, use 20 for tests
     return {
         "parallelism": parallelism,
         "maxsize": 40,
-        "binary_operators": ["+", "*", "/", "-", "cond"],
+        "binary_operators": ["+", "*", "/", "-", cond_op],
         "extra_sympy_mappings": {
             'cond': sympy_cond,
         },

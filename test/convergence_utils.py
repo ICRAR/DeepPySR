@@ -156,7 +156,7 @@ def train_model(model_provider, X, y, n_iterations=10, output_dir="./convergence
     os.makedirs(output_dir, exist_ok=True)
     
     # Use base kwargs from model_utils.py
-    pysr_kwargs = get_pysr_base_kwargs()
+    pysr_kwargs = get_pysr_base_kwargs(use_explicit_cond=(model_provider == "pysr"))
     
     # Apply requested overrides from params
     if "adaptive_parsimony_scaling" in params:
@@ -323,12 +323,12 @@ def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_ite
     results_list = []
     
     # Run DeepPySR (pypysr)
-    if 'Best DeepPySR' in model_params_dict:
-        print(f"\n--- Running DeepPySR convergence ---")
-        pypysr_params = model_params_dict['Best DeepPySR']
-        pypysr_hist = train_model("deeppysr", X, y, n_iterations=n_iterations,
-                                  output_dir=output_root, params=pypysr_params, task=task)
-        results_list.append(pypysr_hist)
+    # if 'Best DeepPySR' in model_params_dict:
+    #     print(f"\n--- Running DeepPySR convergence ---")
+    #     pypysr_params = model_params_dict['Best DeepPySR']
+    #     pypysr_hist = train_model("deeppysr", X, y, n_iterations=n_iterations,
+    #                               output_dir=output_root, params=pypysr_params, task=task)
+    #     results_list.append(pypysr_hist)
     
     # Run PySR (pysr)
     if 'Best PySR' in model_params_dict:
