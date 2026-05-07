@@ -314,7 +314,7 @@ def plot_convergence(combined_df, output_dir, title="Loss Convergence Comparison
     print(f"Convergence plot saved to: {plot_path}")
     plt.close()
 
-def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_iterations=100, task='regression'):
+def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_iterations=500, task='regression'):
     """
     Runs convergence test for Best DeepPySR and Best PySR for a given type and age.
     """

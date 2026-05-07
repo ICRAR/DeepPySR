@@ -1,0 +1,2 @@
+model,formula,f1,complexity
+fullsr_vps75_vpr50_aps10.0_nit100_pop100_sz200_grid_r2w1.0_L0.01,GenHlth*(0.12*HighBP + 0.12*HighChol - 0.12*HvyAlcoholConsump + 0.02*Age)*sin(0.04*BMI - 0.48),0.34264038405156166,24.0
