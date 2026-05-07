@@ -51,7 +51,7 @@ def main():
     print("WHITE WINE DEEP ANALYSIS")
     print("="*70)
 
-    white_metrics = metrics_df[metrics_df['type'] == 'white']
+    white_metrics = metrics_df[metrics_df['wine type'] == 'white']
     white_models = get_best_interpretable_params(white_metrics, model_type='Best DeepPySR')
 
     df_white = load_wine_data('white')
