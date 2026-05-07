@@ -85,7 +85,7 @@ def main():
             continue
 
         rel_df = pd.read_csv(rel_file)
-        layer1 = rel_df[(rel_df['layer'] == 1) & (rel_df['target'] == 'y')]
+        layer1 = rel_df[(rel_df['layer'] == 1)]
         
         if not layer1.empty:
             formula = layer1.iloc[0]['formula']

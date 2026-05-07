@@ -90,7 +90,7 @@ def main():
 
         rel_df = pd.read_csv(rel_file)
         # Filter for layer 1 and target 'y'
-        layer1 = rel_df[(rel_df['layer'] == 1) & (rel_df['target'] == 'y')]
+        layer1 = rel_df[(rel_df['layer'] == 1)]
         
         X, y = load_feynman_data(eq_name, n_samples=1000)
         

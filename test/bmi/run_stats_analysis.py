@@ -94,7 +94,7 @@ def main():
     if os.path.exists(long_rel_file):
         rel_df = pd.read_csv(long_rel_file)
         # Filter for layer 1 and target 'y'
-        layer1 = rel_df[(rel_df['layer'] == 1) & (rel_df['target'] == 'y')]
+        layer1 = rel_df[(rel_df['layer'] == 1)]
         if not layer1.empty:
             formula = layer1.iloc[0]['formula']
             features = get_features_from_formula(formula)
@@ -126,7 +126,7 @@ def main():
             
             if os.path.exists(age_rel_file):
                 rel_df = pd.read_csv(age_rel_file)
-                layer1 = rel_df[(rel_df['layer'] == 1) & (rel_df['target'] == 'y')]
+                layer1 = rel_df[(rel_df['layer'] == 1)]
                 if not layer1.empty:
                     formula = layer1.iloc[0]['formula']
                     features = get_features_from_formula(formula)
