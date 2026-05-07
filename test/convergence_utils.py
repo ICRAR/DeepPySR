@@ -323,12 +323,12 @@ def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_ite
     results_list = []
     
     # Run DeepPySR (pypysr)
-    # if 'Best DeepPySR' in model_params_dict:
-    #     print(f"\n--- Running DeepPySR convergence ---")
-    #     pypysr_params = model_params_dict['Best DeepPySR']
-    #     pypysr_hist = train_model("deeppysr", X, y, n_iterations=n_iterations,
-    #                               output_dir=output_root, params=pypysr_params, task=task)
-    #     results_list.append(pypysr_hist)
+    if 'Best DeepPySR' in model_params_dict:
+        print(f"\n--- Running DeepPySR convergence ---")
+        pypysr_params = model_params_dict['Best DeepPySR']
+        pypysr_hist = train_model("deeppysr", X, y, n_iterations=n_iterations,
+                                  output_dir=output_root, params=pypysr_params, task=task)
+        results_list.append(pypysr_hist)
     
     # Run PySR (pysr)
     if 'Best PySR' in model_params_dict:
