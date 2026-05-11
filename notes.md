@@ -26,13 +26,13 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 
 | Dataset   | Machine | nit | cvtrain | analysis | deep + stats | convergence | 
 |:----------|:--------|:----|:--------|:---------|:-------------|:------------|
-| BMI       | setonix | 500 | finish  | analysis | run          | run         |
-| feynman   | setonix | 500 | finish  | analysis | run          | run         |
-| heart     | setonix | 500 | finish  | analysis | run          | run         |
-| stroke    | setonix | 100 | finish  | analysis | run          | run         |
-| bodyfat   | setonix | 500 | finish  | analysis | run          | run         |
-| wine      | setonix | 500 | finish  | analysis | run          | run         |
-| diabetes  | setonix | 100 | finish  | analysis |              |             |
+| BMI       | setonix | 500 | finish  | finish   | rerun        | rerun age   |
+| feynman   | setonix | 500 | no       | no       | no need      | no          |
+| heart     | setonix | 500 | finish  | finish   | rerun        | rerun       |
+| stroke    | setonix | 100 | finish  | finish   | rerun        | rerun       |
+| bodyfat   | setonix | 500 | finish  | finish   | rerun        | rerun       |
+| wine      | setonix | 500 | finish  | finish   | rerun        | rerun       |
+| diabetes  | setonix | 100 | finish  | finish   | rerun        | rerun       |
 
 
 steps: cv train -> analysis -> deep, convergence -> stats

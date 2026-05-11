@@ -16,6 +16,9 @@ def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_i
 
     results = []
 
+    r2w_list = [1, 1.5, 2]
+    lambda_list = [0.001, 0.005, 0.01]
+
     for model_display_name, params in model_params_dict.items():
         print(f"  Training {model_display_name} for {name}...")
         
@@ -23,6 +26,8 @@ def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_i
         model_params = params.copy() if params else {}
         model_params['max_layers'] = n_layers
         model_params['stopping_score'] = 0.01
+        model_params['pareto_r2_weight'] = r2w_list
+        model_params['pareto_lambda'] = lambda_list
         if 'niterations' in model_params:
             # Prefer n_iterations if it exists in the provider
             model_params['niterations'] = n_iterations

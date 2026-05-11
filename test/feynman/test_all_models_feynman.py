@@ -21,8 +21,8 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--eq_name', type=str, default=None)
-    parser.add_argument('--vps', type=int, default=None)
+    parser.add_argument('--eq_name', type=str, default='I.32.17')
+    parser.add_argument('--vps', type=int, default=25)
     args = parser.parse_args()
 
     eq_names = [args.eq_name] if args.eq_name else list(equations.keys())
@@ -77,6 +77,7 @@ def main():
                 kwargs.update(co)
                 return DeepPySR(
                     **kwargs,
+                    extra_constants=["pi", "c", "G", "e"],
                     max_layers=1,
                     output_dir=gout,
                     pareto_r2_weight=r2w_list,

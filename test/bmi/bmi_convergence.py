@@ -39,6 +39,15 @@ def main():
     metrics_df = pd.read_csv(metrics_file)
     output_root = os.path.join(current_dir, './convergence_results')
     
+    # Consistent config for BMI convergence test
+    consistent_config = {
+        'adaptive_parsimony_scaling': 10.0,
+        'variable_prune_start': 25,
+        'variable_prune_ramp': 150,
+        'r2_weight': 1.5,
+        'lambda': 0.001
+    }
+    
     # 1. Longitudinal Models
     print("\n" + "="*70)
     print("LONGITUDINAL CONVERGENCE TESTS")
@@ -50,12 +59,14 @@ def main():
     for _, row in long_metrics.iterrows():
         if row['display_model'] in ['Best DeepPySR', 'Best PySR']:
             if row['display_model'] not in long_models:
-                long_models[row['display_model']] = parse_model_string(row['model'])
+                # Use consistent config instead of parsing from string
+                long_models[row['display_model']] = consistent_config.copy()
     
     # Load longitudinal data
     id_long, X_long, y_long = load_bmi_agg_data()
     long_output_root = os.path.join(output_root, 'longitudinal')
-    run_convergence_comparison(X_long, y_long, long_models, long_output_root, name='Longitudinal')
+    if not os.path.exists(long_output_root):
+        run_convergence_comparison(X_long, y_long, long_models, long_output_root, name='Longitudinal')
 
     # 2. Age-Specific Models
     print("\n" + "="*70)
@@ -72,7 +83,8 @@ def main():
         for _, row in age_metrics.iterrows():
             if row['display_model'] in ['Best DeepPySR', 'Best PySR']:
                 if row['display_model'] not in age_models:
-                    age_models[row['display_model']] = parse_model_string(row['model'])
+                    # Use consistent config instead of parsing from string
+                    age_models[row['display_model']] = consistent_config.copy()
         
         # Filter data for specific age
         if 'age' in X_long.columns:
@@ -86,7 +98,8 @@ def main():
         
         if len(X_age) > 0 and age_models:
             age_output_root = os.path.join(output_root, 'age-specific', f'age{age}')
-            run_convergence_comparison(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years')
+            if not os.path.exists(age_output_root):
+                run_convergence_comparison(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years')
         else:
             print(f"No data or no best models found for age {age}")
 

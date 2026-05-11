@@ -34,7 +34,7 @@ def main():
         print("\n" + "="*70)
         print(f"CONVERGENCE TESTS FOR FEYNMAN EQUATION: {eq_name}")
         print("="*70)
-        
+
         # Filter for this equation
         eq_df = aggregated_df[aggregated_df['equation'] == eq_name]
         
@@ -58,11 +58,25 @@ def main():
             print(f"No best models found for {eq_name}")
             continue
 
+        for model_name in models:
+            if models[model_name] is None:
+                models[model_name] = {}
+            models[model_name]["extra_constants"] = ["pi", "c", "G", "e"]
+
         # Load data
         X, y = load_feynman_data(eq_name, n_samples=1000)
         
         eq_output_root = os.path.join(output_root, f"eq_{eq_name.replace('.', '_')}")
-        run_convergence_comparison(X, y, models, eq_output_root, name=f'Feynman: {eq_name}')
+        if os.path.exists(eq_output_root):
+            continue
+        # models['Best DeepPySR'] = {
+        #     'adaptive_parsimony_scaling': 10.0,
+        #     'variable_prune_start': 75,
+        #     'variable_prune_ramp': 100,
+        #     'r2_weight': 1.0,
+        #     'lambda': 0.001
+        # }
+        run_convergence_comparison(X, y, models, eq_output_root, n_iterations=500, name=f'Feynman: {eq_name}')
 
 if __name__ == "__main__":
     main()

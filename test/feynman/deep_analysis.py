@@ -58,6 +58,11 @@ def main():
             print(f"No best models found for {eq_name}")
             continue
 
+        for model_name in models:
+            if models[model_name] is None:
+                models[model_name] = {}
+            models[model_name]["extra_constants"] = ["pi", "c", "G", "e"]
+
         # Load data
         X, y = load_feynman_data(eq_name, n_samples=1000)
         

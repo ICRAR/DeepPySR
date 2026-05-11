@@ -86,6 +86,7 @@ def main():
                 return PySRRegressor(
                     **pysr_base_kwargs,
                     **co,
+                    # extra_constants=["pi", "c", "G", "e"],
                 )
 
             if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
