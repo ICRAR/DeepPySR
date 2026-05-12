@@ -77,8 +77,34 @@ class DeepPySRRegressor:
         # Initialize with input features
         values = {f"x{i}": X_input[:, i] for i in range(X_input.shape[1])}
         
-        # Sort relationships by layer in descending order to evaluate dependencies first
-        sorted_rels = sorted(self.relationships_, key=lambda x: x['layer'], reverse=True)
+        # Filter to only use formulas for layer 1 (predict the target)
+        sorted_rels = [rel for rel in self.relationships_ if rel.get('layer') == 1]
+        
+        if not sorted_rels:
+            raise ValueError("No layer 1 formulas found in relationships_.")
+
+        # If there are multiple relationships for the same target (due to grid search),
+        # select the best one based on R2 (regression) or F1 (classification).
+        # We group by target and pick the best.
+        best_rels = {}
+        for rel in sorted_rels:
+            target = rel['target']
+            if target not in best_rels:
+                best_rels[target] = rel
+            else:
+                current_best = best_rels[target]
+                # Determine if it's classification for this target
+                # We can use the presence of F1 or some other heuristic
+                is_classification = rel.get('f1', 0) > 0 or current_best.get('f1', 0) > 0
+                
+                if is_classification:
+                    if rel.get('f1', 0) > current_best.get('f1', 0):
+                        best_rels[target] = rel
+                else:
+                    if rel.get('r2', -np.inf) > current_best.get('r2', -np.inf):
+                        best_rels[target] = rel
+        
+        sorted_rels = list(best_rels.values())
         
         # Prepare custom mappings for lambdify to avoid conflicts with numpy functions
         # e.g., 'cond' in PySR vs 'numpy.linalg.cond'

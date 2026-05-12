@@ -71,24 +71,19 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
         
-    deep_results_dir = os.path.join(current_dir, 'results_wine_deep')
-    if not os.path.exists(deep_results_dir):
-        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
+    interpretable_formulas_file = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
+    if not os.path.exists(interpretable_formulas_file):
+        print(f"ERROR: Interpretable formulas file not found at {interpretable_formulas_file}")
         return
+
+    df_formulas = pd.read_csv(interpretable_formulas_file)
 
     for wine_type in ['red', 'white']:
         print(f"\nProcessing {wine_type} wine...")
-        rel_file = os.path.join(deep_results_dir, wine_type, 'relationships.csv')
         
-        if not os.path.exists(rel_file):
-            print(f"Relationships file not found for {wine_type}: {rel_file}")
-            continue
-
-        rel_df = pd.read_csv(rel_file)
-        layer1 = rel_df[(rel_df['layer'] == 1)]
-        
-        if not layer1.empty:
-            formula = layer1.iloc[0]['formula']
+        type_formulas = df_formulas[df_formulas['type'] == wine_type]
+        if not type_formulas.empty:
+            formula = type_formulas.iloc[0]['formula']
             features = get_features_from_formula(formula)
             print(f"Extracted features: {features}")
             
@@ -99,7 +94,7 @@ def main():
             output_file = os.path.join(output_dir, f'stats_{wine_type}.txt')
             run_stats(X, y, features, f"{wine_type.capitalize()} Wine", output_file=output_file)
         else:
-            print(f"No layer 1 formula found for {wine_type} wine")
+            print(f"No formula found for {wine_type} wine in CSV")
 
 if __name__ == "__main__":
     main()

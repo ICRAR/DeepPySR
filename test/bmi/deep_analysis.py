@@ -40,33 +40,33 @@ def main():
     metrics_df = pd.read_csv(metrics_file)
     output_root = os.path.join(current_dir, './results_bmi_deep')
 
-    # 1. Longitudinal Models
-    print("\n" + "="*70)
-    print("LONGITUDINAL DEEP ANALYSIS")
-    print("="*70)
-
-    long_metrics = metrics_df[metrics_df['type'] == 'longitudinal']
-    # Get unique best models for longitudinal
-    long_models = get_best_interpretable_params(long_metrics)
-
-    # Load longitudinal data
-    id_long, X_long, y_long = load_bmi_agg_data()
-    long_output_root = os.path.join(output_root, 'longitudinal')
-    
-    # Check if results already exist
-    if os.path.exists(os.path.join(long_output_root, 'relationships.csv')):
-        print(f"Skipping longitudinal analysis as results already exist in {long_output_root}")
-    else:
-        run_deep_analysis(X_long, y_long, long_models, long_output_root, name='Longitudinal', n_iterations=500, n_layers=3)
-
-    # 2. Age-Specific Models
-    print("\n" + "="*70)
-    print("AGE-SPECIFIC DEEP ANALYSIS")
-    print("="*70)
+    # # 1. Longitudinal Models
+    # print("\n" + "="*70)
+    # print("LONGITUDINAL DEEP ANALYSIS")
+    # print("="*70)
+    #
+    # long_metrics = metrics_df[metrics_df['type'] == 'longitudinal']
+    # # Get unique best models for longitudinal
+    # long_models = get_best_interpretable_params(long_metrics)
+    #
+    # # Load longitudinal data
+    # id_long, X_long, y_long = load_bmi_agg_data()
+    # long_output_root = os.path.join(output_root, 'longitudinal')
+    #
+    # # Check if results already exist
+    # if os.path.exists(os.path.join(long_output_root, 'relationships.csv')):
+    #     print(f"Skipping longitudinal analysis as results already exist in {long_output_root}")
+    # else:
+    #     run_deep_analysis(X_long, y_long, long_models, long_output_root, name='Longitudinal', n_iterations=500, n_layers=3)
+    #
+    # # 2. Age-Specific Models
+    # print("\n" + "="*70)
+    # print("AGE-SPECIFIC DEEP ANALYSIS")
+    # print("="*70)
 
     age_specific_metrics = metrics_df[metrics_df['type'] == 'age-specific']
     unique_ages = sorted(age_specific_metrics['age'].unique())
-
+    id_long, X_long, y_long = load_bmi_agg_data()
     for age in unique_ages:
         print(f"\nProcessing Age: {age}")
         age_metrics = age_specific_metrics[age_specific_metrics['age'] == age]
@@ -89,7 +89,7 @@ def main():
             if os.path.exists(os.path.join(age_output_root, 'relationships.csv')):
                 print(f"Skipping age {age} analysis as results already exist in {age_output_root}")
             else:
-                run_deep_analysis(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years', n_iterations=500, n_layers=3)
+                run_deep_analysis(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years', n_iterations=500, n_layers=2)
         else:
             print(f"No data or no best models found for age {age}")
 

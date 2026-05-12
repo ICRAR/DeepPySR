@@ -83,69 +83,50 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    deep_results_dir = os.path.join(current_dir, 'results_bmi_deep')
-    if not os.path.exists(deep_results_dir):
-        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
+    interpretable_formulas_file = os.path.join(current_dir, 'results_bmi_all', 'interpretable_deeppysr_formulas.csv')
+    if not os.path.exists(interpretable_formulas_file):
+        print(f"ERROR: Interpretable formulas file not found at {interpretable_formulas_file}")
         return
+
+    df_formulas = pd.read_csv(interpretable_formulas_file)
 
     # 1. Longitudinal Model
     print("Processing Longitudinal Model...")
-    long_rel_file = os.path.join(deep_results_dir, 'longitudinal', 'relationships.csv')
-    if os.path.exists(long_rel_file):
-        rel_df = pd.read_csv(long_rel_file)
-        # Filter for layer 1 and target 'y'
-        layer1 = rel_df[(rel_df['layer'] == 1)]
-        if not layer1.empty:
-            formula = layer1.iloc[0]['formula']
-            features = get_features_from_formula(formula)
-            print(f"Extracted features: {features}")
+    long_formulas = df_formulas[df_formulas['type'] == 'longitudinal']
+    if not long_formulas.empty:
+        # All longitudinal entries usually have the same formula, take the first one
+        formula = long_formulas.iloc[0]['formula']
+        features = get_features_from_formula(formula)
+        print(f"Extracted features: {features}")
 
-            _, X_all, y_all = load_bmi_agg_data()
-            long_output = os.path.join(output_dir, 'stats_longitudinal.txt')
-            run_stats(X_all, y_all, features, "Longitudinal", output_file=long_output)
-        else:
-            print("No layer 1 formula found for longitudinal.")
+        _, X_all, y_all = load_bmi_agg_data()
+        long_output = os.path.join(output_dir, 'stats_longitudinal.txt')
+        run_stats(X_all, y_all, features, "Longitudinal", output_file=long_output)
     else:
-        print(f"Longitudinal relationships file not found: {long_rel_file}")
+        print("No longitudinal formula found in CSV.")
 
     # 2. Age-Specific Models
     print("\nProcessing Age-Specific Models...")
-    age_specific_dir = os.path.join(deep_results_dir, 'age-specific')
-    if os.path.exists(age_specific_dir):
-        for age_folder in sorted(os.listdir(age_specific_dir)):
-            if not age_folder.startswith('age'):
-                continue
+    age_specific_formulas = df_formulas[df_formulas['type'] == 'age-specific']
+    if not age_specific_formulas.empty:
+        for _, row in age_specific_formulas.sort_values('age').iterrows():
+            age = int(row['age'])
+            formula = row['formula']
             
-            try:
-                age = int(age_folder.replace('age', ''))
-            except ValueError:
-                continue
-
             print(f"\nProcessing Age: {age}")
-            age_rel_file = os.path.join(age_specific_dir, age_folder, 'relationships.csv')
-            
-            if os.path.exists(age_rel_file):
-                rel_df = pd.read_csv(age_rel_file)
-                layer1 = rel_df[(rel_df['layer'] == 1)]
-                if not layer1.empty:
-                    formula = layer1.iloc[0]['formula']
-                    features = get_features_from_formula(formula)
-                    print(f"Age {age}: Extracted features: {features}")
+            features = get_features_from_formula(formula)
+            print(f"Age {age}: Extracted features: {features}")
 
-                    # Load/Filter data for specific age
-                    _, X_age, y_age = load_bmi_agg_data(age=age)
+            # Load/Filter data for specific age
+            _, X_age, y_age = load_bmi_agg_data(age=age)
 
-                    if len(X_age) > 0:
-                        age_output = os.path.join(output_dir, f'stats_age_{age}.txt')
-                        run_stats(X_age, y_age, features, f"Age Specific - Age {age}", output_file=age_output)
-                    else:
-                        print(f"No data found for age {age}")
-                else:
-                    print(f"No layer 1 formula found for age {age}")
+            if len(X_age) > 0:
+                age_output = os.path.join(output_dir, f'stats_age_{age}.txt')
+                run_stats(X_age, y_age, features, f"Age Specific - Age {age}", output_file=age_output)
             else:
-                print(f"Relationships file not found for age {age}: {age_rel_file}")
+                print(f"No data found for age {age}")
     else:
-        print(f"Age-specific deep results directory not found: {age_specific_dir}")
+        print("No age-specific formulas found in CSV.")
 
 if __name__ == "__main__":
     main()

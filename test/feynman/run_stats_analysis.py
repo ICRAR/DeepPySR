@@ -77,32 +77,27 @@ def main():
 
     for eq_name in eq_names:
         print(f"\nProcessing Feynman equation: {eq_name}")
+        eq_key = eq_name.replace(".", "_")
         
-        deep_results_dir = os.path.join(current_dir, f'results_{eq_name.replace(".", "_")}_deep')
-        if not os.path.exists(deep_results_dir):
-            print(f"WARNING: Deep results directory not found at {deep_results_dir}")
+        interpretable_formulas_file = os.path.join(current_dir, f'results_{eq_key}_all', 'interpretable_deeppysr_formulas.csv')
+        if not os.path.exists(interpretable_formulas_file):
+            print(f"WARNING: Interpretable formulas file not found at {interpretable_formulas_file}")
             continue
 
-        rel_file = os.path.join(deep_results_dir, 'relationships.csv')
-        if not os.path.exists(rel_file):
-            print(f"WARNING: Relationships file not found at {rel_file}")
-            continue
-
-        rel_df = pd.read_csv(rel_file)
-        # Filter for layer 1 and target 'y'
-        layer1 = rel_df[(rel_df['layer'] == 1)]
+        df_formulas = pd.read_csv(interpretable_formulas_file)
         
         X, y = load_feynman_data(eq_name, n_samples=1000)
         
-        if not layer1.empty:
-            formula = layer1.iloc[0]['formula']
+        if not df_formulas.empty:
+            # Assuming there is at least one formula in the CSV
+            formula = df_formulas.iloc[0]['formula']
             features = get_features_from_formula(formula)
             print(f"Extracted features: {features}")
             
-            output_file = os.path.join(output_dir, f'stats_{eq_name.replace(".", "_")}.txt')
+            output_file = os.path.join(output_dir, f'stats_{eq_key}.txt')
             run_stats(X, y, features, f"Feynman {eq_name}", output_file=output_file)
         else:
-            print(f"No layer 1 formula found in relationships.csv for {eq_name}")
+            print(f"No formula found in {interpretable_formulas_file} for {eq_name}")
 
 if __name__ == "__main__":
     main()

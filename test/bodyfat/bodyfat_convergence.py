@@ -41,6 +41,14 @@ def main():
     
     # Load data
     X, y = load_bodyfat_data()
+    consistent_config = {
+        'adaptive_parsimony_scaling': 10.0,
+        'variable_prune_start': 25,
+        'variable_prune_ramp': 10,
+        'r2_weight': 5,
+        'lambda': 0.001
+    }
+    best_models['Best DeepPySR'] = consistent_config.copy()
     run_convergence_comparison(X, y, best_models, output_root, name='BodyFat', task='regression')
 
 if __name__ == "__main__":

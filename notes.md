@@ -24,15 +24,17 @@ julia --project=. -e 'using Pkg; Pkg.update(); Pkg.precompile()'
 # notes:
 stroke, diabetes, diabetes130us are 100 nit, others are 500
 
-| Dataset   | Machine | nit | cvtrain | analysis | deep + stats | convergence | 
-|:----------|:--------|:----|:--------|:---------|:-------------|:------------|
-| BMI       | setonix | 500 | finish  | finish   | rerun        | rerun age   |
-| feynman   | setonix | 500 | no       | no       | no need      | no          |
-| heart     | setonix | 500 | finish  | finish   | rerun        | rerun       |
-| stroke    | setonix | 100 | finish  | finish   | rerun        | rerun       |
-| bodyfat   | setonix | 500 | finish  | finish   | rerun        | rerun       |
-| wine      | setonix | 500 | finish  | finish   | rerun        | rerun       |
-| diabetes  | setonix | 100 | finish  | finish   | rerun        | rerun       |
+| Dataset   | Machine | nit | cvtrain | analysis | stats | deep    | convergence  | 
+|:----------|:--------|:----|:--------|:---------|-------|:--------|:-------------|
+| BMI       | setonix | 500 | Yes     | Yes      | Yes   | working | Yes          |
+| feynman   | setonix | 500 | working   | no       | NA    | NA      | rerun        |
+| heart     | setonix | 500 | Yes     | Yes      | Yes   | rerun   | rerun        |
+| stroke    | setonix | 100 | Yes     | Yes      | Yes   | rerun   | rerun        |
+| bodyfat   | setonix | 500 | Yes     | Yes      | Yes   | rerun   | **unstable** |
+| wine      | setonix | 500 | Yes     | Yes      | Yes   | rerun   | rerun        |
+| diabetes  | setonix | 100 | Yes     | Yes      | Yes   | rerun   | rerun        |
 
 
-steps: cv train -> analysis -> deep, convergence -> stats
+steps: cv train -> analysis, stats, deep, convergence
+
+notes: ICC causes convergence unstable

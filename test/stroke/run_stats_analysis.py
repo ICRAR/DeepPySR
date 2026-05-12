@@ -72,31 +72,25 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
         
-    deep_results_dir = os.path.join(current_dir, 'results_stroke_deep')
-    if not os.path.exists(deep_results_dir):
-        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
+    interpretable_formulas_file = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
+    if not os.path.exists(interpretable_formulas_file):
+        print(f"ERROR: Interpretable formulas file not found at {interpretable_formulas_file}")
         return
 
-    rel_file = os.path.join(deep_results_dir, 'relationships.csv')
-    if not os.path.exists(rel_file):
-        print(f"ERROR: Relationships file not found at {rel_file}")
-        return
-
-    rel_df = pd.read_csv(rel_file)
-    # Filter for layer 1 and target 'y'
-    layer1 = rel_df[(rel_df['layer'] == 1)]
+    df_formulas = pd.read_csv(interpretable_formulas_file)
     
     X, y = load_stroke_data()
     
-    if not layer1.empty:
-        formula = layer1.iloc[0]['formula']
+    if not df_formulas.empty:
+        # Assuming there is at least one formula in the CSV
+        formula = df_formulas.iloc[0]['formula']
         features = get_features_from_formula(formula)
         print(f"Extracted features: {features}")
         
         output_file = os.path.join(output_dir, 'stats_stroke.txt')
         run_stats(X, y, features, "Stroke", output_file=output_file)
     else:
-        print("No layer 1 formula found in relationships.csv")
+        print("No formula found in interpretable_deeppysr_formulas.csv")
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 import numpy as np
 
-def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_iterations=500, n_layers=3, task='regression'):
+def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_iterations=500, n_layers=2, task='regression'):
     """
     Run deep analysis using DeepPySRRegressor with provided parameters.
     Trains on the entire dataset provided.
