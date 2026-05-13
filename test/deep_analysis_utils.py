@@ -24,6 +24,12 @@ def run_deep_analysis(X, y, model_params_dict, output_root, name='Analysis', n_i
         
         # Merge or set requested parameters
         model_params = params.copy() if params else {}
+        consistent_config = {
+            'adaptive_parsimony_scaling': 10.0,
+            'variable_prune_start': 25,
+            'variable_prune_ramp': 150,
+        }
+        model_params.update(consistent_config)
         model_params['max_layers'] = n_layers
         model_params['stopping_score'] = 0.01
         model_params['pareto_r2_weight'] = r2w_list

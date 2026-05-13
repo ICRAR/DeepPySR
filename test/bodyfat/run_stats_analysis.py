@@ -28,9 +28,14 @@ def get_features_from_formula(formula_str):
                 features.add(t)
         return list(features)
 
-def run_stats(X, y, features, title, output_file=None):
+def run_stats(X, y, features, title, formula=None, metrics=None, output_file=None):
     print(f"\n{'='*70}")
     print(f"STATS ANALYSIS: {title}")
+    if formula:
+        print(f"Formula: {formula}")
+    if metrics:
+        metrics_str = ", ".join([f"{k}: {v}" for k, v in metrics.items()])
+        print(f"Metrics: {metrics_str}")
     print(f"{'='*70}")
     
     available_features = [f for f in features if f in X.columns]
@@ -54,6 +59,11 @@ def run_stats(X, y, features, title, output_file=None):
         if output_file:
             with open(output_file, 'w') as f:
                 f.write(f"STATS ANALYSIS: {title}\n")
+                if formula:
+                    f.write(f"Formula: {formula}\n")
+                if metrics:
+                    metrics_str = ", ".join([f"{k}: {v}" for k, v in metrics.items()])
+                    f.write(f"Metrics: {metrics_str}\n")
                 f.write(f"Features: {available_features}\n")
                 if missing_features:
                     f.write(f"Missing Features: {missing_features}\n")
@@ -71,25 +81,36 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
         
-    interpretable_formulas_file = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
-    if not os.path.exists(interpretable_formulas_file):
-        print(f"ERROR: Interpretable formulas file not found at {interpretable_formulas_file}")
+    deep_results_dir = os.path.join(current_dir, 'results_bodyfat_deep')
+    if not os.path.exists(deep_results_dir):
+        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
         return
 
-    df_formulas = pd.read_csv(interpretable_formulas_file)
+    rel_file = os.path.join(deep_results_dir, 'relationships.csv')
+    if not os.path.exists(rel_file):
+        print(f"ERROR: Relationships file not found at {rel_file}")
+        return
+
+    rel_df = pd.read_csv(rel_file)
+    # Filter for layer 1 and target 'y', and sort by r2 and f1 descending
+    layer1 = rel_df[rel_df['layer'] == 1]
     
     X, y = load_bodyfat_data()
     
-    if not df_formulas.empty:
-        # Assuming there is at least one formula in the CSV
-        formula = df_formulas.iloc[0]['formula']
+    if not layer1.empty:
+        # Sort by r2 and f1 to get the best one
+        layer1 = layer1.sort_values(by=['r2', 'f1'], ascending=False)
+        best_row = layer1.iloc[0]
+        formula = best_row['formula']
+        metrics = {'r2': best_row['r2'], 'f1': best_row['f1']}
         features = get_features_from_formula(formula)
         print(f"Extracted features: {features}")
+        print(f"Metrics: {metrics}")
         
         output_file = os.path.join(output_dir, 'stats_bodyfat.txt')
-        run_stats(X, y, features, "BodyFat", output_file=output_file)
+        run_stats(X, y, features, "BodyFat", formula=formula, metrics=metrics, output_file=output_file)
     else:
-        print("No formula found in interpretable_deeppysr_formulas.csv")
+        print("No layer 1 formula found in relationships.csv")
 
 if __name__ == "__main__":
     main()
