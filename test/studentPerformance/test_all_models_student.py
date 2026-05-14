@@ -40,6 +40,7 @@ def main():
         # Target is G3
         X = df.drop(columns=['G3'])
         y = df['G3']
+        stratify_col = df['G2']
 
         task = 'regression'
         print(f"Task: {task}, target range: [{y.min()}, {y.max()}]")
@@ -66,7 +67,7 @@ def main():
             'task': task,
             'n_splits': 5,
             'random_state': 42,
-            'stratify_by': None, # Not stratifying on continuous G3 by default unless desired
+            'stratify_by': stratify_col, 
             'feature_selection': False 
         }
         

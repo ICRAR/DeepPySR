@@ -38,6 +38,7 @@ def main():
         
         X = df.drop(columns=['G3'])
         y = df['G3']
+        stratify_col = df['G2']
 
         task = 'regression'
         
@@ -55,7 +56,7 @@ def main():
             'task': task,
             'n_splits': 5,
             'random_state': 42,
-            'stratify_by': None,
+            'stratify_by': stratify_col,
             'feature_selection': False
         }
         
