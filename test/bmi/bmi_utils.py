@@ -25,9 +25,15 @@ def aggregate_bmi_data():
     aggregated_df = pd.concat(all_data, ignore_index=True)
     return aggregated_df
 
+def replace_99_with_nan(df):
+    """Replace sentinel value 99 with NaN across all columns."""
+    return df.replace(99, float('nan'))
+
+
 def clean_bmi_data(df, threshold=0.1):
     if df.empty:
         return df
+    df = replace_99_with_nan(df)
     cols_to_drop = [col for col in df.columns if df[col].nunique(dropna=True) <= 1]
     cols_to_drop = cols_to_drop + ['mother_id','preg_no','cohab_0']
     df_cleaned = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
@@ -36,7 +42,24 @@ def clean_bmi_data(df, threshold=0.1):
     cols_to_drop_nan = nan_rates[nan_rates > threshold].index.tolist()
     df_cleaned = df_cleaned.drop(columns=cols_to_drop_nan)
     df_cleaned = df_cleaned.dropna()
-        
+
+    return df_cleaned
+
+def clean_bmi_data_forecast(df, threshold=0.1):
+    if df.empty:
+        return df
+    df = replace_99_with_nan(df)
+    cols_to_drop = [col for col in df.columns if df[col].nunique(dropna=True) <= 1]
+    cols_to_drop = cols_to_drop + ['mother_id','preg_no','cohab_0']
+    df_cleaned = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
+
+    nan_rates = df_cleaned.isnull().mean()
+    cols_to_drop_nan = nan_rates[nan_rates > threshold].index.tolist()
+    # Don't drop any column naming like y{year}bmi
+    bmi_col_pattern = lambda c: c.startswith('y') and c.endswith('bmi') and c[1:-3].isdigit()
+    cols_to_drop_nan = [c for c in cols_to_drop_nan if not bmi_col_pattern(c)]
+    df_cleaned = df_cleaned.drop(columns=cols_to_drop_nan)
+
     return df_cleaned
 
 def load_bmi_agg_data(age=None):
