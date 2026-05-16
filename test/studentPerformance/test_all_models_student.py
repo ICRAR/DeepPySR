@@ -92,7 +92,7 @@ def main():
             if os.path.exists(os.path.join(grid_out, "overall_metrics.csv")):
                 print(f"    Skipping grid (results exist)")
             else:
-                run_cv(deeppysr_factory, X, y, outdir=grid_out, scaler=True, **cv_kwargs)
+                run_cv(deeppysr_factory, X, y, outdir=grid_out, scaler=False, **cv_kwargs)
             
         # Final Aggregation
         print(f"\nAggregating results for {subject}...")
