@@ -79,6 +79,10 @@ def main():
     parser = argparse.ArgumentParser(description='BMI Forecast: DeepPySR pipeline')
     parser.add_argument('--vps', type=int, default=None,
                         help='Filter DeepPySR configs by vps value.')
+    parser.add_argument('--vpr', type=int, default=None,
+                        help='Filter DeepPySR configs by vpr value.')
+    parser.add_argument('--aps', type=float, default=None,
+                        help='Filter DeepPySR configs by aps value.')
     args = parser.parse_args()
 
     out_root = os.path.join(current_dir, 'results_bmiforecast')
@@ -95,6 +99,13 @@ def main():
     if args.vps is not None:
         deeppysr_configs = {k: v for k, v in deeppysr_configs.items()
                             if f'vps{args.vps}_' in k}
+    if args.vpr is not None:
+        deeppysr_configs = {k: v for k, v in deeppysr_configs.items()
+                            if f'vpr{args.vpr}_' in k}
+    if args.aps is not None:
+        aps_str = str(args.aps) if '.' in str(args.aps) else f'{args.aps}.0'
+        deeppysr_configs = {k: v for k, v in deeppysr_configs.items()
+                            if f'aps{aps_str}' in k}
     pysr_base_kwargs = get_pysr_base_kwargs()
 
     forecast_years = YEARS[1:]

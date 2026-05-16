@@ -86,6 +86,12 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description='BMI Forecast: Baselines + PySR pipeline')
+    parser.add_argument('--aps', type=float, default=None,
+                        help='Filter PySR configs by aps value.')
+    args = parser.parse_args()
+
     out_root = os.path.join(current_dir, 'results_bmiforecast')
     os.makedirs(out_root, exist_ok=True)
 
@@ -95,6 +101,10 @@ def main():
     print(f'Base dataset saved ({len(merged_df)} rows, {len(merged_df.columns)} cols)')
 
     pysr_configs = get_pysr_configs()
+    if args.aps is not None:
+        aps_str = str(args.aps) if '.' in str(args.aps) else f'{args.aps}.0'
+        pysr_configs = {k: v for k, v in pysr_configs.items()
+                        if f'aps{aps_str}' in k}
     pysr_base_kwargs = get_pysr_base_kwargs()
 
     forecast_years = YEARS[1:]
