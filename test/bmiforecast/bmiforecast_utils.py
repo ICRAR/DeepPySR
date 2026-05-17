@@ -61,6 +61,164 @@ def get_best_formula_age8():
     return formula, involved
 
 
+def get_best_pysr_formula_for_year(run_out_dir, X, y):
+    """Extract the best PySR formula from a completed year's results directory.
+
+    Reads all formulas_fold*.csv files under pysr subdirs, evaluates each formula
+    against the provided X and y using evaluate_formula, and picks the one with
+    the highest r2.
+    Returns (formula, involved_str) or (None, None).
+    """
+    import glob
+    import sys
+    # Import evaluate_formula from analysis_utils (one level up)
+    _analysis_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if _analysis_dir not in sys.path:
+        sys.path.insert(0, _analysis_dir)
+    from analysis_utils import evaluate_formula
+
+    best_r2 = -float('inf')
+    best_formula = None
+
+    pysr_dir = os.path.join(run_out_dir, 'pysr')
+    if not os.path.exists(pysr_dir):
+        return None, None
+
+    pattern = os.path.join(pysr_dir, '**', 'formulas_fold*.csv')
+    formula_files = glob.glob(pattern, recursive=True)
+
+    for ff in formula_files:
+        try:
+            fdf = pd.read_csv(ff)
+            if 'formula' not in fdf.columns:
+                continue
+            for _, row in fdf.iterrows():
+                formula = str(row['formula'])
+                try:
+                    y_pred = evaluate_formula(formula, X, model_type='pysr')
+                    from sklearn.metrics import r2_score as _r2
+                    mask = ~np.isnan(y_pred)
+                    if mask.sum() < 2:
+                        continue
+                    r2_val = _r2(np.asarray(y)[mask], y_pred[mask])
+                    if r2_val > best_r2:
+                        best_r2 = r2_val
+                        best_formula = formula
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    if best_formula is None:
+        return None, None
+
+    involved = ','.join(_extract_variables(best_formula))
+    print(f"  [PySR best formula r2={best_r2:.4f}]: {best_formula}")
+    print(f"  [involved]: {involved}")
+    return best_formula, involved
+
+
+def save_baseline_models(run_out_dir, models_dict):
+    """Save fitted baseline models to disk using joblib.
+
+    Args:
+        run_out_dir: directory for this year's results (e.g. results_bmiforecast/age_10)
+        models_dict: dict of {model_name: fitted_model}
+    """
+    import joblib
+    models_save_dir = os.path.join(run_out_dir, 'baselines', '_fitted_models')
+    os.makedirs(models_save_dir, exist_ok=True)
+    for name, model in models_dict.items():
+        path = os.path.join(models_save_dir, f'{name}.joblib')
+        joblib.dump(model, path)
+        print(f"  Saved fitted model: {path}")
+
+
+def load_baseline_models(run_out_dir):
+    """Load all fitted baseline models saved by save_baseline_models.
+
+    Returns dict of {model_name: fitted_model}, empty dict if none found.
+    """
+    import joblib
+    import glob
+    models_save_dir = os.path.join(run_out_dir, 'baselines', '_fitted_models')
+    if not os.path.exists(models_save_dir):
+        return {}
+    models = {}
+    for path in glob.glob(os.path.join(models_save_dir, '*.joblib')):
+        name = os.path.splitext(os.path.basename(path))[0]
+        try:
+            models[name] = joblib.load(path)
+            print(f"  Loaded fitted model: {name}")
+        except Exception as ex:
+            print(f"  Failed to load {path}: {ex}")
+    return models
+
+
+def fill_missing_bmi_with_model(df, bmi_col, model, feature_cols):
+    """Fill missing values in bmi_col using a fitted sklearn model.
+
+    Args:
+        df: DataFrame with feature_cols and bmi_col
+        bmi_col: target column name
+        model: fitted sklearn estimator with .predict()
+        feature_cols: list of feature column names used during training
+    Returns updated DataFrame.
+    """
+    df = df.copy()
+    missing_mask = df[bmi_col].isna()
+    n_missing = missing_mask.sum()
+    if n_missing == 0:
+        return df
+    print(f"  Filling {n_missing} missing {bmi_col} values via baseline model.")
+    avail_cols = [c for c in feature_cols if c in df.columns]
+    can_predict = df.loc[missing_mask, avail_cols].notna().all(axis=1)
+    idx = missing_mask[missing_mask].index[can_predict]
+    if len(idx) > 0:
+        X_pred = df.loc[idx, avail_cols]
+        try:
+            preds = model.predict(X_pred)
+            df.loc[idx, bmi_col] = preds
+        except Exception as ex:
+            print(f"  [model predict error] {ex}")
+    still_missing = df[bmi_col].isna().sum()
+    if still_missing > 0:
+        median_val = df[bmi_col].median()
+        df[bmi_col].fillna(median_val, inplace=True)
+        print(f"  Fallback median imputation for {still_missing} remaining rows.")
+    return df
+
+
+def get_best_baseline_model(run_out_dir):
+    """Return the name of the baseline model with the highest mean r2.
+
+    Reads overall_metrics.csv files under baselines subdirs (excluding _fitted_models).
+    Returns model_name or None.
+    """
+    import glob
+    best_r2 = -float('inf')
+    best_name = None
+    baselines_dir = os.path.join(run_out_dir, 'baselines')
+    if not os.path.exists(baselines_dir):
+        return None
+    pattern = os.path.join(baselines_dir, '*', 'overall_metrics.csv')
+    for mf in glob.glob(pattern):
+        name = os.path.basename(os.path.dirname(mf))
+        if name == '_fitted_models':
+            continue
+        try:
+            df = pd.read_csv(mf)
+            r2_val = df['r2'].mean() if 'r2' in df.columns else -float('inf')
+            if r2_val > best_r2:
+                best_r2 = r2_val
+                best_name = name
+        except Exception:
+            continue
+    if best_name:
+        print(f"  [best baseline model r2={best_r2:.4f}]: {best_name}")
+    return best_name
+
+
 def get_best_formula_for_year(run_out_dir):
     """Extract the best DeepPySR formula from a completed year's results directory.
 

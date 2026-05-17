@@ -76,13 +76,6 @@ def main():
         eq_output_root = os.path.join(output_root, f"eq_{eq_name.replace('.', '_')}")
         if os.path.exists(os.path.join(eq_output_root,f"convergence_Feynman: {eq_name}.csv")):
             continue
-        models['Best DeepPySR'] = {
-            'adaptive_parsimony_scaling': 50.0,
-            'variable_prune_start': 25,
-            'variable_prune_ramp': 20,
-            'r2_weight': 2.0,
-            'lambda': 0.001
-        }
         run_convergence_comparison(X, y, models, eq_output_root, n_iterations=500, name=f'Feynman: {eq_name}')
 
 if __name__ == "__main__":

@@ -1,0 +1,3 @@
+subject,model,formula,r2,complexity
+mat,fullsr_vps75_vpr150_aps10.0_nit500_pop100_sz200_grid_r2w1.0_L0.001,"cond(absences + sin(0.41*studytime - 0.41*G2 + sin(reason*(traveltime + higher + Pstatus))) + 0.66, G2)",0.9434092917008253,23.0
+por,fullsr_vps25_vpr50_aps10.0_nit500_pop100_sz200_grid_r2w1.5_L0.005,"0.96*cond(school + absences - 1.0*sin((G2 + exp(reason - 1.0*activities))**0.5), G2 + 0.93)",0.8923541174199427,24.0

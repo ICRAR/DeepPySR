@@ -12,7 +12,6 @@ from eval_utils import run_cv, aggregate_results
 from bmiforecast_utils import (
     YEARS, actual_age,
     prepare_base_dataset, load_forecast_data,
-    get_best_formula_for_year, fill_missing_bmi_with_formula,
 )
 
 
@@ -76,7 +75,9 @@ def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='BMI Forecast: DeepPySR pipeline')
+    parser = argparse.ArgumentParser(description='BMI Forecast: DeepPySR grid search for one year')
+    parser.add_argument('--year', type=int, required=True,
+                        help='Forecast year to run grid search for (e.g. 10, 13, 16, 20, 23, 26).')
     parser.add_argument('--vps', type=int, default=None,
                         help='Filter DeepPySR configs by vps value.')
     parser.add_argument('--vpr', type=int, default=None,
@@ -84,6 +85,9 @@ def main():
     parser.add_argument('--aps', type=float, default=None,
                         help='Filter DeepPySR configs by aps value.')
     args = parser.parse_args()
+
+    if args.year not in YEARS:
+        raise ValueError(f'--year must be one of {YEARS}, got {args.year}')
 
     out_root = os.path.join(current_dir, 'results_bmiforecast')
     os.makedirs(out_root, exist_ok=True)
@@ -108,46 +112,26 @@ def main():
                             if f'aps{aps_str}' in k}
     pysr_base_kwargs = get_pysr_base_kwargs()
 
-    forecast_years = YEARS[1:]
+    # Build prior BMI cols from real data only (no formula-filling here).
+    # Include all BMI years that come before the target year.
+    prior_bmi_cols = []
+    for y in YEARS:
+        if y >= args.year:
+            break
+        col = f'y{y}bmi'
+        if col in merged_df.columns:
+            prior_bmi_cols.append(col)
 
-    prior_bmi_cols = ['y8bmi'] if 'y8bmi' in merged_df.columns else []
+    print(f'\n{"#"*40}')
+    print(f'# Grid search: predicting y{args.year}bmi')
+    print(f'# Features: non-BMI vars + {prior_bmi_cols}')
+    print(f'{"#"*40}')
 
-    for year in forecast_years:
-        print(f'\n{"#"*40}')
-        print(f'# Rolling step: predicting y{year}bmi')
-        print(f'# Features: non-BMI vars + {prior_bmi_cols}')
-        print(f'{"#"*40}')
-
-        run_out = run_deeppysr_for_year(
-            merged_df, year, prior_bmi_cols, non_bmi_cols,
-            out_root, pysr_base_kwargs, deeppysr_configs,
-            r2w_list, lambda_list,
-        )
-
-        bmi_col = f'y{year}bmi'
-        if bmi_col not in merged_df.columns:
-            continue
-
-        # Extract best formula from this year's results and fill missing BMI values
-        if run_out is not None:
-            print(f'\n--- Extracting best formula for y{year}bmi ---')
-            formula, involved_str = get_best_formula_for_year(run_out)
-            if formula is not None:
-                merged_df = fill_missing_bmi_with_formula(
-                    merged_df, bmi_col, formula, involved_str)
-            else:
-                print(f'  No formula found; missing y{year}bmi values remain NaN.')
-
-        # Add this year's BMI (mix of real + formula-predicted) to features for next year
-        if bmi_col not in prior_bmi_cols:
-            prior_bmi_cols.append(bmi_col)
-
-    # Save final dataset with all filled BMI columns
-    merged_df.to_csv(os.path.join(out_root, 'rolling_dataset.csv'), index=False)
-    print(f'\nRolling dataset saved to {out_root}/rolling_dataset.csv')
-
-    print('\n=== Aggregating all forecast results ===')
-    aggregate_results(out_root, task='regression')
+    run_deeppysr_for_year(
+        merged_df, args.year, prior_bmi_cols, non_bmi_cols,
+        out_root, pysr_base_kwargs, deeppysr_configs,
+        r2w_list, lambda_list,
+    )
 
 
 if __name__ == '__main__':

@@ -53,7 +53,7 @@ def main():
         y = df['G3']
         
         sub_output = os.path.join(output_root, subject)
-        run_deep_analysis(X, y, sub_models, sub_output, name=f'{subject.upper()} Student', n_iterations=500, n_layers=3, task='regression')
+        run_deep_analysis(X, y, sub_models, sub_output, name=f'{subject.upper()} Student', n_iterations=500, n_layers=2, task='regression')
 
 if __name__ == "__main__":
     main()
