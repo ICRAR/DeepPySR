@@ -57,18 +57,10 @@ def main():
         if not models:
             print(f"No best models found for {eq_name}")
             continue
-        consistent_config = {
-            'adaptive_parsimony_scaling': 10.0,
-            'variable_prune_start': 25,
-            'variable_prune_ramp': 150,
-            'r2_weight': 1.5,
-            'lambda': 0.001,
-        }
         for model_name in models:
             if models[model_name] is None:
                 models[model_name] = {}
             models[model_name]["extra_constants"] = ["pi", "c", "G", "e"]
-            models[model_name].update(consistent_config)
 
         # Load data
         X, y = load_feynman_data(eq_name, n_samples=1000)
