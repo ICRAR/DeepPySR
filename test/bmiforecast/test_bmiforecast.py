@@ -1,17 +1,11 @@
-"""Local debug script for the BMI forecast rolling pipeline.
+"""Production BMI forecast rolling pipeline.
 
-Runs the full pipeline (DeepPySR + baselines/PySR + rolling step) year by year
-for a small subset of years, with reduced iterations so it finishes quickly.
+Runs the full pipeline (DeepPySR + PySR grid search + baselines + rolling step)
+year by year over all forecast years.
 
 Usage:
     cd /path/to/DeepPySR
-    python test/bmiforecast/debug_pipeline_local.py
-
-Tunable constants at the top of the file:
-    DEBUG_YEARS   - which forecast years to run (subset of YEARS[1:])
-    N_ITERATIONS  - niterations for both DeepPySR and PySR (keep small, e.g. 5)
-    VPS, VPR, APS - single values for DeepPySR grid-search filtering
-    PYSR_APS      - single aps value for PySR filtering
+    python test/bmiforecast/test_bmiforecast.py
 """
 import os
 import sys
@@ -21,16 +15,6 @@ import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
-
-# ── Debug parameters ──────────────────────────────────────────────────────────
-DEBUG_YEARS  = [10, 13]   # subset of YEARS[1:] to run
-N_ITERATIONS = 5          # niterations for DeepPySR and PySR
-VPS          = 25         # variable_prune_start filter
-VPR          = 50         # variable_prune_ramp filter
-APS          = 1.0        # adaptive_parsimony_scaling filter (DeepPySR)
-PYSR_APS     = 1.0        # adaptive_parsimony_scaling filter (PySR)
-N_SPLITS     = 2          # CV folds (keep small for speed)
-# ─────────────────────────────────────────────────────────────────────────────
 
 import pandas as pd
 from sklearn.base import clone
@@ -46,17 +30,15 @@ from analysis_utils import evaluate_formula
 from bmiforecast_utils import (
     YEARS, actual_age,
     prepare_base_dataset,
-    save_baseline_models, load_baseline_models,
-    get_best_formula_for_year, get_best_pysr_formula_for_year,
-    get_best_baseline_model,
-    fill_missing_bmi_with_formula, fill_missing_bmi_with_model,
     _is_bmi_col,
     save_rolling_dataset_with_predictions,
     load_forecast_data_for_model,
 )
 
-OUT_ROOT = os.path.join(current_dir, 'results_bmiforecast_debug')
+OUT_ROOT = os.path.join(current_dir, 'results_bmiforecast')
 os.makedirs(OUT_ROOT, exist_ok=True)
+
+N_SPLITS = 5
 
 # Populated by main() before each pipeline year so run_rolling_step can access configs
 _rolling_step_kwargs = {}
@@ -79,23 +61,16 @@ def _pysr_kwargs(base_kwargs, overrides=None):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def evaluate_all_deeppysr_formulas(run_out_dir, X, y):
-    """Evaluate all DeepPySR formulas on the real data.
-    
-    Returns:
-        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
-    """
     results = {}
     deeppysr_dir = os.path.join(run_out_dir, 'deeppysr')
-    
     if not os.path.exists(deeppysr_dir):
         return results
-    
+
     pattern = os.path.join(deeppysr_dir, '**', 'relationships_fold*.csv')
     files = glob.glob(pattern, recursive=True)
     if not files:
-        pattern2 = os.path.join(deeppysr_dir, '**', 'relationships.csv')
-        files = glob.glob(pattern2, recursive=True)
-    
+        files = glob.glob(os.path.join(deeppysr_dir, '**', 'relationships.csv'), recursive=True)
+
     for f in files:
         try:
             df = pd.read_csv(f)
@@ -116,26 +91,16 @@ def evaluate_all_deeppysr_formulas(run_out_dir, X, y):
                     continue
         except Exception:
             continue
-    
     return results
 
 
 def evaluate_all_pysr_formulas(run_out_dir, X, y):
-    """Evaluate all PySR formulas on the real data.
-    
-    Returns:
-        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
-    """
     results = {}
     pysr_dir = os.path.join(run_out_dir, 'pysr')
-    
     if not os.path.exists(pysr_dir):
         return results
-    
-    pattern = os.path.join(pysr_dir, '**', 'formulas_fold*.csv')
-    files = glob.glob(pattern, recursive=True)
-    
-    for f in files:
+
+    for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_fold*.csv'), recursive=True):
         try:
             df = pd.read_csv(f)
             if 'formula' not in df.columns:
@@ -155,28 +120,20 @@ def evaluate_all_pysr_formulas(run_out_dir, X, y):
                     continue
         except Exception:
             continue
-    
     return results
 
 
 def evaluate_all_kan_formulas(run_out_dir, X, y):
-    """Evaluate all KAN formulas on the real data.
-    
-    Returns:
-        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
-    """
     results = {}
     kan_dir = os.path.join(run_out_dir, 'baselines', 'KAN')
-    
     if not os.path.exists(kan_dir):
         return results
-    
+
     pattern = os.path.join(kan_dir, '**', 'formulas_fold*.csv')
     files = glob.glob(pattern, recursive=True)
     if not files:
-        pattern2 = os.path.join(kan_dir, '**', 'formulas.csv')
-        files = glob.glob(pattern2, recursive=True)
-    
+        files = glob.glob(os.path.join(kan_dir, '**', 'formulas.csv'), recursive=True)
+
     for f in files:
         try:
             df = pd.read_csv(f)
@@ -197,16 +154,11 @@ def evaluate_all_kan_formulas(run_out_dir, X, y):
                     continue
         except Exception:
             continue
-    
     return results
 
 
 def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
-    """Read CV out-of-fold baseline predictions saved by run_cv.
-
-    Returns:
-        dict: {model_name: (r2, cv_predictions)} or empty dict if none found.
-    """
+    """Read CV out-of-fold baseline predictions saved by run_cv."""
     results = {}
     baselines_dir = os.path.join(run_out_dir, 'baselines')
     if not os.path.exists(baselines_dir):
@@ -231,65 +183,42 @@ def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
             results[name] = (r2_val, y_pred_cv)
         except Exception:
             continue
-
     return results
 
 
 def evaluate_full_baseline_models(full_models_dir, X_eval, y_eval, feature_cols):
-    """Evaluate full (non-CV) baseline models on known data.
-
-    Loads models from full_models_dir/_models/ and predicts on X_eval.
-
-    Returns:
-        dict: {model_name: (r2, predictions)} or empty dict if none found.
-    """
+    """Evaluate full (non-CV) baseline models on known data."""
     import joblib as _jl
     results = {}
     models_dir = os.path.join(full_models_dir, '_models')
     if not os.path.exists(models_dir):
         return results
 
-    # Load and evaluate each saved model
     for fname in sorted(os.listdir(models_dir)):
         if not fname.endswith('.joblib'):
             continue
-        name = fname[:-len('.joblib')]
+        model_name = fname.replace('.joblib', '')
         try:
-            model = _jl.load(os.path.join(models_dir, fname))
-        except Exception:
-            continue
-        try:
-            avail_cols = [c for c in feature_cols if c in X_eval.columns]
-            can_predict = X_eval[avail_cols].notna().all(axis=1)
-            y_pred_full = np.full(len(X_eval), np.nan)
-            X_sub = X_eval.loc[can_predict, avail_cols]
-            if len(X_sub) > 0:
-                y_pred_full[can_predict.values] = model.predict(X_sub)
-            mask = ~np.isnan(y_pred_full)
+            m = _jl.load(os.path.join(models_dir, fname))
+            y_pred = m.predict(X_eval.values)
+            mask = ~np.isnan(y_pred)
             if mask.sum() < 2:
                 continue
-            r2_val = r2_score(np.asarray(y_eval)[mask], y_pred_full[mask])
-            results[name] = (r2_val, y_pred_full)
+            r2_val = r2_score(np.asarray(y_eval)[mask], y_pred[mask])
+            results[model_name] = (r2_val, y_pred)
         except Exception:
             continue
-
     return results
 
 
 def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
-    """Evaluate full (non-CV) formula models saved under full_models_dir.
-
-    Reads relationships_nocv.csv (DeepPySR) and formulas_nocv.csv (PySR/KAN).
-
-    Returns:
-        dict: {family: {formula: (r2, predictions)}}
-    """
+    """Read formulas_nocv.csv / relationships_nocv.csv and evaluate on X_eval."""
     results = {}
 
     # DeepPySR
     deeppysr_dir = os.path.join(full_models_dir, 'deeppysr')
     if os.path.exists(deeppysr_dir):
-        deeppysr_res = {}
+        dsr_res = {}
         for f in glob.glob(os.path.join(deeppysr_dir, '**', 'relationships_nocv.csv'), recursive=True):
             try:
                 df = pd.read_csv(f)
@@ -297,7 +226,7 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
                     continue
                 for _, row in df.iterrows():
                     formula = str(row['formula'])
-                    if formula in deeppysr_res:
+                    if formula in dsr_res:
                         continue
                     try:
                         y_pred = evaluate_formula(formula, X_eval, model_type='deeppysr')
@@ -305,26 +234,26 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
                         if mask.sum() < 2:
                             continue
                         r2_val = r2_score(np.asarray(y_eval)[mask], y_pred[mask])
-                        deeppysr_res[formula] = (r2_val, y_pred)
+                        dsr_res[formula] = (r2_val, y_pred)
                     except Exception:
                         continue
             except Exception:
                 continue
-        if deeppysr_res:
-            results['deeppysr'] = deeppysr_res
+        if dsr_res:
+            results['deeppysr'] = dsr_res
 
     # PySR
     pysr_dir = os.path.join(full_models_dir, 'pysr')
     if os.path.exists(pysr_dir):
-        pysr_res = {}
-        for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_foldnocv.csv'), recursive=True):
+        psr_res = {}
+        for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_nocv.csv'), recursive=True):
             try:
                 df = pd.read_csv(f)
                 if 'formula' not in df.columns:
                     continue
                 for _, row in df.iterrows():
                     formula = str(row['formula'])
-                    if formula in pysr_res:
+                    if formula in psr_res:
                         continue
                     try:
                         y_pred = evaluate_formula(formula, X_eval, model_type='pysr')
@@ -332,13 +261,13 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
                         if mask.sum() < 2:
                             continue
                         r2_val = r2_score(np.asarray(y_eval)[mask], y_pred[mask])
-                        pysr_res[formula] = (r2_val, y_pred)
+                        psr_res[formula] = (r2_val, y_pred)
                     except Exception:
                         continue
             except Exception:
                 continue
-        if pysr_res:
-            results['pysr'] = pysr_res
+        if psr_res:
+            results['pysr'] = psr_res
 
     # KAN
     kan_dir = os.path.join(full_models_dir, 'kan')
@@ -368,15 +297,10 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
             results['kan'] = kan_res
 
     return results
-    
+
+
 def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None):
-    """Select the best CV result from each family and save CV metrics to CSV.
-
-    Operates purely on CV evaluation results — no model loading or saving.
-
-    Returns:
-        dict: {family: {model_name: (formula_or_label, cv_predictions, r2)}}
-    """
+    """Select the best CV result per family and save cv_metrics_summary.csv."""
     from sklearn.metrics import mean_absolute_error, mean_squared_error
 
     def _extra_metrics(y_true, y_pred):
@@ -390,9 +314,7 @@ def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None
 
     for family, label in [('deeppysr', 'DeepPySR'), ('pysr', 'PySR'), ('kan', 'KAN')]:
         best_r2 = -float('inf')
-        best_name = None
-        best_preds = None
-        best_formula = None
+        best_name = best_preds = best_formula = None
         for formula, (r2_val, preds) in all_results_dict.get(family, {}).items():
             print(f"    {label} formula r2={r2_val:.4f}: {formula[:60]}...")
             if r2_val > best_r2:
@@ -404,19 +326,16 @@ def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None
             print(f"  [{label} best CV] r2={best_r2:.4f}")
             results_by_family[family] = {best_name: (best_formula, best_preds, best_r2)}
 
-    # Keep all baseline CV results
     results_by_family['baseline'] = {}
     for model_name, (r2_val, preds) in all_results_dict.get('baseline', {}).items():
         print(f"    Baseline {model_name} CV r2={r2_val:.4f}")
         results_by_family['baseline'][model_name] = (model_name, preds, r2_val)
 
-    # Save CV metrics summary
     rows = []
     for family, models_dict in results_by_family.items():
         for model_name, (formula_or_label, preds, r2_val) in models_dict.items():
             row = {'family': family, 'model': model_name, 'cv_r2': r2_val}
             if family == 'baseline':
-                # Baselines store CV out-of-fold preds; read y_true from saved CSV
                 pred_file = os.path.join(run_out, 'baselines', model_name, 'predictions.csv')
                 try:
                     df_pred = pd.read_csv(pred_file)
@@ -431,6 +350,7 @@ def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None
                 row['cv_mae'] = mae
                 row['cv_rmse'] = rmse
             rows.append(row)
+
     if rows:
         metrics_csv = os.path.join(run_out, 'cv_metrics_summary.csv')
         pd.DataFrame(rows).to_csv(metrics_csv, index=False)
@@ -440,18 +360,12 @@ def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None
 
 
 def select_best_full_model(all_results_dict):
-    """Select best result per family from full-training evaluation results.
-
-    Returns:
-        dict: {family: {model_name: (formula_or_label, predictions, r2)}}
-    """
+    """Select best result per family from full-training evaluation results."""
     results_by_family = {}
 
     for family, label in [('deeppysr', 'DeepPySR'), ('pysr', 'PySR'), ('kan', 'KAN')]:
         best_r2 = -float('inf')
-        best_name = None
-        best_preds = None
-        best_formula = None
+        best_name = best_preds = best_formula = None
         for formula, (r2_val, preds) in all_results_dict.get(family, {}).items():
             print(f"    [Full] {label} formula r2={r2_val:.4f}: {formula[:60]}...")
             if r2_val > best_r2:
@@ -471,12 +385,12 @@ def select_best_full_model(all_results_dict):
     return results_by_family
 
 
-# ── Step 1: DeepPySR grid search for one year ─────────────────────────────────
+# ── Step 1: DeepPySR grid search ──────────────────────────────────────────────
 
 def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
                           pysr_base_kwargs, deeppysr_configs, r2w_list, lambda_list):
-    ids, X, y = load_forecast_data_for_model(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
-                                             model_type='deeppysr')
+    ids, X, y = load_forecast_data_for_model(
+        merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='deeppysr')
     if ids is None or len(y) < 10:
         print(f"  Skipping yr{target_year}: insufficient data.")
         return None
@@ -487,23 +401,16 @@ def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
 
     print(f"\n{'='*20}\n[DeepPySR] Forecasting y{target_year}bmi (age {age_label})  n={len(y)}\n{'='*20}")
 
-    cv_kwargs = {
-        'ids': ids,
-        'task': 'regression',
-        'n_splits': N_SPLITS,
-        'random_state': 42,
-    }
-
-    nit = pysr_base_kwargs.get('niterations', N_ITERATIONS)
-    pop = pysr_base_kwargs.get('populations', 30)
+    nit = pysr_base_kwargs.get('niterations', 500)
+    pop = pysr_base_kwargs.get('populations', 100)
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f'nit{nit}_pop{pop}_sz{sz}'
 
+    cv_kwargs = {'ids': ids, 'task': 'regression', 'n_splits': N_SPLITS, 'random_state': 42}
+
     for cfg_name, cfg_overrides in deeppysr_configs.items():
         parts = cfg_name.split('_', 1)
-        setting_prefix = parts[0]
-        params_part = parts[1] if len(parts) > 1 else ''
-        full_cfg_name = f'{setting_prefix}_{param_suffix}_{params_part}_grid'
+        full_cfg_name = f'{parts[0]}_{param_suffix}_{parts[1] if len(parts) > 1 else ""}_grid'
         deeppysr_out = os.path.join(run_out, 'deeppysr', full_cfg_name)
 
         if os.path.exists(os.path.join(deeppysr_out, 'overall_metrics.csv')):
@@ -515,13 +422,8 @@ def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
         def deeppysr_factory(co=cfg_overrides, dout=deeppysr_out):
             kwargs = pysr_base_kwargs.copy()
             kwargs.update(co)
-            return DeepPySR(
-                max_layers=1,
-                output_dir=dout,
-                pareto_r2_weight=r2w_list,
-                pareto_lambda=lambda_list,
-                **kwargs
-            )
+            return DeepPySR(max_layers=1, output_dir=dout,
+                            pareto_r2_weight=r2w_list, pareto_lambda=lambda_list, **kwargs)
 
         run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
 
@@ -530,7 +432,7 @@ def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
     return run_out
 
 
-# ── Step 2: Baselines + PySR for one year ─────────────────────────────────────
+# ── Step 2: Baselines + PySR grid search ──────────────────────────────────────
 
 def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
                            pysr_base_kwargs, pysr_configs):
@@ -540,15 +442,13 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
 
     print(f"\n{'='*20}\n[Baselines/PySR] Forecasting y{target_year}bmi (age {age_label})\n{'='*20}")
 
-    nit = pysr_base_kwargs.get('niterations', N_ITERATIONS)
-    pop = pysr_base_kwargs.get('populations', 30)
+    nit = pysr_base_kwargs.get('niterations', 500)
+    pop = pysr_base_kwargs.get('populations', 100)
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f'nit{nit}_pop{pop}_sz{sz}'
 
-    # Baseline models — each uses its own model-specific prior bmi pred columns
     print('  Evaluating Baseline Models...')
     baseline_model_instances = get_baseline_models(task='regression', input_dim=1)
-    fitted_models = {}
     any_ran = False
 
     for name in baseline_model_instances:
@@ -560,18 +460,16 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
         any_ran = True
         model_out = os.path.join(run_out, 'baselines', name)
 
-        if name == 'KAN':
-            m = KANWrapper(input_dim=X.shape[1], output_dim=1,
-                           hidden_dim=5, steps=200, update_grid=False,
-                           task='regression')
-        else:
-            m = clone(baseline_model_instances[name])
-
         if os.path.exists(os.path.join(model_out, 'overall_metrics.csv')):
             print(f'    Skipping {name} (CV results exist)')
             continue
 
         print(f'    {name}...')
+        if name == 'KAN':
+            m = KANWrapper(input_dim=X.shape[1], output_dim=1,
+                           hidden_dim=5, steps=200, update_grid=False, task='regression')
+        else:
+            m = clone(baseline_model_instances[name])
 
         def baseline_factory(inst=m):
             return clone(inst) if hasattr(inst, 'get_params') else inst
@@ -583,7 +481,6 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
         print(f'  Skipping yr{target_year}: insufficient data for all baseline models.')
         return None
 
-    # PySR models — use pysr-specific prior bmi pred columns
     print('  Evaluating PySR Models...')
     ids_pysr, X_pysr, y_pysr = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='pysr')
@@ -608,7 +505,7 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
     return run_out
 
 
-# ── Step 3: Train all models on full data (no CV) ─────────────────────────────
+# ── Step 3: Train all models on full data ─────────────────────────────────────
 
 def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
                                pysr_base_kwargs, deeppysr_configs, pysr_configs,
@@ -624,12 +521,11 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
     import joblib as _jl
     full_out = os.path.join(run_out, 'full_models')
 
-    nit = pysr_base_kwargs.get('niterations', N_ITERATIONS)
-    pop = pysr_base_kwargs.get('populations', 30)
+    nit = pysr_base_kwargs.get('niterations', 500)
+    pop = pysr_base_kwargs.get('populations', 100)
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f'nit{nit}_pop{pop}_sz{sz}'
 
-    # Build expected output paths for all models and skip if all exist.
     def _all_full_models_exist():
         for cfg_name in deeppysr_configs:
             parts = cfg_name.split('_', 1)
@@ -648,20 +544,18 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
         baseline_model_instances = get_baseline_models(task='regression', input_dim=1)
         for name in baseline_model_instances:
             if name == 'KAN':
-                if not os.path.exists(os.path.join(full_out,'_models','KAN_state')):
-                    return False
-            else:
-                if not os.path.exists(os.path.join(full_out, '_models', f'{name}.joblib')):
-                    return False
+                continue
+            if not os.path.exists(os.path.join(full_out, '_models', f'{name}.joblib')):
+                return False
         return True
 
     if _all_full_models_exist():
         print('  Skipping train_full_models_for_year (all full models exist)')
         return full_out
 
-    # os.makedirs(full_out, exist_ok=True)
+    os.makedirs(full_out, exist_ok=True)
 
-    # DeepPySR — train on all data
+    # DeepPySR
     ids_dsr, X_dsr, y_dsr = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='deeppysr')
     if ids_dsr is not None and len(y_dsr) >= 10:
@@ -683,7 +577,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(deeppysr_factory, X_dsr, y_dsr, ids=ids_dsr,
                      task='regression', outdir=dsr_full_out, scaler=False)
 
-    # PySR — train on all data
+    # PySR
     ids_psr, X_psr, y_psr = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='pysr')
     if ids_psr is not None and len(y_psr) >= 10:
@@ -702,7 +596,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(pysr_factory, X_psr, y_psr, ids=ids_psr,
                      task='regression', outdir=psr_full_out, scaler=False)
 
-    # KAN — train on all data via run_nocv so symbolize()+formulas_nocv.csv are handled automatically
+    # KAN — via run_nocv so symbolize() + formulas_nocv.csv are handled automatically
     ids_kan, X_kan, y_kan = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='KAN')
     if ids_kan is not None and len(y_kan) >= 10:
@@ -717,25 +611,23 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(kan_factory, X_kan, y_kan, ids=ids_kan,
                      task='regression', outdir=kan_full_out, scaler=False)
 
-    # Baseline models (non-KAN) — train on all data
+    # Baseline models (non-KAN)
     models_save_dir = os.path.join(full_out, '_models')
     os.makedirs(models_save_dir, exist_ok=True)
     baseline_model_instances = get_baseline_models(task='regression', input_dim=1)
 
     for name in baseline_model_instances:
         if name == 'KAN':
-            continue  # handled above via run_nocv
+            continue
         save_path = os.path.join(models_save_dir, f'{name}.joblib')
         if os.path.exists(save_path):
             print(f'  Skipping {name} full training (exists)')
             continue
-
         ids_bl, X_bl, y_bl = load_forecast_data_for_model(
             merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type=name)
         if ids_bl is None or len(y_bl) < 10:
             print(f'    Skipping {name}: insufficient data.')
             continue
-
         m = clone(baseline_model_instances[name])
         print(f'  Training {name} (full)...')
         try:
@@ -759,27 +651,23 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     print(f'# Rolling step: y{target_year}bmi (age {age_label})')
     print(f'{"#"*50}')
 
-    if not os.path.exists(run_out):
-        print(f'  No results directory at {run_out}, skipping.')
-        return merged_df
-
     if bmi_col not in merged_df.columns:
-        print(f'  Column {bmi_col} not in dataset, skipping.')
+        print(f'  {bmi_col} not in dataset, skipping.')
         return merged_df
 
     year_idx = YEARS.index(target_year)
     prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
                       if f'y{y}bmi' in merged_df.columns]
-    feature_cols = [c for c in non_bmi_cols if c in merged_df.columns] + \
+    feature_cols = [c for c in _rolling_step_kwargs.get('non_bmi_cols_ref', non_bmi_cols)
+                    if c in merged_df.columns] + \
                    [c for c in prior_bmi_cols if c in merged_df.columns]
 
     known_mask = merged_df[bmi_col].notna()
     X_eval = merged_df.loc[known_mask, feature_cols].reset_index(drop=True)
     y_eval = merged_df.loc[known_mask, bmi_col].values
-    
+
     print(f'  Evaluating CV results on {len(X_eval)} known samples...\n')
 
-    # ── CV evaluation (metrics only, no model saving) ─────────────────────────
     print('  Evaluating DeepPySR CV formulas...')
     cv_deeppysr = evaluate_all_deeppysr_formulas(run_out, X_eval, y_eval)
 
@@ -803,10 +691,8 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         print('\n  --- CV metrics ---')
         select_best_cv_model_and_save_metrics(run_out, cv_results, y_eval=y_eval)
     else:
-        print(f'  No CV results found.')
+        print('  No CV results found.')
 
-    # ── Full model training (all available data, no CV) ───────────────────────
-    # Retrieve configs from main() — passed via run_rolling_step kwargs
     pysr_base_kwargs = _rolling_step_kwargs.get('pysr_base_kwargs', {})
     deeppysr_configs = _rolling_step_kwargs.get('deeppysr_configs', {})
     pysr_configs = _rolling_step_kwargs.get('pysr_configs', {})
@@ -819,7 +705,6 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         pysr_base_kwargs, deeppysr_configs, pysr_configs,
         r2w_list, lambda_list, run_out)
 
-    # ── Evaluate full models ───────────────────────────────────────────────────
     print('\n  --- Evaluating full models ---')
     full_formula_results = evaluate_full_formula_models(full_out, X_eval, y_eval)
     full_baseline_results = evaluate_full_baseline_models(full_out, X_eval, y_eval, feature_cols)
@@ -827,7 +712,7 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     full_results = {**full_formula_results, 'baseline': full_baseline_results}
 
     if not any(full_results.values()):
-        print(f'  No full-model results found for NaN prediction.')
+        print('  No full-model results found for NaN prediction.')
         merged_df.to_csv(rolling_csv, index=False)
         print(f'\n  Rolling dataset saved to {rolling_csv}')
         return merged_df
@@ -839,7 +724,6 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         for model_name, (_, _, r2) in models_dict.items():
             print(f'    {family}_{model_name}: r2={r2:.4f}')
 
-    # ── Save rolling dataset using full models ─────────────────────────────────
     merged_df = save_rolling_dataset_with_predictions(
         merged_df, target_year, full_results_by_family, rolling_csv,
         full_models_dir=full_out, non_bmi_cols=non_bmi_cols,
@@ -854,7 +738,6 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
 def main():
     rolling_csv = os.path.join(OUT_ROOT, 'rolling_dataset.csv')
 
-    # Prepare base dataset (or load existing)
     if os.path.exists(rolling_csv):
         print(f'\n=== Loading existing rolling dataset from {rolling_csv} ===')
         merged_df = pd.read_csv(rolling_csv)
@@ -866,28 +749,16 @@ def main():
         merged_df.to_csv(os.path.join(OUT_ROOT, 'base_dataset.csv'), index=False)
         print(f'Base dataset: {len(merged_df)} rows, {len(merged_df.columns)} cols')
 
-    # Build shared configs with reduced iterations
     pysr_base_kwargs = get_pysr_base_kwargs()
-    pysr_base_kwargs['niterations'] = N_ITERATIONS  # override for debug
+    deeppysr_configs = get_deeppysr_configs()
+    pysr_configs = get_pysr_configs()
 
     r2w_list    = [1.5]
     lambda_list = [0.001]
 
-    # Filter DeepPySR configs to a single combination
-    deeppysr_configs = get_deeppysr_configs()
-    aps_str = str(APS) if '.' in str(APS) else f'{APS}.0'
-    deeppysr_configs = {k: v for k, v in deeppysr_configs.items()
-                        if f'vps{VPS}_' in k and f'vpr{VPR}_' in k and f'aps{aps_str}' in k}
-    print(f'\nDeepPySR configs selected: {list(deeppysr_configs.keys())}')
+    print(f'\nDeepPySR configs: {len(deeppysr_configs)} combinations')
+    print(f'PySR configs: {len(pysr_configs)} combinations')
 
-    # Filter PySR configs to a single aps
-    pysr_configs = get_pysr_configs()
-    pysr_aps_str = str(PYSR_APS) if '.' in str(PYSR_APS) else f'{PYSR_APS}.0'
-    pysr_configs = {k: v for k, v in pysr_configs.items()
-                    if f'aps{pysr_aps_str}' in k}
-    print(f'PySR configs selected: {list(pysr_configs.keys())}')
-
-    # Share configs with run_rolling_step via module-level dict
     global _rolling_step_kwargs
     _rolling_step_kwargs = {
         'pysr_base_kwargs': pysr_base_kwargs,
@@ -895,14 +766,10 @@ def main():
         'pysr_configs': pysr_configs,
         'r2w_list': r2w_list,
         'lambda_list': lambda_list,
+        'non_bmi_cols_ref': non_bmi_cols,
     }
 
-    # Year-by-year rolling pipeline
-    for year in DEBUG_YEARS:
-        if year not in YEARS:
-            print(f'WARNING: year {year} not in YEARS={YEARS}, skipping.')
-            continue
-
+    for year in YEARS[1:]:
         year_idx = YEARS.index(year)
         prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
                           if f'y{y}bmi' in merged_df.columns]
@@ -912,22 +779,19 @@ def main():
         print(f'  prior BMI cols: {prior_bmi_cols}')
         print(f'{"="*60}')
 
-        # Step 1: DeepPySR CV
         run_deeppysr_for_year(
             merged_df, year, prior_bmi_cols, non_bmi_cols,
             pysr_base_kwargs, deeppysr_configs, r2w_list, lambda_list,
         )
 
-        # Step 2: Baselines + PySR CV
         run_baselines_for_year(
             merged_df, year, prior_bmi_cols, non_bmi_cols,
             pysr_base_kwargs, pysr_configs,
         )
 
-        # Step 3: Evaluate CV, train full models, predict NaNs, save rolling dataset
         merged_df = run_rolling_step(merged_df, non_bmi_cols, year, rolling_csv)
 
-    print('\n=== Debug pipeline complete ===')
+    print('\n=== Pipeline complete ===')
     print(f'Results saved under: {OUT_ROOT}')
 
 

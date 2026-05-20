@@ -33,9 +33,11 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 | bodyfat   | setonix | 500 | Yes     | Yes      | Yes   | Yes     | **unstable** |
 | wine      | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no           |
 | diabetes  | setonix | 100 | Yes     | Yes      | Yes   | Yes     | no           |
-|students   | setonix | 500 | working | no       | no    | no      | no           |
+|students   | setonix | 500 | Yes | Yes       | Yes    | Yes      | no           |
 
 
 steps: cv train -> analysis, stats, deep, convergence
 
 notes: ICC causes convergence unstable
+notes: convergence needs to select the best model,
+fix the bmiforecast problem in vscode
