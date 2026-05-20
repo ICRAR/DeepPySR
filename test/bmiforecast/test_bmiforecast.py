@@ -61,8 +61,14 @@ def _pysr_kwargs(base_kwargs, overrides=None):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def evaluate_all_deeppysr_formulas(run_out_dir, X, y):
+    """Evaluate all DeepPySR formulas on the real data.
+
+    Returns:
+        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
+    """
     results = {}
     deeppysr_dir = os.path.join(run_out_dir, 'deeppysr')
+
     if not os.path.exists(deeppysr_dir):
         return results
 
@@ -95,8 +101,14 @@ def evaluate_all_deeppysr_formulas(run_out_dir, X, y):
 
 
 def evaluate_all_pysr_formulas(run_out_dir, X, y):
+    """Evaluate all PySR formulas on the real data.
+
+    Returns:
+        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
+    """
     results = {}
     pysr_dir = os.path.join(run_out_dir, 'pysr')
+
     if not os.path.exists(pysr_dir):
         return results
 
@@ -120,12 +132,19 @@ def evaluate_all_pysr_formulas(run_out_dir, X, y):
                     continue
         except Exception:
             continue
+
     return results
 
 
 def evaluate_all_kan_formulas(run_out_dir, X, y):
+    """Evaluate all KAN formulas on the real data.
+
+    Returns:
+        dict: {formula: (r2, predictions)} or empty dict if no formulas found.
+    """
     results = {}
     kan_dir = os.path.join(run_out_dir, 'baselines', 'KAN')
+
     if not os.path.exists(kan_dir):
         return results
 
@@ -154,11 +173,16 @@ def evaluate_all_kan_formulas(run_out_dir, X, y):
                     continue
         except Exception:
             continue
+
     return results
 
 
 def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
-    """Read CV out-of-fold baseline predictions saved by run_cv."""
+    """Read CV out-of-fold baseline predictions saved by run_cv.
+
+    Returns:
+        dict: {model_name: (r2, cv_predictions)} or empty dict if none found.
+    """
     results = {}
     baselines_dir = os.path.join(run_out_dir, 'baselines')
     if not os.path.exists(baselines_dir):
@@ -183,17 +207,25 @@ def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
             results[name] = (r2_val, y_pred_cv)
         except Exception:
             continue
+
     return results
 
 
 def evaluate_full_baseline_models(full_models_dir, X_eval, y_eval, feature_cols):
-    """Evaluate full (non-CV) baseline models on known data."""
+    """Evaluate full (non-CV) baseline models on known data.
+
+    Loads models from full_models_dir/_models/ and predicts on X_eval.
+
+    Returns:
+        dict: {model_name: (r2, predictions)} or empty dict if none found.
+    """
     import joblib as _jl
     results = {}
     models_dir = os.path.join(full_models_dir, '_models')
     if not os.path.exists(models_dir):
         return results
 
+    # Load and evaluate each saved model
     for fname in sorted(os.listdir(models_dir)):
         if not fname.endswith('.joblib'):
             continue
@@ -471,6 +503,12 @@ def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
         else:
             m = clone(baseline_model_instances[name])
 
+        if os.path.exists(os.path.join(model_out, 'overall_metrics.csv')):
+            print(f'    Skipping {name} (CV results exist)')
+            continue
+
+        print(f'    {name}...')
+
         def baseline_factory(inst=m):
             return clone(inst) if hasattr(inst, 'get_params') else inst
 
@@ -544,18 +582,20 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
         baseline_model_instances = get_baseline_models(task='regression', input_dim=1)
         for name in baseline_model_instances:
             if name == 'KAN':
-                continue
-            if not os.path.exists(os.path.join(full_out, '_models', f'{name}.joblib')):
-                return False
+                if not os.path.exists(os.path.join(full_out,'_models','KAN_state')):
+                    return False
+            else:
+                if not os.path.exists(os.path.join(full_out, '_models', f'{name}.joblib')):
+                    return False
         return True
 
     if _all_full_models_exist():
         print('  Skipping train_full_models_for_year (all full models exist)')
         return full_out
 
-    os.makedirs(full_out, exist_ok=True)
+    # os.makedirs(full_out, exist_ok=True)
 
-    # DeepPySR
+    # DeepPySR — train on all data
     ids_dsr, X_dsr, y_dsr = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='deeppysr')
     if ids_dsr is not None and len(y_dsr) >= 10:
@@ -577,7 +617,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(deeppysr_factory, X_dsr, y_dsr, ids=ids_dsr,
                      task='regression', outdir=dsr_full_out, scaler=False)
 
-    # PySR
+    # PySR — train on all data
     ids_psr, X_psr, y_psr = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='pysr')
     if ids_psr is not None and len(y_psr) >= 10:
@@ -596,7 +636,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(pysr_factory, X_psr, y_psr, ids=ids_psr,
                      task='regression', outdir=psr_full_out, scaler=False)
 
-    # KAN — via run_nocv so symbolize() + formulas_nocv.csv are handled automatically
+    # KAN — train on all data via run_nocv so symbolize()+formulas_nocv.csv are handled automatically
     ids_kan, X_kan, y_kan = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='KAN')
     if ids_kan is not None and len(y_kan) >= 10:
@@ -611,7 +651,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
             run_nocv(kan_factory, X_kan, y_kan, ids=ids_kan,
                      task='regression', outdir=kan_full_out, scaler=False)
 
-    # Baseline models (non-KAN)
+    # Baseline models (non-KAN) — train on all data
     models_save_dir = os.path.join(full_out, '_models')
     os.makedirs(models_save_dir, exist_ok=True)
     baseline_model_instances = get_baseline_models(task='regression', input_dim=1)
@@ -651,6 +691,10 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     print(f'# Rolling step: y{target_year}bmi (age {age_label})')
     print(f'{"#"*50}')
 
+    if not os.path.exists(run_out):
+        print(f'  No results directory at {run_out}, skipping.')
+        return merged_df
+
     if bmi_col not in merged_df.columns:
         print(f'  {bmi_col} not in dataset, skipping.')
         return merged_df
@@ -668,6 +712,7 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
 
     print(f'  Evaluating CV results on {len(X_eval)} known samples...\n')
 
+    # ── CV evaluation (metrics only, no model saving) ─────────────────────────
     print('  Evaluating DeepPySR CV formulas...')
     cv_deeppysr = evaluate_all_deeppysr_formulas(run_out, X_eval, y_eval)
 
@@ -693,6 +738,8 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     else:
         print('  No CV results found.')
 
+    # ── Full model training (all available data, no CV) ───────────────────────
+    # Retrieve configs from main() — passed via run_rolling_step kwargs
     pysr_base_kwargs = _rolling_step_kwargs.get('pysr_base_kwargs', {})
     deeppysr_configs = _rolling_step_kwargs.get('deeppysr_configs', {})
     pysr_configs = _rolling_step_kwargs.get('pysr_configs', {})
@@ -705,6 +752,7 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         pysr_base_kwargs, deeppysr_configs, pysr_configs,
         r2w_list, lambda_list, run_out)
 
+    # ── Evaluate full models ───────────────────────────────────────────────────
     print('\n  --- Evaluating full models ---')
     full_formula_results = evaluate_full_formula_models(full_out, X_eval, y_eval)
     full_baseline_results = evaluate_full_baseline_models(full_out, X_eval, y_eval, feature_cols)
@@ -724,6 +772,7 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         for model_name, (_, _, r2) in models_dict.items():
             print(f'    {family}_{model_name}: r2={r2:.4f}')
 
+    # ── Save rolling dataset using full models ─────────────────────────────────
     merged_df = save_rolling_dataset_with_predictions(
         merged_df, target_year, full_results_by_family, rolling_csv,
         full_models_dir=full_out, non_bmi_cols=non_bmi_cols,
@@ -753,8 +802,8 @@ def main():
     deeppysr_configs = get_deeppysr_configs()
     pysr_configs = get_pysr_configs()
 
-    r2w_list    = [1.5]
-    lambda_list = [0.001]
+    r2w_list = [1, 1.5, 2]
+    lambda_list = [0.001, 0.005, 0.01]
 
     print(f'\nDeepPySR configs: {len(deeppysr_configs)} combinations')
     print(f'PySR configs: {len(pysr_configs)} combinations')
@@ -779,16 +828,19 @@ def main():
         print(f'  prior BMI cols: {prior_bmi_cols}')
         print(f'{"="*60}')
 
+        # Step 1: DeepPySR CV
         run_deeppysr_for_year(
             merged_df, year, prior_bmi_cols, non_bmi_cols,
             pysr_base_kwargs, deeppysr_configs, r2w_list, lambda_list,
         )
 
+        # Step 2: Baselines + PySR CV
         run_baselines_for_year(
             merged_df, year, prior_bmi_cols, non_bmi_cols,
             pysr_base_kwargs, pysr_configs,
         )
 
+        # Step 3: Evaluate CV, train full models, predict NaNs, save rolling dataset
         merged_df = run_rolling_step(merged_df, non_bmi_cols, year, rolling_csv)
 
     print('\n=== Pipeline complete ===')

@@ -732,13 +732,12 @@ def prepare_base_dataset():
         # Median fallback for any remaining NaN (formula could not evaluate)
         still_nan = merged[pred_col].isna()
         if still_nan.any():
-            merged.loc[still_nan, pred_col] = bmi8_median
+            raise ValueError(f'Formula {model_type} failed to fill all missing values for {bmi8_col}')
         n_filled = int(merged.loc[missing_mask, pred_col].notna().sum()) if n_missing else 0
         print(f'  {model_type}: {n_filled}/{n_missing} missing filled via formula')
 
     # --- Baseline models: fit on observed y8bmi rows, predict on missing rows ---
     # Feature columns: non-BMI features present in merged (no prior BMI for age-8)
-    feat_cols_8 = [c for c in non_bmi_cols if c in merged.columns]
     _bl_save_dir = os.path.abspath(os.path.join(
         _current_dir, '../bmi/results_bmi_all/age_specific/age_8/baselines/_fitted_models'))
     os.makedirs(_bl_save_dir, exist_ok=True)
@@ -754,12 +753,12 @@ def prepare_base_dataset():
         print(f'  WARNING: Could not import get_baseline_models: {_ie}')
         _get_bl_models = None
 
-    if _get_bl_models is not None and feat_cols_8:
-        X_train8 = merged.loc[real_mask, feat_cols_8].values
+    if _get_bl_models is not None and age8_fcols:
+        X_train8 = merged.loc[real_mask, age8_fcols].values
         y_train8 = merged.loc[real_mask, bmi8_col].values
-        X_miss8 = merged.loc[missing_mask, feat_cols_8].values if n_missing > 0 else None
+        X_miss8 = merged.loc[missing_mask, age8_fcols].values if n_missing > 0 else None
 
-        _bl_model_instances = _get_bl_models(task='regression', input_dim=len(feat_cols_8))
+        _bl_model_instances = _get_bl_models(task='regression', input_dim=len(age8_fcols))
         for model_name, model_template in _bl_model_instances.items():
             pred_col = f'{bmi8_col}_{model_name}_pred'
             merged[pred_col] = merged[bmi8_col].copy()
