@@ -70,5 +70,6 @@ def load_bmi_agg_data(age=None):
 
     ids = df["child_id"].values
     X = df.drop(columns=['child_id','target_bmi'])
+    X = X.rename(columns={col: col.replace("SUM_PGS", "PGS") for col in X.columns if col.startswith("SUM_PGS")})
     y = df['target_bmi'].values
     return ids, X, y

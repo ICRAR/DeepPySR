@@ -22,7 +22,7 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--setting', type=str, default='longitudinal', choices=['longitudinal', 'age_specific'])
+    parser.add_argument('--setting', type=str, default='age_specific', choices=['longitudinal', 'age_specific'])
     parser.add_argument('--age', type=int, default=None)
     args = parser.parse_args()
 

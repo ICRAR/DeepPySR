@@ -214,14 +214,14 @@ def get_pysr_configs():
 
 # --- KAN Wrapper ---
 class KANWrapper:
-    def __init__(self, input_dim, output_dim=1, hidden_dim=5, steps=200, update_grid=False, task='regression', lamb=0.05, lamb_l1=1):
+    def __init__(self, input_dim, output_dim=1, hidden_dim=10, steps=200, update_grid=False, task='regression', lamb=0.01, lamb_l1=1):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # Ensure input, hidden, and output dims are integers
         input_dim = int(input_dim) if not isinstance(input_dim, list) else int(input_dim[0])
         hidden_dim = int(hidden_dim) if not isinstance(hidden_dim, list) else int(hidden_dim[0])
         output_dim = int(output_dim) if not isinstance(output_dim, list) else int(output_dim[0])
 
-        self.width = [input_dim, hidden_dim, output_dim]
+        self.width = [input_dim, hidden_dim, 5, output_dim]
         # Pass a copy to avoid in-place modification of self.width by pykan
         self.model = KAN(width=self.width.copy(), device=self.device)
         self.lamb = lamb
@@ -416,7 +416,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'ExtraTrees': ExtraTreesClassifier(n_estimators=100, max_depth=5, min_samples_leaf=10, random_state=random_state),
             'XGBoost': XGBClassifier(n_estimators=100, max_depth=3, reg_lambda=1, reg_alpha=0.1, subsample=0.8, random_state=random_state, use_label_encoder=False, eval_metric='logloss'),
             'MLP': MLPClassifierWrapper(hidden_layer_sizes=(256, 128, 64), dropout=0.1, activation='leaky_relu', random_state=random_state),
-            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='classification')
+            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=10, steps=200, update_grid=False, task='classification')
         }
     else: # regression
         return {
@@ -431,7 +431,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             #     transformations=['sin', 'cos', 'exp', 'log', 'sqrt'],
             #     random_state=random_state
             # ),
-            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=5, steps=200, update_grid=False, task='regression')
+            'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=10, steps=200, update_grid=False, task='regression')
         }
 
 def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):

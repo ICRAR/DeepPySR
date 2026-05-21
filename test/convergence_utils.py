@@ -278,41 +278,38 @@ def plot_convergence(combined_df, output_dir, title="Loss Convergence Comparison
     if params is None:
         params = {}
         
-    plt.figure(figsize=(12, 8))
-    
+    MODEL_COLORS = {"deeppysr": "#1976D2", "pysr": "#E65100"}
+
+    fig, ax = plt.subplots(figsize=(3.2, 2.4))
+
     for model_name in combined_df['Model'].unique():
-        model_data = combined_df[combined_df['Model'] == model_name]
-        plt.plot(model_data['Iteration'], model_data['Loss'], label=f"{model_name.upper()}")
-    
+        model_data = combined_df[combined_df['Model'] == model_name].sort_values('Iteration')
+        color = MODEL_COLORS.get(model_name, None)
+        ax.plot(model_data['Iteration'], model_data['Loss'],
+                label=model_name.upper(), color=color, linewidth=1.4)
+
     if task == 'regression':
-        plt.yscale('log')
-        plt.ylabel('Loss (MSE)')
+        ax.set_yscale('log')
+        import matplotlib.ticker as ticker
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
+        ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation(base=10))
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+        ax.set_ylabel('Loss (MSE)', fontsize=6)
     else:
-        plt.ylabel('Loss (1 - F1)')
-        
-    plt.xlabel('Iteration')
-    plt.title(title)
-    plt.grid(True, which="both", ls="-", alpha=0.5)
-    plt.legend()
-    
-    # Model parameters to specify in text
-    params_text = "Model Parameters:\n"
-    params_text += f"adaptive_parsimony_scaling: {params.get('adaptive_parsimony_scaling', 'N/A')}\n"
-    params_text += f"variable_prune_start: {params.get('variable_prune_start', 'N/A')}\n"
-    params_text += f"ramp: {params.get('variable_prune_ramp', 'N/A')}\n"
-    params_text += f"max: {params.get('variable_prune_max', 'N/A')}\n"
-    params_text += f"r2_weight: {params.get('r2_weight', 'N/A')}\n"
-    params_text += f"lambda_complexity: {params.get('lambda', 'N/A')}"
-    
-    plt.figtext(0.75, 0.5, params_text, fontsize=10, 
-                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray'))
-    
-    plt.tight_layout(rect=[0, 0, 0.75, 1])
-    
+        ax.set_ylabel('Loss (1 - F1)', fontsize=6)
+
+    ax.set_xlabel('Iteration', fontsize=6)
+    ax.set_title(title, fontsize=10, fontweight='bold')
+    ax.tick_params(axis='x', labelsize=6)
+    ax.tick_params(axis='y', labelsize=6)
+    ax.grid(True, which='major', linestyle='--', alpha=0.4, linewidth=0.6)
+    ax.legend(fontsize=8, loc='upper right', framealpha=0.8)
+
+    fig.tight_layout(pad=0.5)
     plot_path = os.path.join(output_dir, filename)
-    plt.savefig(plot_path)
+    fig.savefig(plot_path, dpi=200, bbox_inches='tight')
     print(f"Convergence plot saved to: {plot_path}")
-    plt.close()
+    plt.close(fig)
 
 def run_convergence_comparison(X, y, model_params_dict, output_root, name, n_iterations=500, task='regression'):
     """
