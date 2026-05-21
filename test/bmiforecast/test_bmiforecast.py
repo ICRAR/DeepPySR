@@ -682,6 +682,10 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
 
 # ── Step 4: Rolling step for one year ─────────────────────────────────────────
 
+def _year_done_flag(age_label):
+    return os.path.join(OUT_ROOT, f'age_{age_label}', 'done.flag')
+
+
 def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     bmi_col = f'y{target_year}bmi'
     age_label = actual_age(target_year)
@@ -761,7 +765,9 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
 
     if not any(full_results.values()):
         print('  No full-model results found for NaN prediction.')
-        merged_df.to_csv(rolling_csv, index=False)
+        _tmp = rolling_csv + '.tmp'
+        merged_df.to_csv(_tmp, index=False)
+        os.replace(_tmp, rolling_csv)
         print(f'\n  Rolling dataset saved to {rolling_csv}')
         return merged_df
 
@@ -779,6 +785,8 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         prior_bmi_col_names=prior_bmi_cols,
         formula_feature_cols=feature_cols)
     print(f'\n  Rolling dataset saved with full-model predictions')
+
+    open(_year_done_flag(age_label), 'w').close()
     return merged_df
 
 
@@ -795,7 +803,9 @@ def main():
     else:
         print('\n=== Preparing base dataset ===')
         merged_df, non_bmi_cols = prepare_base_dataset()
-        merged_df.to_csv(os.path.join(OUT_ROOT, 'base_dataset.csv'), index=False)
+        _tmp = os.path.join(OUT_ROOT, 'base_dataset.csv.tmp')
+        merged_df.to_csv(_tmp, index=False)
+        os.replace(_tmp, os.path.join(OUT_ROOT, 'base_dataset.csv'))
         print(f'Base dataset: {len(merged_df)} rows, {len(merged_df.columns)} cols')
 
     pysr_base_kwargs = get_pysr_base_kwargs()
@@ -822,6 +832,11 @@ def main():
         year_idx = YEARS.index(year)
         prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
                           if f'y{y}bmi' in merged_df.columns]
+
+        age_label = actual_age(year)
+        if os.path.exists(_year_done_flag(age_label)):
+            print(f'\n[SKIP] y{year}bmi (age {age_label}) — done.flag found, skipping.')
+            continue
 
         print(f'\n{"="*60}')
         print(f'PIPELINE: predicting y{year}bmi')

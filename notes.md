@@ -34,7 +34,8 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 | wine      | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no           |
 | diabetes  | setonix | 100 | Yes     | Yes      | Yes   | Yes     | no           |
 |students   | setonix | 500 | Yes | Yes       | Yes    | Yes      | no           |
-
+bmiforecast, on a400
+rerun deep for bmi longitudinal and students, for plots
 
 steps: cv train -> analysis, stats, deep, convergence
 

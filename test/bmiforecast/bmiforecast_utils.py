@@ -896,7 +896,9 @@ def save_rolling_dataset_with_predictions(merged_df, target_year, results_by_fam
     bmi_col = f'y{target_year}bmi'
 
     if bmi_col not in merged_df.columns:
-        merged_df.to_csv(rolling_csv, index=False)
+        _tmp = rolling_csv + '.tmp'
+        merged_df.to_csv(_tmp, index=False)
+        os.replace(_tmp, rolling_csv)
         print(f'  Saved rolling dataset to {rolling_csv}')
         return merged_df
 
@@ -965,7 +967,9 @@ def save_rolling_dataset_with_predictions(merged_df, target_year, results_by_fam
             merged_df[bmi_col].fillna(bmi_median, inplace=True)
             print(f'  Median fallback for {still_missing} remaining rows of {bmi_col}.')
 
-    merged_df.to_csv(rolling_csv, index=False)
+    _tmp = rolling_csv + '.tmp'
+    merged_df.to_csv(_tmp, index=False)
+    os.replace(_tmp, rolling_csv)
     print(f'  Saved rolling dataset to {rolling_csv}')
     return merged_df
 
