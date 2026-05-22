@@ -38,7 +38,7 @@ def main():
         return
 
     metrics_df = pd.read_csv(metrics_file)
-    output_root = os.path.join(current_dir, './results_bmi_deep')
+    output_root = os.path.join(current_dir, './results_bmi_deep1')
 
     # 1. Longitudinal Models
     print("\n" + "="*70)
@@ -89,7 +89,7 @@ def main():
             if os.path.exists(os.path.join(age_output_root, 'relationships.csv')):
                 print(f"Skipping age {age} analysis as results already exist in {age_output_root}")
             else:
-                run_deep_analysis(X_age, y_age, age_models, age_output_root,target_name='BMI', name=f'Age: {age} years', n_iterations=500, n_layers=2)
+                run_deep_analysis(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years', n_iterations=500, n_layers=3)
         else:
             print(f"No data or no best models found for age {age}")
 
