@@ -33,7 +33,8 @@ PLOTS = [
 ]
 
 MODEL_LABELS = {"deeppysr": "DeepPySR", "pysr": "PySR"}
-MODEL_COLORS = {"deeppysr": "#1976D2", "pysr": "#E65100"}
+MODEL_COLORS = {"deeppysr": "#222222", "pysr": "#888888"}
+MODEL_LINESTYLES = {"deeppysr": "-", "pysr": "--"}
 
 FIG_W, FIG_H = 3.2, 2.4   # inches — scales well to 0.31 textwidth
 FONTSIZE_TITLE  = 10
@@ -43,28 +44,37 @@ FONTSIZE_LEGEND = 8
 
 for cfg in PLOTS:
     df = pd.read_csv(cfg["csv"])
-    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 
-    for model in df["Model"].unique():
-        mdf = df[df["Model"] == model].sort_values("Iteration")
-        label = MODEL_LABELS.get(model, model.upper())
-        color = MODEL_COLORS.get(model, None)
-        ax.plot(mdf["Iteration"], mdf["Loss"], label=label, color=color, linewidth=1.4)
+    with plt.style.context("grayscale"):
+        fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
+        fig.patch.set_facecolor("#F5F5F5")
+        ax.set_facecolor("#EFEFEF")
 
-    ax.set_yscale("log")
-    ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
-    ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation(base=10))
-    ax.yaxis.set_minor_locator(ticker.NullLocator())
-    ax.set_xlabel("Iteration", fontsize=FONTSIZE_AXIS)
-    ax.set_ylabel("Loss (MSE)", fontsize=FONTSIZE_AXIS)
-    ax.set_title(cfg["title"], fontsize=FONTSIZE_TITLE, fontweight="bold")
-    ax.tick_params(axis="x", labelsize=FONTSIZE_TICK)
-    ax.tick_params(axis="y", labelsize=cfg.get("ytick_size", FONTSIZE_TICK))
-    ax.grid(True, which="major", linestyle="--", alpha=0.4, linewidth=0.6)
-    ax.legend(fontsize=FONTSIZE_LEGEND, loc="upper right", framealpha=0.8)
+        for model in df["Model"].unique():
+            mdf = df[df["Model"] == model].sort_values("Iteration")
+            label = MODEL_LABELS.get(model, model.upper())
+            color = MODEL_COLORS.get(model, "#444444")
+            ls = MODEL_LINESTYLES.get(model, "-")
+            ax.plot(mdf["Iteration"], mdf["Loss"], label=label, color=color,
+                    linewidth=1.4, linestyle=ls)
 
-    fig.tight_layout(pad=0.5)
-    os.makedirs(os.path.dirname(cfg["out"]), exist_ok=True)
-    fig.savefig(cfg["out"], dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {cfg['out']}")
+        ax.set_yscale("log")
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
+        ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation(base=10))
+        ax.yaxis.set_minor_locator(ticker.NullLocator())
+        ax.set_xlabel("Iteration", fontsize=FONTSIZE_AXIS)
+        ax.set_ylabel("Loss (MSE)", fontsize=FONTSIZE_AXIS)
+        ax.set_title(cfg["title"], fontsize=FONTSIZE_TITLE, fontweight="bold", color="#111111")
+        ax.tick_params(axis="x", labelsize=FONTSIZE_TICK, colors="#333333")
+        ax.tick_params(axis="y", labelsize=cfg.get("ytick_size", FONTSIZE_TICK), colors="#333333")
+        for spine in ax.spines.values():
+            spine.set_edgecolor("#BBBBBB")
+        ax.grid(True, which="major", linestyle="--", alpha=0.5, linewidth=0.6, color="#AAAAAA")
+        ax.legend(fontsize=FONTSIZE_LEGEND, loc="upper right", framealpha=0.8,
+                  facecolor="#F0F0F0", edgecolor="#BBBBBB")
+
+        fig.tight_layout(pad=0.5)
+        os.makedirs(os.path.dirname(cfg["out"]), exist_ok=True)
+        fig.savefig(cfg["out"], dpi=200, bbox_inches="tight", facecolor=fig.get_facecolor())
+        plt.close(fig)
+        print(f"Saved: {cfg['out']}")
