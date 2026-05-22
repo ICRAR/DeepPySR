@@ -85,7 +85,7 @@ def run_deep_analysis(X, y, model_params_dict, output_root, target_name:str =Non
         try:
             print(f"    Generating plots for {model_display_name}...")
             regressor.plot(filename=os.path.join(output_root, "hierarchy.png"))
-            regressor.plot_circle(target_variable=target_name,filename=os.path.join(output_root, "circle.png"))
+            regressor.plot_circle(filename=os.path.join(output_root, "circle.png"))
             regressor.save_relationships(filename=os.path.join(output_root, "relationships.csv"))
         except Exception as e:
             print(f"    Error generating plots: {e}")
