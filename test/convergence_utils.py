@@ -278,15 +278,17 @@ def plot_convergence(combined_df, output_dir, title="Loss Convergence Comparison
     if params is None:
         params = {}
         
-    MODEL_COLORS = {"deeppysr": "#1976D2", "pysr": "#E65100"}
+    MODEL_COLORS  = {"deeppysr": "#1976D2", "pysr": "#E65100"}
+    MODEL_LABELS  = {"deeppysr": "DeepPySR", "pysr": "PySR"}
 
     fig, ax = plt.subplots(figsize=(3.2, 2.4))
 
     for model_name in combined_df['Model'].unique():
         model_data = combined_df[combined_df['Model'] == model_name].sort_values('Iteration')
+        label = MODEL_LABELS.get(model_name, model_name.upper())
         color = MODEL_COLORS.get(model_name, None)
         ax.plot(model_data['Iteration'], model_data['Loss'],
-                label=model_name.upper(), color=color, linewidth=1.4)
+                label=label, color=color, linewidth=1.4)
 
     if task == 'regression':
         ax.set_yscale('log')
@@ -294,14 +296,14 @@ def plot_convergence(combined_df, output_dir, title="Loss Convergence Comparison
         ax.yaxis.set_major_locator(ticker.LogLocator(base=10, numticks=10))
         ax.yaxis.set_major_formatter(ticker.LogFormatterSciNotation(base=10))
         ax.yaxis.set_minor_locator(ticker.NullLocator())
-        ax.set_ylabel('Loss (MSE)', fontsize=6)
+        ax.set_ylabel('Loss (MSE)', fontsize=8)
     else:
-        ax.set_ylabel('Loss (1 - F1)', fontsize=6)
+        ax.set_ylabel('Loss (1 - F1)', fontsize=8)
 
-    ax.set_xlabel('Iteration', fontsize=6)
+    ax.set_xlabel('Iteration', fontsize=8)
     ax.set_title(title, fontsize=10, fontweight='bold')
-    ax.tick_params(axis='x', labelsize=6)
-    ax.tick_params(axis='y', labelsize=6)
+    ax.tick_params(axis='x', labelsize=8)
+    ax.tick_params(axis='y', labelsize=8)
     ax.grid(True, which='major', linestyle='--', alpha=0.4, linewidth=0.6)
     ax.legend(fontsize=8, loc='upper right', framealpha=0.8)
 
