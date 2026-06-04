@@ -1,5 +1,5 @@
 import numpy as np
-from DeepPySR.regressor import DeepPySRRegressor
+from deeppysr import DeepPySR
 import os,torch
 import time
 import kan as KAN
