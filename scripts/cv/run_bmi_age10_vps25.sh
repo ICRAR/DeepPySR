@@ -18,7 +18,6 @@ source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 export PYTHON_JULIAPKG_OFFLINE=yes
 
-python $PROJECT_ROOT/scripts/fix_julia_manifest.py
 set -e
 
 echo "Starting bmi_age10_vps25 at $(date)"
