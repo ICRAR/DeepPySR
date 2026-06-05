@@ -41,7 +41,8 @@ export PROJECT_ROOT="${PROJECT_ROOT}"
 export DEEPPYSR_PATH="${DEEPPYSR_PATH}"
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}"
 export PYTHON_JULIAPKG_PROJECT="${PYTHON_JULIAPKG_PROJECT}"
-python -m juliapkg exe -- -e 'using Pkg; Pkg.status()'
+export JULIA="$PYTHON_JULIAPKG_PROJECT/pyjuliapkg/install/bin/julia"
+$JULIA --project=$PYTHON_JULIAPKG_PROJECT -e 'using Pkg; Pkg.status()'
 export PYTHON_JULIAPKG_OFFLINE=no
 cd \$PROJECT_ROOT
 source ".venv/bin/activate"
