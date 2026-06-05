@@ -7,7 +7,7 @@
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/diabetes_vps75_vpr50_aps50.0.log
 
 export PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
-export MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
+export MYPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
 #export PYTHONPATH="$PROJECT_ROOT:$MYPYSR_PATH:$PYTHONPATH"
 
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"

@@ -14,7 +14,7 @@
 set -e
 
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR"
-MYPYSR_PATH="/scratch/pawsey0411/fchen1/mypysr.jl/python"
+MYPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
 JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
 ACCOUNT="pawsey0411"
