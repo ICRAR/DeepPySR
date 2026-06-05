@@ -18,7 +18,7 @@ export PYTHON_JULIAPKG_OFFLINE=no
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
-# python -m juliapkg update
+python -m juliapkg update
 set -e
 
 echo "Starting insulin_baselines_age22_homa_ir at $(date)"

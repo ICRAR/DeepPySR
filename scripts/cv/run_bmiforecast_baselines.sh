@@ -15,7 +15,7 @@ export PYTHON_JULIAPKG_OFFLINE=no
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
-# python -m juliapkg update
+python -m juliapkg update
 set -e
 echo "Starting bmiforecast_baselines at $(date)"
 python -u test/bmiforecast/test_baselines_bmiforecast.py

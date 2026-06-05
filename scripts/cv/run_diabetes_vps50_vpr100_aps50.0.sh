@@ -19,7 +19,7 @@ export PYTHON_JULIAPKG_OFFLINE=no
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
-# python -m juliapkg update
+python -m juliapkg update
 set -e
 
 echo "Starting diabetes_vps50_vpr100_aps50.0 at $(date)"

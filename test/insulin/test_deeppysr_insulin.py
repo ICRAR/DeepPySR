@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--age', type=int, default=17)
     parser.add_argument('--target', type=str, default='homa_ir',
                         choices=['homa_ir', 'insulin', 'glucose'])
-    parser.add_argument('--vps', type=int, default=None)
+    parser.add_argument('--vps', type=int, default=25)
     args = parser.parse_args()
 
     out_root = os.path.join(current_dir, "results_insulin")

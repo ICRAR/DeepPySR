@@ -47,7 +47,7 @@ export PYTHON_JULIAPKG_OFFLINE=no
 cd \$PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="\$PROJECT_ROOT:\$PYTHONPATH"
-# python -m juliapkg update
+python -m juliapkg update
 set -e
 echo "Starting bmi_y${year}_vps${vps}_vpr${vpr}_aps${aps} at \$(date)"
 python -u test/bmiforecast/test_deeppysr_bmiforecast.py --year ${year} --vps ${vps} --vpr ${vpr} --aps ${aps}
