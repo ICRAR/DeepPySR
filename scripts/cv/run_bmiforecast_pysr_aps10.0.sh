@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/bmiforecast_pysr_aps10.0.log
 export PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
-export MYPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
+export DEEPPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 export PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
 python -m juliapkg exe -- -e 'using Pkg; Pkg.status()'

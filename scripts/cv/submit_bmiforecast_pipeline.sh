@@ -14,7 +14,7 @@
 set -e
 
 PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR"
-MYPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
+DEEPPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
 JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
 PYTHON_JULIAPKG_PROJECT="/scratch/pawsey0411/fchen1/DeepPySR/.venv/julia_env"
 ACCOUNT="pawsey0411"
@@ -38,7 +38,7 @@ deeppysr_preamble() {
 #SBATCH --nodes=1
 #SBATCH --output=${LOG_DIR}/bmi_y${year}_vps${vps}_vpr${vpr}_aps${aps}.log
 export PROJECT_ROOT="${PROJECT_ROOT}"
-export MYPYSR_PATH="${MYPYSR_PATH}"
+export DEEPPYSR_PATH="${DEEPPYSR_PATH}"
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}"
 export PYTHON_JULIAPKG_PROJECT="${PYTHON_JULIAPKG_PROJECT}"
 python -m juliapkg exe -- -e 'using Pkg; Pkg.status()'
