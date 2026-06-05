@@ -15,10 +15,8 @@ export JULIA="$PYTHON_JULIAPKG_PROJECT/pyjuliapkg/install/bin/julia"
 cd $PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
-python -m juliapkg update
 export PYTHON_JULIAPKG_OFFLINE=yes
 
-$JULIA --project=$PYTHON_JULIAPKG_PROJECT -e 'import Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
 python $PROJECT_ROOT/scripts/fix_julia_manifest.py
 set -e
 

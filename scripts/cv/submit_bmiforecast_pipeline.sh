@@ -42,12 +42,10 @@ export DEEPPYSR_PATH="${DEEPPYSR_PATH}"
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}"
 export PYTHON_JULIAPKG_PROJECT="${PYTHON_JULIAPKG_PROJECT}"
 export JULIA="$PYTHON_JULIAPKG_PROJECT/pyjuliapkg/install/bin/julia"
-$JULIA --project=$PYTHON_JULIAPKG_PROJECT -e 'import Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
-export PYTHON_JULIAPKG_OFFLINE=no
+export PYTHON_JULIAPKG_OFFLINE=yes
 cd \$PROJECT_ROOT
 source ".venv/bin/activate"
 export PYTHONPATH="\$PROJECT_ROOT:\$PYTHONPATH"
-python -m juliapkg update
 set -e
 echo "Starting bmi_y${year}_vps${vps}_vpr${vpr}_aps${aps} at \$(date)"
 python -u test/bmiforecast/test_deeppysr_bmiforecast.py --year ${year} --vps ${vps} --vpr ${vpr} --aps ${aps}
