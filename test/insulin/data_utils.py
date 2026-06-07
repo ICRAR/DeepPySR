@@ -13,6 +13,8 @@ from bmiforecast_utils import _is_categorical_col
 
 _BASE = Path(__file__).parents[2] / "test_data" / "Health"
 _RAINE_PATH = _BASE / "raine" / "merged.csv"
+_CACHE_KEEPTO8  = _BASE / "raine" / "insulin_glucose_keepto8"
+_CACHE_KEEPTO14 = _BASE / "raine" / "insulin_glucose_keepto14"
 _BMI_PATH = _BASE / "bmi"
 _PGS_ROOT = _BASE / "raine" / "PGSt2d" / "pgs_score"
 
@@ -308,8 +310,8 @@ def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-_LONGITUDINAL_AGES = [14, 17, 20, 22, 27, 28]
-
+_LONGITUDINAL_AGES_KEEPTO8 = [14, 17, 20, 22, 27, 28]
+_LONGITUDINAL_AGES_KEEPTO14 = [17, 20, 22, 27, 28]
 
 def _build_merged() -> pd.DataFrame:
     """Load, merge, and preprocess the raw data once (no age-specific filtering)."""
@@ -403,10 +405,21 @@ def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
     return X
 
 
+def _high_age_suffixes(cutoff: int) -> set:
+    """Return yr/y suffix strings for timepoints with age > cutoff."""
+    suffixes = set()
+    for yr in _TIMEPOINT_YEAR.values():
+        m = re.match(r"yr(\d+)$", yr)
+        if m and int(m.group(1)) > cutoff:
+            suffixes.add(yr)
+            suffixes.add(f"y{m.group(1)}")
+    return suffixes
+
+
 def load_data(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
     target_list = [targets] if isinstance(targets, str) else list(targets)
     cache_name = "_".join(target_list) + f"_{age}.csv"
-    cache_path = _BASE / "raine" / cache_name
+    cache_path = _CACHE_KEEPTO8 / cache_name
 
     if cache_path.exists():
         print(f"[load_data] loading cached data from {cache_path}")
@@ -429,17 +442,7 @@ def load_data(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFra
             raise ValueError(f"No column found containing '{target}' and '{y_suffix}'")
         y_cols.append(candidates[0])
 
-    # drop all columns with yr{age} or y{age} where age > 8
-    high_age_suffixes = set()
-    for yr in _TIMEPOINT_YEAR.values():
-        m = re.match(r"yr(\d+)$", yr)
-        if m and int(m.group(1)) > 8:
-            high_age_suffixes.add(yr)
-            high_age_suffixes.add(f"y{m.group(1)}")
-    drop_cols = {
-        c for c in merged.columns
-        if any(suf in c for suf in high_age_suffixes)
-    }
+    drop_cols = {c for c in merged.columns if any(suf in c for suf in _high_age_suffixes(8))}
 
     merged = merged.dropna(subset=y_cols)
 
@@ -458,15 +461,61 @@ def load_data(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFra
     return id_col, X, y
 
 
+def load_data_keepto14(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
+    """Like load_data but drops variables with timepoints after age 14."""
+    target_list = [targets] if isinstance(targets, str) else list(targets)
+    cache_name = "_".join(target_list) + f"_{age}.csv"
+    cache_path = _CACHE_KEEPTO14 / cache_name
+
+    if cache_path.exists():
+        print(f"[load_data_keepto14] loading cached data from {cache_path}")
+        cached = pd.read_csv(cache_path, low_memory=False)
+        y_suffix = f"yr{age}"
+        y_cols = [c for c in cached.columns
+                  if any(t in c and y_suffix in c for t in target_list)]
+        id_col = cached["child_id"]
+        y = cached[y_cols]
+        X = cached.drop(columns=["child_id"] + y_cols)
+        return id_col, X, y
+
+    merged = _build_merged()
+    y_suffix = f"yr{age}"
+
+    y_cols = []
+    for target in target_list:
+        candidates = [c for c in merged.columns if target in c and y_suffix in c]
+        if not candidates:
+            raise ValueError(f"No column found containing '{target}' and '{y_suffix}'")
+        y_cols.append(candidates[0])
+
+    drop_cols = {c for c in merged.columns if any(suf in c for suf in _high_age_suffixes(14))}
+
+    merged = merged.dropna(subset=y_cols)
+
+    id_col = merged["child_id"]
+    y = merged[y_cols]
+    X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
+
+    cache_df = pd.concat([id_col.reset_index(drop=True),
+                          X.reset_index(drop=True),
+                          y.reset_index(drop=True)], axis=1)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_df.to_csv(cache_path, index=False)
+    print(f"[load_data_keepto14] saved cache to {cache_path}")
+
+    return id_col, X, y
+
+
 def load_data_longitudinal(targets: str | list[str],
                            ages: list[int] | None = None
                            ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
     target_list = [targets] if isinstance(targets, str) else list(targets)
     if ages is None:
-        ages = _LONGITUDINAL_AGES
+        ages = _LONGITUDINAL_AGES_KEEPTO8
 
     cache_name = "_".join(target_list) + "_longitudinal.csv"
-    cache_path = _BASE / "raine" / cache_name
+    cache_path = _CACHE_KEEPTO8 / cache_name
 
     if cache_path.exists():
         print(f"[load_data_longitudinal] loading cached data from {cache_path}")
@@ -478,13 +527,8 @@ def load_data_longitudinal(targets: str | list[str],
 
     merged = _build_merged()
 
-    # build high-age suffixes (age > 8) for dropping future outcome columns
-    high_age_suffixes = set()
-    for yr in _TIMEPOINT_YEAR.values():
-        m = re.match(r"yr(\d+)$", yr)
-        if m and int(m.group(1)) > 8:
-            high_age_suffixes.add(yr)
-            high_age_suffixes.add(f"y{m.group(1)}")
+    # baseline (non-timepoint) columns: keep only up to age 8
+    high_age_suffixes = _high_age_suffixes(8)
 
     # baseline (non-timepoint) columns shared across all slices
     baseline_cols = [c for c in merged.columns
@@ -536,6 +580,82 @@ def load_data_longitudinal(targets: str | list[str],
 
     return id_col, X, y
 
+def load_data_longitudinal_keepto14(targets: str | list[str],
+                                    ages: list[int] | None = None
+                                    ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
+    """Like load_data_longitudinal but drops variables with timepoints after age 14."""
+    target_list = [targets] if isinstance(targets, str) else list(targets)
+    if ages is None:
+        ages = _LONGITUDINAL_AGES_KEEPTO14
+
+    cache_name = "_".join(target_list) + "_longitudinal.csv"
+    cache_path = _CACHE_KEEPTO14 / cache_name
+
+    if cache_path.exists():
+        print(f"[load_data_longitudinal_keepto14] loading cached data from {cache_path}")
+        cached = pd.read_csv(cache_path, low_memory=False)
+        id_col = cached["child_id"]
+        y = cached[target_list]
+        X = cached.drop(columns=["child_id"] + target_list)
+        return id_col, X, y
+
+    merged = _build_merged()
+
+    # baseline (non-timepoint) columns: keep only up to age 14
+    high_age_suffixes = _high_age_suffixes(14)
+
+    baseline_cols = [c for c in merged.columns
+                     if not any(suf in c for suf in high_age_suffixes)
+                     and c != "child_id"]
+
+    slices = []
+    for age in ages:
+        y_suffix = f"yr{age}"
+        y_col_map = {}
+        missing = False
+        for target in target_list:
+            candidates = [c for c in merged.columns if target in c and y_suffix in c]
+            if not candidates:
+                print(f"  [longitudinal_keepto14] no column for target='{target}' age={age}, skipping age")
+                missing = True
+                break
+            y_col_map[target] = candidates[0]
+
+        if missing:
+            continue
+
+        actual_y_cols = list(y_col_map.values())
+        sub = merged.dropna(subset=actual_y_cols).copy()
+        sub["age"] = age
+        sub = sub.rename(columns={v: k for k, v in y_col_map.items()})
+        keep_cols = ["child_id", "age"] + baseline_cols + target_list
+        slices.append(sub[[c for c in keep_cols if c in sub.columns]].copy())
+        print(f"  [longitudinal_keepto14] age={age}: {len(slices[-1])} rows")
+
+    if not slices:
+        raise RuntimeError("No age slices could be built for longitudinal_keepto14 data.")
+
+    stacked: pd.DataFrame = pd.concat(slices, axis=0, ignore_index=True)
+
+    id_col = stacked["child_id"]
+    y = stacked[target_list]
+    X = stacked.drop(columns=["child_id"] + target_list)
+
+    X = _clean_and_impute(X)
+
+    cache_df = pd.concat([id_col.reset_index(drop=True),
+                          X.reset_index(drop=True),
+                          y.reset_index(drop=True)], axis=1)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_df.to_csv(cache_path, index=False)
+    print(f"[load_data_longitudinal_keepto14] saved cache to {cache_path}")
+
+    return id_col, X, y
+
+
 if __name__ == '__main__':
     # ids, X, y = load_data(["insulin", "glucose"], 28)
-    ids, X, y = load_data_longitudinal(["insulin", "glucose"], ages=_LONGITUDINAL_AGES)
+    # ids, X, y = load_data_longitudinal(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO8)
+
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 28)
+    ids, X, y = load_data_longitudinal_keepto14(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO14)

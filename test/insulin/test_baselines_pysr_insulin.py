@@ -9,7 +9,7 @@ from pysr import PySRRegressor
 from model_utils import get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results
-from data_utils import load_data, load_data_longitudinal
+from data_utils import load_data_keepto14, load_data_longitudinal_keepto14
 
 import argparse
 
@@ -39,7 +39,7 @@ def main():
                         choices=['homa_ir', 'insulin', 'glucose'])
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "results_insulin")
+    out_root = os.path.join(current_dir, "results_insulin_keepto14")
     os.makedirs(out_root, exist_ok=True)
 
     pysr_configs = get_pysr_configs()
@@ -51,12 +51,12 @@ def main():
 
     if args.setting == 'longitudinal':
         print("\nLoading longitudinal data...")
-        ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
+        ids, X, y_df = load_data_longitudinal_keepto14(["insulin", "glucose"])
         y = resolve_target(y_df, args.target)
         runs = [(f"longitudinal_{args.target}", ids, X, y)]
     else:
         print(f"\nLoading data for age={args.age}...")
-        ids, X, y_df = load_data(["insulin", "glucose"], args.age)
+        ids, X, y_df = load_data_keepto14(["insulin", "glucose"], args.age)
         y = resolve_target(y_df, args.target)
         runs = [(f"age_{args.age}_{args.target}", ids, X, y)]
 
