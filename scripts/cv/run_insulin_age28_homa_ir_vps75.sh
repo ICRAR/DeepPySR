@@ -20,5 +20,5 @@ export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 set -e
 
 echo "Starting insulin_age28_homa_ir_vps75 at $(date)"
-python -u test/insulin/test_deeppysr_insulin.py --age 28 --target homa_ir --vps 75
+python -u test/insulin/test_deeppysr_insulin.py --age 28 --vps 75
 echo "Finished insulin_age28_homa_ir_vps75 at $(date)"

@@ -18,33 +18,31 @@ except ImportError:
     sympy = None
 
 AGES = [14, 17, 20, 22, 27, 28]
-TARGET = 'homa_ir'
+TARGETS = ['insulin', 'glucose']
 
 
-def _load_age(age):
+def _extract_y(y_df, target):
+    col = [c for c in y_df.columns if target in c][0]
+    return y_df[col].rename(target)
+
+
+def _load_age(age, target):
     ids, X, y_df = load_data(["insulin", "glucose"], age)
-    insulin_col = [c for c in y_df.columns if "insulin" in c][0]
-    glucose_col = [c for c in y_df.columns if "glucose" in c][0]
-    y = (y_df[insulin_col] * y_df[glucose_col] / 22.5).rename("homa_ir")
-    return ids, X, y
+    return ids, X, _extract_y(y_df, target)
 
 
-def _load_longitudinal():
+def _load_longitudinal(target):
     ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
-    insulin_col = [c for c in y_df.columns if "insulin" in c][0]
-    glucose_col = [c for c in y_df.columns if "glucose" in c][0]
-    y = (y_df[insulin_col] * y_df[glucose_col] / 22.5).rename("homa_ir")
-    return ids, X, y
+    return ids, X, _extract_y(y_df, target)
 
 
-def main():
-    metrics_file = os.path.join(current_dir, 'results_insulin/insulin_best_models_metrics.csv')
+def _run_for_target(target, output_root):
+    metrics_file = os.path.join(current_dir, f'results_insulin/insulin_{target}_best_models_metrics.csv')
     if not os.path.exists(metrics_file):
-        print(f"ERROR: Metrics file not found at {metrics_file}")
+        print(f"Skipping {target}: metrics file not found at {metrics_file}")
         return
 
     metrics_df = pd.read_csv(metrics_file)
-    output_root = os.path.join(current_dir, './convergence_results_insulin')
 
     consistent_config = {
         'adaptive_parsimony_scaling': 10.0,
@@ -54,10 +52,10 @@ def main():
         'lambda': 0.001
     }
 
-    # 1. Longitudinal
-    print("\n" + "="*70)
-    print("LONGITUDINAL CONVERGENCE TESTS")
-    print("="*70)
+    # Longitudinal
+    print(f"\n{'='*70}")
+    print(f"LONGITUDINAL CONVERGENCE TESTS — {target.upper()}")
+    print('='*70)
 
     long_metrics = metrics_df[metrics_df['type'] == 'longitudinal']
     long_models = {}
@@ -65,20 +63,19 @@ def main():
         if row['display_model'] in ['Best DeepPySR', 'Best PySR'] and row['display_model'] not in long_models:
             long_models[row['display_model']] = consistent_config.copy()
 
-    _, X_long, y_long = _load_longitudinal()
-    long_output_root = os.path.join(output_root, 'longitudinal')
+    _, X_long, y_long = _load_longitudinal(target)
+    long_output_root = os.path.join(output_root, target, 'longitudinal')
     if not os.path.exists(long_output_root):
-        run_convergence_comparison(X_long, y_long, long_models, long_output_root, name='Longitudinal')
+        run_convergence_comparison(X_long, y_long, long_models, long_output_root, name=f'Longitudinal ({target})')
 
-    # 2. Age-Specific
-    print("\n" + "="*70)
-    print("AGE-SPECIFIC CONVERGENCE TESTS")
-    print("="*70)
+    # Age-Specific
+    print(f"\n{'='*70}")
+    print(f"AGE-SPECIFIC CONVERGENCE TESTS — {target.upper()}")
+    print('='*70)
 
     age_specific_metrics = metrics_df[metrics_df['type'] == 'age-specific']
     unique_ages = sorted(age_specific_metrics['age'].unique())
 
-    _, X_long, y_long = _load_longitudinal()
     for age in unique_ages:
         print(f"\nProcessing Age: {age}")
         age_metrics = age_specific_metrics[age_specific_metrics['age'] == age]
@@ -92,14 +89,20 @@ def main():
             X_age = X_long[mask].drop(columns=['age'])
             y_age = y_long[mask]
         else:
-            _, X_age, y_age = _load_age(age)
+            _, X_age, y_age = _load_age(age, target)
 
         if len(X_age) > 0 and age_models:
-            age_output_root = os.path.join(output_root, 'age-specific', f'age{age}')
+            age_output_root = os.path.join(output_root, target, 'age-specific', f'age{age}')
             if not os.path.exists(age_output_root):
-                run_convergence_comparison(X_age, y_age, age_models, age_output_root, name=f'Age: {age} years')
+                run_convergence_comparison(X_age, y_age, age_models, age_output_root, name=f'Age: {age} ({target})')
         else:
             print(f"No data or no best models found for age {age}")
+
+
+def main():
+    output_root = os.path.join(current_dir, './convergence_results_insulin')
+    for target in TARGETS:
+        _run_for_target(target, output_root)
 
 
 if __name__ == "__main__":

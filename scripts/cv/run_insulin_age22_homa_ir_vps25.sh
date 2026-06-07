@@ -20,5 +20,5 @@ export PYTHON_JULIAPKG_OFFLINE=yes
 set -e
 
 echo "Starting insulin_age22_homa_ir_vps25 at $(date)"
-python -u test/insulin/test_deeppysr_insulin.py --age 22 --target homa_ir --vps 25
+python -u test/insulin/test_deeppysr_insulin.py --age 22 --vps 25
 echo "Finished insulin_age22_homa_ir_vps25 at $(date)"

@@ -6,30 +6,28 @@ import sympy
 from sympy import sympify
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(current_dir)
 sys.path.append(os.path.dirname(current_dir))
 
 from data_utils import load_data, load_data_longitudinal
 
 AGES = [14, 17, 20, 22, 27, 28]
-TARGET = 'homa_ir'
+TARGETS = ['insulin', 'glucose']
 
 
-def _load_age(age):
+def _extract_y(y_df, target):
+    col = [c for c in y_df.columns if target in c][0]
+    return y_df[col].rename(target)
+
+
+def _load_age(age, target):
     ids, X, y_df = load_data(["insulin", "glucose"], age)
-    insulin_col = [c for c in y_df.columns if "insulin" in c][0]
-    glucose_col = [c for c in y_df.columns if "glucose" in c][0]
-    y = (y_df[insulin_col] * y_df[glucose_col] / 22.5).rename("homa_ir")
-    return ids, X, y
+    return ids, X, _extract_y(y_df, target)
 
 
-def _load_longitudinal():
+def _load_longitudinal(target):
     ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
-    insulin_col = [c for c in y_df.columns if "insulin" in c][0]
-    glucose_col = [c for c in y_df.columns if "glucose" in c][0]
-    y = (y_df[insulin_col] * y_df[glucose_col] / 22.5).rename("homa_ir")
-    return ids, X, y
+    return ids, X, _extract_y(y_df, target)
 
 
 def get_features_from_formula(formula_str):
@@ -51,7 +49,7 @@ def run_stats(X, y, features, title, formula=None, metrics=None, output_file=Non
         print(f"Formula: {formula}")
     if metrics:
         print(f"Metrics: {', '.join(f'{k}: {v}' for k, v in metrics.items())}")
-    print(f"{'='*70}")
+    print('='*70)
 
     available_features = [f for f in features if f in X.columns]
     missing_features = [f for f in features if f not in X.columns]
@@ -85,18 +83,14 @@ def run_stats(X, y, features, title, formula=None, metrics=None, output_file=Non
         return None
 
 
-def main():
-    output_dir = os.path.join(current_dir, 'results_insulin_stats')
-    os.makedirs(output_dir, exist_ok=True)
+def _run_for_target(target, output_dir, deep_results_dir):
+    print(f"\n{'#'*70}")
+    print(f"TARGET: {target.upper()}")
+    print('#'*70)
 
-    deep_results_dir = os.path.join(current_dir, 'results_insulin_deep')
-    if not os.path.exists(deep_results_dir):
-        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
-        return
-
-    # 1. Longitudinal
-    print("Processing Longitudinal Model...")
-    long_rel_file = os.path.join(deep_results_dir, 'longitudinal', 'relationships.csv')
+    # Longitudinal
+    print("\nProcessing Longitudinal Model...")
+    long_rel_file = os.path.join(deep_results_dir, target, 'longitudinal', 'relationships.csv')
     if os.path.exists(long_rel_file):
         rel_df = pd.read_csv(long_rel_file)
         layer1 = rel_df[rel_df['layer'] == 1]
@@ -107,18 +101,17 @@ def main():
             metrics = {'r2': best_row['r2'], 'f1': best_row['f1']}
             features = get_features_from_formula(formula)
             print(f"Extracted features: {features}")
-            print(f"Metrics: {metrics}")
-            _, X_all, y_all = _load_longitudinal()
-            run_stats(X_all, y_all, features, "Longitudinal", formula=formula, metrics=metrics,
-                      output_file=os.path.join(output_dir, 'stats_longitudinal.txt'))
+            _, X_all, y_all = _load_longitudinal(target)
+            run_stats(X_all, y_all, features, f"Longitudinal ({target})", formula=formula, metrics=metrics,
+                      output_file=os.path.join(output_dir, f'stats_longitudinal_{target}.txt'))
         else:
-            print("No layer 1 formula found for longitudinal.")
+            print(f"No layer 1 formula found for longitudinal ({target}).")
     else:
         print(f"Longitudinal relationships file not found: {long_rel_file}")
 
-    # 2. Age-Specific
-    print("\nProcessing Age-Specific Models...")
-    age_specific_dir = os.path.join(deep_results_dir, 'age-specific')
+    # Age-Specific
+    print(f"\nProcessing Age-Specific Models ({target})...")
+    age_specific_dir = os.path.join(deep_results_dir, target, 'age-specific')
     if os.path.exists(age_specific_dir):
         for age_folder in sorted(os.listdir(age_specific_dir)):
             if not age_folder.startswith('age'):
@@ -128,7 +121,7 @@ def main():
             except ValueError:
                 continue
 
-            print(f"\nProcessing Age: {age}")
+            print(f"\nProcessing Age: {age} ({target})")
             age_rel_file = os.path.join(age_specific_dir, age_folder, 'relationships.csv')
             if os.path.exists(age_rel_file):
                 rel_df = pd.read_csv(age_rel_file)
@@ -139,20 +132,32 @@ def main():
                     formula = best_row['formula']
                     metrics = {'r2': best_row['r2'], 'f1': best_row['f1']}
                     features = get_features_from_formula(formula)
-                    print(f"Age {age}: Extracted features: {features}")
-                    _, X_age, y_age = _load_age(age)
+                    _, X_age, y_age = _load_age(age, target)
                     if len(X_age) > 0:
-                        run_stats(X_age, y_age, features, f"Age Specific - Age {age}",
+                        run_stats(X_age, y_age, features, f"Age Specific — Age {age} ({target})",
                                   formula=formula, metrics=metrics,
-                                  output_file=os.path.join(output_dir, f'stats_age_{age}.txt'))
+                                  output_file=os.path.join(output_dir, f'stats_age_{age}_{target}.txt'))
                     else:
                         print(f"No data found for age {age}")
                 else:
                     print(f"No layer 1 formula found for age {age}")
             else:
-                print(f"Relationships file not found for age {age}: {age_rel_file}")
+                print(f"Relationships file not found: {age_rel_file}")
     else:
         print(f"Age-specific deep results directory not found: {age_specific_dir}")
+
+
+def main():
+    output_dir = os.path.join(current_dir, 'results_insulin_stats')
+    os.makedirs(output_dir, exist_ok=True)
+
+    deep_results_dir = os.path.join(current_dir, 'results_insulin_deep')
+    if not os.path.exists(deep_results_dir):
+        print(f"ERROR: Deep results directory not found at {deep_results_dir}")
+        return
+
+    for target in TARGETS:
+        _run_for_target(target, output_dir, deep_results_dir)
 
 
 if __name__ == "__main__":

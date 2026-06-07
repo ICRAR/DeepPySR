@@ -4,30 +4,20 @@ import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 
-import pandas as pd
 from pysr import PySRRegressor
 from model_utils import get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results
-from data_utils import load_data_keepto14, load_data_longitudinal_keepto14
+from data_utils import load_data, load_data_longitudinal
 
 import argparse
 
-
-def compute_homa_ir(y: pd.DataFrame) -> pd.Series:
-    """HOMA-IR = insulin (mU/L) * glucose (mmol/L) / 22.5"""
-    insulin_col = [c for c in y.columns if "insulin" in c][0]
-    glucose_col = [c for c in y.columns if "glucose" in c][0]
-    return (y[insulin_col] * y[glucose_col] / 22.5).rename("homa_ir")
+TARGETS = ['insulin', 'glucose']
 
 
-def resolve_target(y_df: pd.DataFrame, target: str) -> pd.Series:
-    if target == 'homa_ir':
-        return compute_homa_ir(y_df)
-    elif target == 'insulin':
-        return y_df[[c for c in y_df.columns if "insulin" in c][0]]
-    else:
-        return y_df[[c for c in y_df.columns if "glucose" in c][0]]
+def _extract_target(y_df, target):
+    col = [c for c in y_df.columns if target in c][0]
+    return y_df[col].rename(target)
 
 
 def main():
@@ -35,11 +25,9 @@ def main():
     parser.add_argument('--setting', type=str, default='age_specific',
                         choices=['longitudinal', 'age_specific'])
     parser.add_argument('--age', type=int, default=17)
-    parser.add_argument('--target', type=str, default='homa_ir',
-                        choices=['homa_ir', 'insulin', 'glucose'])
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "results_insulin_keepto14")
+    out_root = os.path.join(current_dir, "results_insulin")
     os.makedirs(out_root, exist_ok=True)
 
     pysr_configs = get_pysr_configs()
@@ -51,18 +39,16 @@ def main():
 
     if args.setting == 'longitudinal':
         print("\nLoading longitudinal data...")
-        ids, X, y_df = load_data_longitudinal_keepto14(["insulin", "glucose"])
-        y = resolve_target(y_df, args.target)
-        runs = [(f"longitudinal_{args.target}", ids, X, y)]
+        ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
+        runs = [(f"longitudinal_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
     else:
         print(f"\nLoading data for age={args.age}...")
-        ids, X, y_df = load_data_keepto14(["insulin", "glucose"], args.age)
-        y = resolve_target(y_df, args.target)
-        runs = [(f"age_{args.age}_{args.target}", ids, X, y)]
+        ids, X, y_df = load_data(["insulin", "glucose"], args.age)
+        runs = [(f"age_{args.age}_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
 
     for run_name, ids, X, y in runs:
         print(f"\n--- Run: {run_name} ---")
-        print(f"  n={len(X)}, features={X.shape[1]}, target={args.target}")
+        print(f"  n={len(X)}, features={X.shape[1]}, target={y.name}")
 
         run_out = os.path.join(out_root, run_name)
         os.makedirs(run_out, exist_ok=True)
