@@ -8,7 +8,7 @@ from pysr import PySRRegressor
 from model_utils import get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results
-from data_utils import load_data, load_data_longitudinal
+from data_utils import load_data_keepto14 as load_data, load_data_longitudinal_keepto14 as load_data_longitudinal
 
 import argparse
 

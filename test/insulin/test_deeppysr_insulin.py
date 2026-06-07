@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 from deeppysr import DeepPySR
 from model_utils import get_deeppysr_configs, get_pysr_base_kwargs
 from eval_utils import run_cv, aggregate_results
-from data_utils import load_data, load_data_longitudinal
+from data_utils import load_data_keepto14 as load_data, load_data_longitudinal_keepto14 as load_data_longitudinal
 
 import argparse
 
