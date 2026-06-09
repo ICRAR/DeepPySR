@@ -25,9 +25,11 @@ def main():
     parser.add_argument('--setting', type=str, default='age_specific',
                         choices=['longitudinal', 'age_specific'])
     parser.add_argument('--age', type=int, default=17)
+    parser.add_argument('--n_features', type=int, default=100)
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "results_insulin")
+    feat_suffix = f"_top{args.n_features}" if args.n_features is not None else ""
+    out_root = os.path.join(current_dir, f"results_insulin{feat_suffix}")
     os.makedirs(out_root, exist_ok=True)
 
     pysr_configs = get_pysr_configs()
@@ -39,11 +41,11 @@ def main():
 
     if args.setting == 'longitudinal':
         print("\nLoading longitudinal data...")
-        ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
+        ids, X, y_df = load_data_longitudinal(["insulin", "glucose"], n_features=args.n_features)
         runs = [(f"longitudinal_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
     else:
         print(f"\nLoading data for age={args.age}...")
-        ids, X, y_df = load_data(["insulin", "glucose"], args.age)
+        ids, X, y_df = load_data(["insulin", "glucose"], args.age, n_features=args.n_features)
         runs = [(f"age_{args.age}_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
 
     for run_name, ids, X, y in runs:

@@ -2,7 +2,9 @@ import re
 import sys
 import pandas as pd
 from pathlib import Path
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+from sklearn.feature_selection import RFE
 from sklearn.impute import IterativeImputer, SimpleImputer
 
 # import categorical definitions from bmiforecast_utils
@@ -13,7 +15,6 @@ from bmiforecast_utils import _is_categorical_col
 
 _BASE = Path(__file__).parents[2] / "test_data" / "Health"
 _RAINE_PATH = _BASE / "raine" / "merged.csv"
-_CACHE_KEEPTO8  = _BASE / "raine" / "insulin_glucose_keepto8"
 _CACHE_KEEPTO14 = _BASE / "raine" / "insulin_glucose_keepto14"
 _BMI_PATH = _BASE / "bmi"
 _PGS_ROOT = _BASE / "raine" / "PGSt2d" / "pgs_score"
@@ -310,7 +311,6 @@ def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-_LONGITUDINAL_AGES_KEEPTO8 = [14, 17, 20, 22, 27, 28]
 _LONGITUDINAL_AGES_KEEPTO14 = [17, 20, 22, 27, 28]
 
 def _build_merged() -> pd.DataFrame:
@@ -416,14 +416,29 @@ def _high_age_suffixes(cutoff: int) -> set:
     return suffixes
 
 
-def load_data(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    target_list = [targets] if isinstance(targets, str) else list(targets)
-    cache_name = "_".join(target_list) + f"_{age}.csv"
-    cache_path = _CACHE_KEEPTO8 / cache_name
+def _select_features(X: pd.DataFrame, y: pd.DataFrame, n_features: int) -> pd.DataFrame:
+    """Use RFE with a RandomForest to select the top n_features columns."""
+    print(f"\n[feature selection] RFE selecting {n_features} from {X.shape[1]} features")
+    estimator = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+    # RFE requires a single target; use the first column when y is multi-target
+    y_rfe = y.iloc[:, 0] if isinstance(y, pd.DataFrame) else y
+    selector = RFE(estimator, n_features_to_select=n_features, step=0.1)
+    selector.fit(X, y_rfe)
+    selected = X.columns[selector.support_].tolist()
+    print(f"[feature selection] selected: {selected}")
+    return X[selected]
 
-    if cache_path.exists():
-        print(f"[load_data] loading cached data from {cache_path}")
-        cached = pd.read_csv(cache_path, low_memory=False)
+
+def load_data_keepto14(targets: str | list[str], age: int, n_features: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
+    """Like load_data but drops variables with timepoints after age 14."""
+    target_list = [targets] if isinstance(targets, str) else list(targets)
+    base_name = "_".join(target_list) + f"_{age}"
+    cache_path = _CACHE_KEEPTO14 / f"{base_name}.csv"
+    rfe_cache_path = _CACHE_KEEPTO14 / f"{base_name}_top{n_features}.csv" if n_features is not None else None
+
+    if rfe_cache_path is not None and rfe_cache_path.exists():
+        print(f"[load_data_keepto14] loading RFE cache from {rfe_cache_path}")
+        cached = pd.read_csv(rfe_cache_path, low_memory=False)
         y_suffix = f"yr{age}"
         y_cols = [c for c in cached.columns
                   if any(t in c and y_suffix in c for t in target_list)]
@@ -431,41 +446,6 @@ def load_data(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFra
         y = cached[y_cols]
         X = cached.drop(columns=["child_id"] + y_cols)
         return id_col, X, y
-
-    merged = _build_merged()
-    y_suffix = f"yr{age}"
-
-    y_cols = []
-    for target in target_list:
-        candidates = [c for c in merged.columns if target in c and y_suffix in c]
-        if not candidates:
-            raise ValueError(f"No column found containing '{target}' and '{y_suffix}'")
-        y_cols.append(candidates[0])
-
-    drop_cols = {c for c in merged.columns if any(suf in c for suf in _high_age_suffixes(8))}
-
-    merged = merged.dropna(subset=y_cols)
-
-    id_col = merged["child_id"]
-    y = merged[y_cols]
-    X = merged.drop(columns=["child_id"] + list(drop_cols))
-    X = _clean_and_impute(X)
-
-    cache_df = pd.concat([id_col.reset_index(drop=True),
-                          X.reset_index(drop=True),
-                          y.reset_index(drop=True)], axis=1)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_df.to_csv(cache_path, index=False)
-    print(f"[load_data] saved cache to {cache_path}")
-
-    return id_col, X, y
-
-
-def load_data_keepto14(targets: str | list[str], age: int) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    """Like load_data but drops variables with timepoints after age 14."""
-    target_list = [targets] if isinstance(targets, str) else list(targets)
-    cache_name = "_".join(target_list) + f"_{age}.csv"
-    cache_path = _CACHE_KEEPTO14 / cache_name
 
     if cache_path.exists():
         print(f"[load_data_keepto14] loading cached data from {cache_path}")
@@ -476,6 +456,13 @@ def load_data_keepto14(targets: str | list[str], age: int) -> tuple[pd.Series, p
         id_col = cached["child_id"]
         y = cached[y_cols]
         X = cached.drop(columns=["child_id"] + y_cols)
+        if n_features is not None:
+            X = _select_features(X, y, n_features)
+            rfe_df = pd.concat([id_col.reset_index(drop=True),
+                                X.reset_index(drop=True),
+                                y.reset_index(drop=True)], axis=1)
+            rfe_df.to_csv(rfe_cache_path, index=False)
+            print(f"[load_data_keepto14] saved RFE cache to {rfe_cache_path}")
         return id_col, X, y
 
     merged = _build_merged()
@@ -491,6 +478,17 @@ def load_data_keepto14(targets: str | list[str], age: int) -> tuple[pd.Series, p
     drop_cols = {c for c in merged.columns if any(suf in c for suf in _high_age_suffixes(14))}
 
     merged = merged.dropna(subset=y_cols)
+    # deduplicate rows by child_id: keep the row with the most non-null values
+    if "child_id" in merged.columns:
+        before = len(merged)
+        merged = (merged
+                  .assign(_n_valid=merged.notna().sum(axis=1))
+                  .sort_values("_n_valid", ascending=False)
+                  .drop_duplicates(subset="child_id", keep="first")
+                  .drop(columns="_n_valid"))
+        dropped = before - len(merged)
+        if dropped:
+            print(f"\n[dedup by child_id] dropped {dropped} duplicate rows, kept row with most values")
 
     id_col = merged["child_id"]
     y = merged[y_cols]
@@ -504,92 +502,37 @@ def load_data_keepto14(targets: str | list[str], age: int) -> tuple[pd.Series, p
     cache_df.to_csv(cache_path, index=False)
     print(f"[load_data_keepto14] saved cache to {cache_path}")
 
-    return id_col, X, y
-
-
-def load_data_longitudinal(targets: str | list[str],
-                           ages: list[int] | None = None
-                           ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    target_list = [targets] if isinstance(targets, str) else list(targets)
-    if ages is None:
-        ages = _LONGITUDINAL_AGES_KEEPTO8
-
-    cache_name = "_".join(target_list) + "_longitudinal.csv"
-    cache_path = _CACHE_KEEPTO8 / cache_name
-
-    if cache_path.exists():
-        print(f"[load_data_longitudinal] loading cached data from {cache_path}")
-        cached = pd.read_csv(cache_path, low_memory=False)
-        id_col = cached["child_id"]
-        y = cached[target_list]
-        X = cached.drop(columns=["child_id"] + target_list)
-        return id_col, X, y
-
-    merged = _build_merged()
-
-    # baseline (non-timepoint) columns: keep only up to age 8
-    high_age_suffixes = _high_age_suffixes(8)
-
-    # baseline (non-timepoint) columns shared across all slices
-    baseline_cols = [c for c in merged.columns
-                     if not any(suf in c for suf in high_age_suffixes)
-                     and c != "child_id"]
-
-    slices = []
-    for age in ages:
-        y_suffix = f"yr{age}"
-        y_col_map = {}  # target name → actual column name for this age
-        missing = False
-        for target in target_list:
-            candidates = [c for c in merged.columns if target in c and y_suffix in c]
-            if not candidates:
-                print(f"  [longitudinal] no column for target='{target}' age={age}, skipping age")
-                missing = True
-                break
-            y_col_map[target] = candidates[0]
-
-        if missing:
-            continue
-
-        actual_y_cols = list(y_col_map.values())
-        sub = merged.dropna(subset=actual_y_cols).copy()
-        sub["age"] = age
-        # rename each target's age-specific col to the generic target name for stacking
-        sub = sub.rename(columns={v: k for k, v in y_col_map.items()})
-        keep_cols = ["child_id", "age"] + baseline_cols + target_list
-        slices.append(sub[[c for c in keep_cols if c in sub.columns]].copy())
-        print(f"  [longitudinal] age={age}: {len(slices[-1])} rows")
-
-    if not slices:
-        raise RuntimeError("No age slices could be built for longitudinal data.")
-
-    stacked: pd.DataFrame = pd.concat(slices, axis=0, ignore_index=True)
-
-    id_col = stacked["child_id"]
-    y = stacked[target_list]
-    X = stacked.drop(columns=["child_id"] + target_list)
-
-    X = _clean_and_impute(X)
-
-    cache_df = pd.concat([id_col.reset_index(drop=True),
-                          X.reset_index(drop=True),
-                          y.reset_index(drop=True)], axis=1)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_df.to_csv(cache_path, index=False)
-    print(f"[load_data_longitudinal] saved cache to {cache_path}")
+    if n_features is not None:
+        X = _select_features(X, y, n_features)
+        rfe_df = pd.concat([id_col.reset_index(drop=True),
+                            X.reset_index(drop=True),
+                            y.reset_index(drop=True)], axis=1)
+        rfe_df.to_csv(rfe_cache_path, index=False)
+        print(f"[load_data_keepto14] saved RFE cache to {rfe_cache_path}")
 
     return id_col, X, y
+
 
 def load_data_longitudinal_keepto14(targets: str | list[str],
-                                    ages: list[int] | None = None
+                                    ages: list[int] | None = None,
+                                    n_features: int | None = None,
                                     ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
     """Like load_data_longitudinal but drops variables with timepoints after age 14."""
     target_list = [targets] if isinstance(targets, str) else list(targets)
     if ages is None:
         ages = _LONGITUDINAL_AGES_KEEPTO14
 
-    cache_name = "_".join(target_list) + "_longitudinal.csv"
-    cache_path = _CACHE_KEEPTO14 / cache_name
+    base_name = "_".join(target_list) + "_longitudinal"
+    cache_path = _CACHE_KEEPTO14 / f"{base_name}.csv"
+    rfe_cache_path = _CACHE_KEEPTO14 / f"{base_name}_top{n_features}.csv" if n_features is not None else None
+
+    if rfe_cache_path is not None and rfe_cache_path.exists():
+        print(f"[load_data_longitudinal_keepto14] loading RFE cache from {rfe_cache_path}")
+        cached = pd.read_csv(rfe_cache_path, low_memory=False)
+        id_col = cached["child_id"]
+        y = cached[target_list]
+        X = cached.drop(columns=["child_id"] + target_list)
+        return id_col, X, y
 
     if cache_path.exists():
         print(f"[load_data_longitudinal_keepto14] loading cached data from {cache_path}")
@@ -597,6 +540,13 @@ def load_data_longitudinal_keepto14(targets: str | list[str],
         id_col = cached["child_id"]
         y = cached[target_list]
         X = cached.drop(columns=["child_id"] + target_list)
+        if n_features is not None:
+            X = _select_features(X, y, n_features)
+            rfe_df = pd.concat([id_col.reset_index(drop=True),
+                                X.reset_index(drop=True),
+                                y.reset_index(drop=True)], axis=1)
+            rfe_df.to_csv(rfe_cache_path, index=False)
+            print(f"[load_data_longitudinal_keepto14] saved RFE cache to {rfe_cache_path}")
         return id_col, X, y
 
     merged = _build_merged()
@@ -650,12 +600,22 @@ def load_data_longitudinal_keepto14(targets: str | list[str],
     cache_df.to_csv(cache_path, index=False)
     print(f"[load_data_longitudinal_keepto14] saved cache to {cache_path}")
 
+    if n_features is not None:
+        X = _select_features(X, y, n_features)
+        rfe_df = pd.concat([id_col.reset_index(drop=True),
+                            X.reset_index(drop=True),
+                            y.reset_index(drop=True)], axis=1)
+        rfe_df.to_csv(rfe_cache_path, index=False)
+        print(f"[load_data_longitudinal_keepto14] saved RFE cache to {rfe_cache_path}")
+
     return id_col, X, y
 
 
 if __name__ == '__main__':
-    # ids, X, y = load_data(["insulin", "glucose"], 28)
-    # ids, X, y = load_data_longitudinal(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO8)
-
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 28)
-    # ids, X, y = load_data_longitudinal_keepto14(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO14)
+    n_feature = 200
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 17, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 20, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 22, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 27, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["insulin", "glucose"], 28, n_features=n_feature)
+    ids, X, y = load_data_longitudinal_keepto14(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO14, n_features=n_feature)

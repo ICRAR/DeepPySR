@@ -3,6 +3,17 @@
 eval "$(ssh-agent -s)"
 ssh-add /scratch/pawsey0411/fchen1/.ssh/setonix
 ---------------------------------------
+bashJULIA_SRC="/scratch/pawsey0411/fchen1/deeppysr.jl/python/deeppysr/julia_src"
+
+$JULIA --project=$JULIA_SRC -e '
+import Pkg
+Pkg.rm("DebugAdapter")
+Pkg.resolve()
+Pkg.instantiate()
+Pkg.precompile()
+'
+
+---------------------------------------
 
 source /scratch/pawsey0411/fchen1/DeepPySR/.venv/bin/activate
 export JULIA_DEPOT_PATH="/scratch/pawsey0411/fchen1/.julia_depot"
@@ -24,16 +35,16 @@ julia --project=. -e 'using Pkg; Pkg.update(); Pkg.precompile()'
 # notes:
 stroke, diabetes, diabetes130us are 100 nit, others are 500
 
-| Dataset   | Machine | nit | cvtrain | analysis | stats | deep    | convergence  | 
-|:----------|:--------|:----|:--------|:---------|-------|:--------|:-------------|
-| BMI       | setonix | 500 | Yes     | Yes      | Yes   | Yes     | Yes          |
-| feynman   | setonix | 500 | Yes     | Yes      | NA    | NA      | yes          |
-| heart     | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no           |
-| stroke    | setonix | 100 | Yes     | Yes      | Yes   | **bad** | no           |
-| bodyfat   | setonix | 500 | Yes     | Yes      | Yes   | Yes     | **unstable** |
-| wine      | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no           |
-| diabetes  | setonix | 100 | Yes     | Yes      | Yes   | Yes     | no           |
-|students   | setonix | 500 | Yes | Yes       | Yes    | Yes      | no           |
+| Dataset   | Machine | nit | cvtrain | analysis | stats | deep    | convergence | 
+|:----------|:--------|:----|:--------|:---------|-------|:--------|:------------|
+| BMI       | setonix | 500 | Yes     | Yes      | Yes   | Yes     | Yes         |
+| feynman   | setonix | 500 | Yes     | Yes      | NA    | NA      | yes         |
+| heart     | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no          |
+| stroke    | setonix | 100 | Yes     | Yes      | Yes   | **bad** | no          |
+| bodyfat   | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no           |
+| wine      | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no          |
+| diabetes  | setonix | 100 | Yes     | Yes      | Yes   | Yes     | no          |
+|students   | setonix | 500 | Yes | Yes       | Yes    | Yes      | no          |
 bmiforecast, on a400
 rerun deep for bmi longitudinal and students, for plots
 
@@ -41,4 +52,15 @@ steps: cv train -> analysis, stats, deep, convergence
 
 notes: ICC causes convergence unstable
 notes: convergence needs to select the best model,
-fix the bmiforecast problem in vscode
+
+----------------------------------------
+# bmiforecast
+
+----------------------------------------
+# insulin
+
+1. data up to year 8 -> predict HOMA-IR -> failed (no blood data)
+2. data up to year 14 -> predict HOMA-IR -> not good (first blood data)
+3. data up to year 14 -> predict insulin and glucose separately -> not good
+4. 3 + top 100 features
+4. data up to year 14, forecast insulin and glucose separately -> up to line 291 in insulinforecast_utils.py
