@@ -243,7 +243,7 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
 
     for family, fname_pattern in [
         ('deeppysr', 'relationships_nocv.csv'),
-        ('pysr', 'formulas_nocv.csv'),
+        ('pysr', 'formulas_foldnocv.csv'),
         ('kan', 'formulas_nocv.csv'),
     ]:
         family_dir = os.path.join(full_models_dir, family)

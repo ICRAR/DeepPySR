@@ -702,6 +702,13 @@ def prepare_base_dataset():
     non_bmi_cols = [c for c in merged.columns
                     if c != 'child_id' and not _is_bmi_col(c)]
 
+    # Remove duplicate rows before imputation
+    n_before = len(merged)
+    merged = merged.drop_duplicates()
+    n_dropped = n_before - len(merged)
+    if n_dropped:
+        print(f'  Dropped {n_dropped} duplicate rows (before imputation).')
+
     # Impute non-BMI variables (do NOT touch any bmi columns)
     print('\n=== Imputing non-BMI variables ===')
     merged = smart_impute(merged, non_bmi_cols)
@@ -908,6 +915,21 @@ def save_rolling_dataset_with_predictions(merged_df, target_year, results_by_fam
     n_missing = int(missing_mask.sum())
     bmi_median = merged_df.loc[real_mask, bmi_col].median() if real_mask.any() else np.nan
 
+    # Build per-family feature cols: replace raw prior BMI cols with family-specific pred cols.
+    # This ensures each family's formula is applied with the same features it was trained on.
+    def _family_fcols(family):
+        if formula_feature_cols is None or prior_bmi_col_names is None:
+            return formula_feature_cols
+        prior_set = set(prior_bmi_col_names)
+        result = []
+        for col in formula_feature_cols:
+            if col in prior_set:
+                specific = f'{col}_{family}_pred'
+                result.append(specific if specific in merged_df.columns else col)
+            else:
+                result.append(col)
+        return result
+
     # --- Formula families: deeppysr, pysr, kan ---
     for family in ('deeppysr', 'pysr', 'kan'):
         if family not in results_by_family:
@@ -916,7 +938,7 @@ def save_rolling_dataset_with_predictions(merged_df, target_year, results_by_fam
             pred_col = f'{bmi_col}_{family}_pred'
             involved_str = ','.join(_extract_variables(formula))
             all_preds = apply_formula(merged_df, formula, involved_str,
-                                      feature_cols=formula_feature_cols)
+                                      feature_cols=_family_fcols(family))
             merged_df[pred_col] = merged_df[bmi_col].copy()
             merged_df.loc[missing_mask, pred_col] = all_preds[missing_mask]
             still_nan = merged_df[pred_col].isna()

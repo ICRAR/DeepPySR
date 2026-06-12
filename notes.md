@@ -3,7 +3,10 @@
 eval "$(ssh-agent -s)"
 ssh-add /scratch/pawsey0411/fchen1/.ssh/setonix
 ---------------------------------------
-bashJULIA_SRC="/scratch/pawsey0411/fchen1/deeppysr.jl/python/deeppysr/julia_src"
+if new environment
+
+bash
+JULIA_SRC="/scratch/pawsey0411/fchen1/deeppysr.jl/python/deeppysr/julia_src"
 
 $JULIA --project=$JULIA_SRC -e '
 import Pkg
@@ -12,7 +15,6 @@ Pkg.resolve()
 Pkg.instantiate()
 Pkg.precompile()
 '
-
 ---------------------------------------
 
 source /scratch/pawsey0411/fchen1/DeepPySR/.venv/bin/activate
@@ -45,8 +47,6 @@ stroke, diabetes, diabetes130us are 100 nit, others are 500
 | wine      | setonix | 500 | Yes     | Yes      | Yes   | Yes     | no          |
 | diabetes  | setonix | 100 | Yes     | Yes      | Yes   | Yes     | no          |
 |students   | setonix | 500 | Yes | Yes       | Yes    | Yes      | no          |
-bmiforecast, on a400
-rerun deep for bmi longitudinal and students, for plots
 
 steps: cv train -> analysis, stats, deep, convergence
 

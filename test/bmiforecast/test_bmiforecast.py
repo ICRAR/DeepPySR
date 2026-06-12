@@ -278,7 +278,7 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
     pysr_dir = os.path.join(full_models_dir, 'pysr')
     if os.path.exists(pysr_dir):
         psr_res = {}
-        for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_nocv.csv'), recursive=True):
+        for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_foldnocv.csv'), recursive=True):
             try:
                 df = pd.read_csv(f)
                 if 'formula' not in df.columns:
