@@ -239,7 +239,7 @@ def _build_rename_map(dict_csv: Path, prefix: str) -> dict:
 
 def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
     # replace sentinel -99 with NaN
-    df = df.replace(-99, float("nan"))
+    df = df.replace([-99, -999, -9999, 999, 9999], float("nan"))
 
     # drop columns that are entirely NaN
     df = df.dropna(axis=1, how="all")

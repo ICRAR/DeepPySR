@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--setting', type=str, default='age_specific',
                         choices=['longitudinal', 'age_specific'])
     parser.add_argument('--age', type=int, default=17)
-    parser.add_argument('--n_features', type=int, default=100)
+    parser.add_argument('--n_features', type=int, default=None)
     args = parser.parse_args()
 
     feat_suffix = f"_top{args.n_features}" if args.n_features is not None else ""

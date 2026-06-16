@@ -13,11 +13,13 @@ if not current_dir:
 sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
-from data_utils import load_data, load_data_longitudinal
+from data_utils import load_data_keepto14, load_data_longitudinal_keepto14
 from analysis_utils import calculate_metrics, evaluate_formula, get_best_formula_from_raw
 
 AGES = [14, 17, 20, 22, 27, 28]
 TARGETS = ['insulin', 'glucose']
+
+RESULTS_DIR = os.path.join(current_dir, "results_insulin")
 
 
 def _extract_y(y_df, target):
@@ -26,18 +28,18 @@ def _extract_y(y_df, target):
 
 
 def _load_age(age, target):
-    ids, X, y_df = load_data(["insulin", "glucose"], age)
+    ids, X, y_df = load_data_keepto14(["insulin", "glucose"], age)
     return ids, X, _extract_y(y_df, target)
 
 
 def _load_longitudinal(target):
-    ids, X, y_df = load_data_longitudinal(["insulin", "glucose"])
+    ids, X, y_df = load_data_longitudinal_keepto14(["insulin", "glucose"])
     return ids, X, _extract_y(y_df, target)
 
 
 def _process_target(target):
     """Collect all results rows for one target."""
-    base_dir = os.path.join(current_dir, "results_insulin")
+    base_dir = RESULTS_DIR
     all_data = []
 
     # 1. Age-specific: results_insulin/age_{age}_{target}/
@@ -189,7 +191,7 @@ def _process_target(target):
 
 
 def process_results():
-    base_dir = os.path.join(current_dir, "results_insulin")
+    base_dir = RESULTS_DIR
     dfs = {}
     for target in TARGETS:
         df = _process_target(target)
@@ -219,7 +221,7 @@ def _select_best_models(df):
         if t == 'longitudinal':
             deeppysr_long = type_df[type_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
             if not deeppysr_long.empty:
-                model_variants = deeppysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first'}).reset_index()
+                model_variants = deeppysr_long.groupby('model').agg({'formula': 'first', 'complexity': 'first', 'r2': 'mean'}).reset_index()
                 best_model_name, best_r2 = None, -np.inf
                 for _, row in model_variants.iterrows():
                     y_pred = evaluate_formula(row['formula'], X_all)
@@ -296,7 +298,7 @@ def _select_best_models(df):
 
 
 def plot_results(dfs):
-    base_dir = os.path.join(current_dir, "results_insulin")
+    base_dir = RESULTS_DIR
     metrics = ['r2', 'rmse', 'mae']
     types = ['longitudinal', 'age-specific']
 
@@ -356,7 +358,7 @@ def plot_results(dfs):
 
 
 def aggregate_feature_importance():
-    base_dir = os.path.join(current_dir, "results_insulin")
+    base_dir = RESULTS_DIR
     importance_data = []
 
     def process_importance(path, model_name, age, type_str, target):
@@ -423,6 +425,15 @@ def aggregate_feature_importance():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--results_dir', type=str, default='results_insulin',
+                        help="Results folder to analyse (default: results_insulin)")
+    args = parser.parse_args()
+
+    if args.results_dir is not None:
+        RESULTS_DIR = os.path.join(current_dir, args.results_dir) if not os.path.isabs(args.results_dir) else args.results_dir
+
     dfs = process_results()
     plot_results(dfs)
     aggregate_feature_importance()

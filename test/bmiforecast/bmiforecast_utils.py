@@ -632,8 +632,11 @@ def smart_impute(df, cols):
     if cat_cols:
         result[cat_cols] = SimpleImputer(strategy='most_frequent').fit_transform(result[cat_cols])
     if cont_cols:
+        # Drop all-NaN columns before imputation; IterativeImputer skips them,
+        # causing a column-count mismatch when assigning results back.
+        valid_cont = [c for c in cont_cols if result[c].notna().any()]
         iter_imp = IterativeImputer(max_iter=10, random_state=42)
-        result[cont_cols] = iter_imp.fit_transform(result[cont_cols])
+        result[valid_cont] = iter_imp.fit_transform(result[valid_cont])
     return result
 
 
