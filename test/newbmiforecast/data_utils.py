@@ -63,6 +63,25 @@ def _is_bmi_col(c: str) -> bool:
     return bool(re.match(r'^y\d+bmi$', c))
 
 
+_COL_AGE_RE = re.compile(r'^yr?(\d+)')
+
+
+def _col_age(c: str):
+    """Return the age (in years) a column was measured at, or None if age-independent."""
+    m = _COL_AGE_RE.match(c)
+    return int(m.group(1)) if m else None
+
+
+def get_age_filtered_feature_cols(non_bmi_cols: list, target_year: int) -> list:
+    """Restrict non-BMI feature columns to those measured at an age < target_year.
+
+    Prevents leaking variables observed at or after the forecast age into the
+    feature set used to predict y{target_year}bmi.
+    """
+    return [c for c in non_bmi_cols
+            if (age := _col_age(c)) is None or age < target_year]
+
+
 def _build_merged_bmi() -> pd.DataFrame:
     """Load merged.csv + G1 + G2 and return a preprocessed DataFrame."""
     raine = pd.read_csv(_RAINE_PATH, low_memory=False)
