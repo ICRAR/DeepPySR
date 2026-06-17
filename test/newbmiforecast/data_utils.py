@@ -106,6 +106,22 @@ def _build_merged_bmi() -> pd.DataFrame:
             print(f"[dedup by child_id] dropped {dropped} duplicate rows")
 
     merged = _preprocess(merged)
+
+    # BMI of 0.0 is not physiologically possible; treat as missing.
+    bmi_cols_all = [c for c in merged.columns if _is_bmi_col(c)]
+    for c in bmi_cols_all:
+        merged.loc[merged[c] == 0.0, c] = np.nan
+
+    # Drop rows with no usable BMI signal at all (age >= _BASE_BMI_YEAR).
+    forecast_bmi_cols = [c for c in bmi_cols_all
+                         if (age := _col_age(c)) is not None and age >= _BASE_BMI_YEAR]
+    if forecast_bmi_cols:
+        before = len(merged)
+        merged = merged.dropna(subset=forecast_bmi_cols, how="all")
+        dropped = before - len(merged)
+        if dropped:
+            print(f"[drop all-NaN BMI] dropped {dropped} rows with no BMI observed at age >= {_BASE_BMI_YEAR}")
+
     return merged
 
 
