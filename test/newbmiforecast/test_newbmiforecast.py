@@ -33,6 +33,7 @@ from data_utils import (
     _is_bmi_col,
     save_rolling_dataset_with_predictions,
     load_forecast_data_for_model,
+    get_age_filtered_feature_cols,
 )
 
 OUT_ROOT = os.path.join(current_dir, 'results_newbmiforecast')
@@ -379,6 +380,7 @@ def select_best_full_model(all_results_dict):
 
 def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
                           pysr_base_kwargs, deeppysr_configs, r2w_list, lambda_list):
+    non_bmi_cols = get_age_filtered_feature_cols(non_bmi_cols, target_year)
     ids, X, y = load_forecast_data_for_model(
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='deeppysr')
     if ids is None or len(y) < 10:
@@ -426,6 +428,7 @@ def run_deeppysr_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
 
 def run_baselines_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_cols,
                            pysr_base_kwargs, pysr_configs):
+    non_bmi_cols = get_age_filtered_feature_cols(non_bmi_cols, target_year)
     age_label = actual_age(target_year)
     run_out = os.path.join(OUT_ROOT, f'age_{age_label}')
     os.makedirs(run_out, exist_ok=True)
@@ -501,6 +504,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
                                pysr_base_kwargs, deeppysr_configs, pysr_configs,
                                r2w_list, lambda_list, run_out):
     import joblib as _jl
+    non_bmi_cols = get_age_filtered_feature_cols(non_bmi_cols, target_year)
     full_out = os.path.join(run_out, 'full_models')
 
     nit = pysr_base_kwargs.get('niterations', 500)
@@ -619,8 +623,9 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
     year_idx = YEARS.index(target_year)
     prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
                       if f'y{y}bmi' in merged_df.columns]
-    feature_cols = [c for c in _rolling_step_kwargs.get('non_bmi_cols_ref', non_bmi_cols)
-                    if c in merged_df.columns] + \
+    non_bmi_cols = get_age_filtered_feature_cols(
+        _rolling_step_kwargs.get('non_bmi_cols_ref', non_bmi_cols), target_year)
+    feature_cols = [c for c in non_bmi_cols if c in merged_df.columns] + \
                    [c for c in prior_bmi_cols if c in merged_df.columns]
 
     known_mask = merged_df[bmi_col].notna()

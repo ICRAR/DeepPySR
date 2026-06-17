@@ -17,8 +17,7 @@
 /*/__pycache__/
 */**/__pycache__/
 /.claude/
-/paper/
 /out/
-/paper/
+/*paper/
 /Manifest.toml
 /Project.toml

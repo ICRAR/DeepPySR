@@ -63,12 +63,12 @@ def _is_bmi_col(c: str) -> bool:
     return bool(re.match(r'^y\d+bmi$', c))
 
 
-_COL_AGE_RE = re.compile(r'^yr?(\d+)')
+_COL_AGE_RE = re.compile(r'(?:^|_)yr?(\d+)')
 
 
 def _col_age(c: str):
     """Return the age (in years) a column was measured at, or None if age-independent."""
-    m = _COL_AGE_RE.match(c)
+    m = _COL_AGE_RE.search(c)
     return int(m.group(1)) if m else None
 
 
@@ -256,7 +256,9 @@ def prepare_base_dataset():
     print(f"  y8bmi: {int(real_mask.sum())} observed, {n_missing} missing")
 
     bmi8_median = merged.loc[real_mask, bmi8_col].median()
-    age8_fcols = [c for c in non_bmi_cols if c in merged.columns]
+    age8_fcols = get_age_filtered_feature_cols(
+        [c for c in non_bmi_cols if c in merged.columns], _BASE_BMI_YEAR
+    )
 
     # Set cache for later use
     global _base_feature_cols_cache
