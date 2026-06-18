@@ -282,7 +282,296 @@ def plot_best_models():
     plt.close()
     print(f"Plot saved to {plot_path}")
 
+def process_ablation_data():
+    """Collect variant-level results for ablation studies (keeps VPS/VPR/pareto info)."""
+    from feynman_utils import load_feynman_data
+    all_data = []
+    for eq_name in equations.keys():
+        eq_key = eq_name.replace('.', '_')
+        base_dir = os.path.join(current_dir, f"results_{eq_key}_all")
+        X_df, y_true = load_feynman_data(eq_name, n_samples=1000)
+
+        deeppysr_dir = os.path.join(base_dir, "deeppysr")
+        if os.path.exists(deeppysr_dir):
+            for variant in os.listdir(deeppysr_dir):
+                v_path = os.path.join(deeppysr_dir, variant)
+                if not os.path.isdir(v_path):
+                    continue
+                res = get_best_formula_from_raw(v_path, X_df, y_true, model_type='deeppysr')
+                if isinstance(res, dict):
+                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                        r2, rmse, mae = metrics
+                        all_data.append([eq_name, f"{variant}_r2w{r2w}_L{lamb}", r2, rmse, mae, complexity])
+                else:
+                    formula, complexity, mets = res
+                    r2, rmse, mae = mets
+                    all_data.append([eq_name, variant, r2, rmse, mae, complexity])
+
+        pysr_dir = os.path.join(base_dir, "pysr")
+        if os.path.exists(pysr_dir):
+            for variant in os.listdir(pysr_dir):
+                v_path = os.path.join(pysr_dir, variant)
+                if not os.path.isdir(v_path):
+                    continue
+                res = get_best_formula_from_raw(v_path, X_df, y_true, model_type='pysr')
+                if isinstance(res, dict):
+                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
+                        r2, rmse, mae = metrics
+                        all_data.append([eq_name, f"{variant}_r2w{r2w}_L{lamb}", r2, rmse, mae, complexity])
+                else:
+                    formula, complexity, mets = res
+                    r2, rmse, mae = mets
+                    all_data.append([eq_name, variant, r2, rmse, mae, complexity])
+
+    result_df = pd.DataFrame(all_data, columns=['equation', 'model', 'r2', 'rmse', 'mae', 'complexity'])
+    result_df['r2'] = result_df['r2'].clip(lower=0)
+    return result_df
+
+
+def plot_vps_vpr_ablation(ablation_df):
+    """Ablation: VPS/VPR effect with fixed APS=10.0, r2w=1.0, λ=0.01. Per-equation bar charts."""
+    import re
+    from matplotlib.patches import Patch
+
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
+    df = ablation_df
+
+    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False) &
+                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_df = df[deep_mask].copy()
+
+    def vps_vpr_label(m):
+        match = re.search(r'vps(\d+)_vpr(\d+)', m)
+        return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
+    deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+
+    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_df = df[pysr_mask].copy()
+    pysr_df['label'] = 'PySR (no VPS/VPR)'
+
+    # Save CSV
+    csv_df = pd.concat([deep_df[['equation', 'label'] + metrics],
+                        pysr_df[['equation', 'label'] + metrics]], ignore_index=True)
+    csv_df.to_csv(os.path.join(current_dir, 'ablation_vps_vpr.csv'), index=False)
+    print(f"VPS/VPR ablation data saved to {os.path.join(current_dir, 'ablation_vps_vpr.csv')}")
+
+    if deep_df.empty and pysr_df.empty:
+        print("No data for VPS/VPR ablation")
+        return
+
+    def sort_key(lbl):
+        m = re.search(r'vps(\d+)/vpr(\d+)', lbl)
+        return (int(m.group(1)), int(m.group(2))) if m else (999, 999)
+
+    deep_labels = sorted(deep_df['label'].unique(), key=sort_key)
+    order = deep_labels + ['PySR (no VPS/VPR)']
+    colors = ['#4878CF'] * len(deep_labels) + ['#E87722']
+    eq_names = list(equations.keys())
+    n_eq = len(eq_names)
+
+    fig, axes = plt.subplots(n_eq, 4, figsize=(24, 5 * n_eq))
+    if n_eq == 1:
+        axes = axes.reshape(1, -1)
+    plt.rcParams.update({'font.size': 11})
+
+    for row_i, eq_name in enumerate(eq_names):
+        deep_eq = deep_df[deep_df['equation'] == eq_name]
+        pysr_eq = pysr_df[pysr_df['equation'] == eq_name]
+        parts = []
+        if not deep_eq.empty:
+            parts.append(deep_eq[['label'] + metrics])
+        if not pysr_eq.empty:
+            pr = pysr_eq[metrics].mean().to_frame().T
+            pr['label'] = 'PySR (no VPS/VPR)'
+            parts.append(pr[['label'] + metrics])
+        if not parts:
+            continue
+        plot_eq = pd.concat(parts, ignore_index=True)
+
+        for col_j, (metric, mlabel) in enumerate(zip(metrics, metric_labels)):
+            ax = axes[row_i, col_j]
+            vals = [plot_eq[plot_eq['label'] == lbl][metric].mean() for lbl in order]
+            ax.bar(range(len(order)), vals, color=colors, edgecolor='white', linewidth=0.5)
+            ax.set_xticks(range(len(order)))
+            ax.set_xticklabels(order, rotation=45, ha='right', fontsize=8)
+            ax.set_title(f'{eq_name} – {mlabel}', fontsize=12, fontweight='bold')
+            ax.set_ylabel(mlabel, fontsize=10)
+
+    fig.legend(handles=[Patch(facecolor='#4878CF', label='DeepPySR'),
+                        Patch(facecolor='#E87722', label='PySR (reference)')],
+               loc='upper right', fontsize=11, frameon=True)
+    plt.suptitle('Ablation: VPS/VPR Effect (APS=10.0, r2w=1.0, λ=0.01)', fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    out = os.path.join(current_dir, 'ablation_vps_vpr.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"VPS/VPR ablation plot saved to {out}")
+
+
+def plot_pareto_ablation(ablation_df):
+    """Ablation: pareto r2w/λ effect with fixed VPS=25, VPR=100, APS=10.0. Per-equation bar charts."""
+    import re
+    from matplotlib.patches import Patch
+
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
+    df = ablation_df
+
+    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
+                 df['model'].str.contains('_vps25_', regex=False, na=False) &
+                 df['model'].str.contains('_vpr100_', regex=False, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    deep_df = df[deep_mask].copy()
+
+    def pareto_label(m):
+        r2w_m = re.search(r'_r2w([\d.]+)_L', m)
+        l_m = re.search(r'_L([\d.]+)$', m)
+        if r2w_m and l_m:
+            return f"r2w={r2w_m.group(1)}, λ={l_m.group(1)}"
+        return m
+    deep_df['label'] = deep_df['model'].apply(pareto_label)
+
+    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_df = df[pysr_mask].copy()
+    pysr_df['label'] = 'PySR (reference)'
+
+    # Save CSV
+    csv_df = pd.concat([deep_df[['equation', 'label'] + metrics],
+                        pysr_df[['equation', 'label'] + metrics]], ignore_index=True)
+    csv_df.to_csv(os.path.join(current_dir, 'ablation_pareto.csv'), index=False)
+    print(f"Pareto ablation data saved to {os.path.join(current_dir, 'ablation_pareto.csv')}")
+
+    if deep_df.empty and pysr_df.empty:
+        print("No data for pareto ablation")
+        return
+
+    def sort_key(lbl):
+        r2w_m = re.search(r'r2w=([\d.]+)', lbl)
+        l_m = re.search(r'λ=([\d.]+)', lbl)
+        if r2w_m and l_m:
+            return (float(r2w_m.group(1)), float(l_m.group(1)))
+        return (999, 999)
+
+    deep_labels = sorted(deep_df['label'].unique(), key=sort_key)
+    order = deep_labels + ['PySR (reference)']
+    r2w_vals = sorted(set(float(re.search(r'r2w=([\d.]+)', l).group(1))
+                          for l in deep_labels if re.search(r'r2w=([\d.]+)', l)))
+    r2w_palette = dict(zip(r2w_vals, ['#2166ac', '#4dac26', '#d6604d']))
+    colors = []
+    for lbl in order:
+        m = re.search(r'r2w=([\d.]+)', lbl)
+        colors.append(r2w_palette.get(float(m.group(1)), '#888') if m else '#E87722')
+
+    eq_names = list(equations.keys())
+    n_eq = len(eq_names)
+    fig, axes = plt.subplots(n_eq, 4, figsize=(26, 5 * n_eq))
+    if n_eq == 1:
+        axes = axes.reshape(1, -1)
+    plt.rcParams.update({'font.size': 11})
+
+    for row_i, eq_name in enumerate(eq_names):
+        deep_eq = deep_df[deep_df['equation'] == eq_name]
+        pysr_eq = pysr_df[pysr_df['equation'] == eq_name]
+        parts = []
+        if not deep_eq.empty:
+            parts.append(deep_eq[['label'] + metrics])
+        if not pysr_eq.empty:
+            pr = pysr_eq[metrics].mean().to_frame().T
+            pr['label'] = 'PySR (reference)'
+            parts.append(pr[['label'] + metrics])
+        if not parts:
+            continue
+        plot_eq = pd.concat(parts, ignore_index=True)
+
+        for col_j, (metric, mlabel) in enumerate(zip(metrics, metric_labels)):
+            ax = axes[row_i, col_j]
+            vals = [plot_eq[plot_eq['label'] == lbl][metric].mean() for lbl in order]
+            ax.bar(range(len(order)), vals, color=colors, edgecolor='white', linewidth=0.5)
+            ax.set_xticks(range(len(order)))
+            ax.set_xticklabels(order, rotation=45, ha='right', fontsize=8)
+            ax.set_title(f'{eq_name} – {mlabel}', fontsize=12, fontweight='bold')
+            ax.set_ylabel(mlabel, fontsize=10)
+
+    legend_elements = [Patch(facecolor=r2w_palette[v], label=f'DeepPySR r2w={v}') for v in r2w_vals]
+    legend_elements.append(Patch(facecolor='#E87722', label='PySR (reference)'))
+    fig.legend(handles=legend_elements, loc='upper right', fontsize=11, frameon=True)
+    plt.suptitle('Ablation: Pareto r2w/λ Effect (VPS=25, VPR=100, APS=10.0)', fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    out = os.path.join(current_dir, 'ablation_pareto.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Pareto ablation plot saved to {out}")
+
+
+def _pareto_front_steps(complexity, error):
+    """Return Pareto-optimal (complexity, error) pairs sorted by complexity (both minimize)."""
+    points = sorted(zip(complexity, error), key=lambda p: (p[0], p[1]))
+    pareto = []
+    min_error = float('inf')
+    for c, e in points:
+        if e < min_error:
+            min_error = e
+            pareto.append((c, e))
+    return pareto
+
+
+def plot_pareto_front_rmse(ablation_df):
+    """Scatter plot of complexity vs RMSE showing the Pareto front per Feynman equation."""
+    eq_names = list(equations.keys())
+    n_eq = len(eq_names)
+    ncols = min(n_eq, 3)
+    nrows = (n_eq + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(8 * ncols, 6 * nrows), squeeze=False)
+    axes_flat = axes.flatten()
+
+    for idx, eq_name in enumerate(eq_names):
+        ax = axes_flat[idx]
+        sub_df = ablation_df[ablation_df['equation'] == eq_name]
+        deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
+        pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
+
+        deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
+        pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
+
+        if not deep_df.empty:
+            pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+            if pf:
+                px, py = zip(*pf)
+                ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
+                ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
+
+        if not pysr_df.empty:
+            pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+            if pf_pysr:
+                px, py = zip(*pf_pysr)
+                ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
+                ax.scatter(px, py, c='#cc4400', s=100, zorder=5, marker='D', label='PySR')
+
+        ax.set_xlabel('Complexity', fontsize=12)
+        ax.set_ylabel('RMSE', fontsize=12)
+        ax.set_title(f'{eq_name} – Pareto Front: Complexity vs RMSE', fontsize=12, fontweight='bold')
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.3)
+
+    for idx in range(len(eq_names), len(axes_flat)):
+        axes_flat[idx].set_visible(False)
+
+    plt.tight_layout()
+    out = os.path.join(current_dir, 'pareto_front_rmse.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Pareto front RMSE plot saved to {out}")
+
+
 if __name__ == "__main__":
     df = process_results()
     save_best_formulas(df)
     plot_best_models()
+    ablation_df = process_ablation_data()
+    plot_vps_vpr_ablation(ablation_df)
+    plot_pareto_ablation(ablation_df)
+    plot_pareto_front_rmse(ablation_df)

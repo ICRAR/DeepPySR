@@ -649,8 +649,259 @@ def aggregate_feature_importance():
         plt.close()
         print(f"Combined feature importance plot saved to {plot_path}")
 
+def plot_vps_vpr_ablation(df):
+    """Ablation: VPS/VPR effect with fixed APS=10.0, r2w=1.0, λ=0.01. Line plots per age, per type."""
+    import re
+    from matplotlib.lines import Line2D
+
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
+    types = ['longitudinal', 'age-specific']
+    results_dir = os.path.join(current_dir, 'results_bmi_all')
+
+    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False) &
+                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_df = df[deep_mask].copy()
+
+    def vps_vpr_label(m):
+        match = re.search(r'vps(\d+)_vpr(\d+)', m)
+        return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
+    deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+
+    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_df = df[pysr_mask].copy()
+    pysr_df['label'] = 'PySR (no VPS/VPR)'
+
+    # Save CSV with per-age data
+    csv_df = pd.concat([deep_df[['age', 'type', 'label'] + metrics],
+                        pysr_df[['age', 'type', 'label'] + metrics]], ignore_index=True)
+    csv_df.to_csv(os.path.join(results_dir, 'ablation_vps_vpr.csv'), index=False)
+    print(f"VPS/VPR ablation data saved to {results_dir}/ablation_vps_vpr.csv")
+
+    if deep_df.empty and pysr_df.empty:
+        print("No data for VPS/VPR ablation")
+        return
+
+    def sort_key(lbl):
+        m = re.search(r'vps(\d+)/vpr(\d+)', lbl)
+        return (int(m.group(1)), int(m.group(2))) if m else (999, 999)
+
+    all_deep_labels = sorted(deep_df['label'].unique(), key=sort_key)
+    palette = sns.color_palette("tab10", n_colors=len(all_deep_labels))
+    label_colors = dict(zip(all_deep_labels, palette))
+
+    ages = sorted(df['age'].dropna().unique())
+
+    fig, axes = plt.subplots(2, 4, figsize=(24, 12))
+    plt.rcParams.update({'font.size': 11})
+
+    for row_i, t in enumerate(types):
+        deep_t = deep_df[deep_df['type'] == t]
+        pysr_t = pysr_df[pysr_df['type'] == t]
+        type_label = 'Longitudinal' if t == 'longitudinal' else 'Age-Specific'
+
+        for col_j, (metric, mlabel) in enumerate(zip(metrics, metric_labels)):
+            ax = axes[row_i, col_j]
+            for lbl in all_deep_labels:
+                sub = deep_t[deep_t['label'] == lbl]
+                if not sub.empty:
+                    pts = sub.groupby('age')[metric].mean().reset_index()
+                    ax.plot(pts['age'], pts[metric], marker='o', markersize=4,
+                            color=label_colors[lbl], label=lbl, linewidth=1.5)
+            if not pysr_t.empty:
+                pts = pysr_t.groupby('age')[metric].mean().reset_index()
+                ax.plot(pts['age'], pts[metric], marker='s', markersize=6, color='black',
+                        label='PySR (no VPS/VPR)', linewidth=2, linestyle='--')
+            ax.set_title(f'BMI {type_label} – {mlabel}', fontsize=12, fontweight='bold')
+            ax.set_ylabel(mlabel, fontsize=10)
+            ax.set_xlabel('Age', fontsize=10)
+            ax.set_xticks(ages)
+            if ax.get_legend():
+                ax.get_legend().remove()
+
+    legend_elements = [Line2D([0], [0], color=label_colors[lbl], marker='o', lw=1.5, label=lbl)
+                       for lbl in all_deep_labels]
+    legend_elements.append(Line2D([0], [0], color='black', marker='s', lw=2, ls='--',
+                                  label='PySR (no VPS/VPR)'))
+    fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1.0, 0.5),
+               fontsize=9, frameon=True, title='Setting', title_fontsize=11)
+    plt.suptitle('Ablation: VPS/VPR Effect (APS=10.0, r2w=1.0, λ=0.01)', fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout(rect=[0, 0, 0.88, 1.0])
+    out = os.path.join(results_dir, 'ablation_vps_vpr.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"VPS/VPR ablation plot saved to {out}")
+
+
+def plot_pareto_ablation(df):
+    """Ablation: pareto r2w/λ effect with fixed VPS=25, VPR=100, APS=10.0. Line plots per age, per type."""
+    import re
+    from matplotlib.lines import Line2D
+
+    metrics = ['r2', 'rmse', 'mae', 'complexity']
+    metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
+    types = ['longitudinal', 'age-specific']
+    results_dir = os.path.join(current_dir, 'results_bmi_all')
+
+    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
+                 df['model'].str.contains('_vps25_', regex=False, na=False) &
+                 df['model'].str.contains('_vpr100_', regex=False, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    deep_df = df[deep_mask].copy()
+
+    def pareto_label(m):
+        r2w_m = re.search(r'_r2w([\d.]+)_L', m)
+        l_m = re.search(r'_L([\d.]+)$', m)
+        if r2w_m and l_m:
+            return f"r2w={r2w_m.group(1)}, λ={l_m.group(1)}"
+        return m
+    deep_df['label'] = deep_df['model'].apply(pareto_label)
+
+    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
+                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_df = df[pysr_mask].copy()
+    pysr_df['label'] = 'PySR (reference)'
+
+    # Save CSV with per-age data
+    csv_df = pd.concat([deep_df[['age', 'type', 'label'] + metrics],
+                        pysr_df[['age', 'type', 'label'] + metrics]], ignore_index=True)
+    csv_df.to_csv(os.path.join(results_dir, 'ablation_pareto.csv'), index=False)
+    print(f"Pareto ablation data saved to {results_dir}/ablation_pareto.csv")
+
+    if deep_df.empty and pysr_df.empty:
+        print("No data for pareto ablation")
+        return
+
+    def sort_key(lbl):
+        r2w_m = re.search(r'r2w=([\d.]+)', lbl)
+        l_m = re.search(r'λ=([\d.]+)', lbl)
+        if r2w_m and l_m:
+            return (float(r2w_m.group(1)), float(l_m.group(1)))
+        return (999, 999)
+
+    all_deep_labels = sorted(deep_df['label'].unique(), key=sort_key)
+    r2w_vals = sorted(set(float(re.search(r'r2w=([\d.]+)', l).group(1))
+                          for l in all_deep_labels if re.search(r'r2w=([\d.]+)', l)))
+    r2w_palette = dict(zip(r2w_vals, ['#2166ac', '#4dac26', '#d6604d']))
+    lambda_markers = {0.001: 'o', 0.005: 's', 0.01: '^'}
+
+    def label_color(lbl):
+        m = re.search(r'r2w=([\d.]+)', lbl)
+        return r2w_palette.get(float(m.group(1)), '#888') if m else 'black'
+
+    def label_marker(lbl):
+        m = re.search(r'λ=([\d.]+)', lbl)
+        return lambda_markers.get(float(m.group(1)), 'o') if m else 'D'
+
+    ages = sorted(df['age'].dropna().unique())
+
+    fig, axes = plt.subplots(2, 4, figsize=(26, 12))
+    plt.rcParams.update({'font.size': 11})
+
+    for row_i, t in enumerate(types):
+        deep_t = deep_df[deep_df['type'] == t]
+        pysr_t = pysr_df[pysr_df['type'] == t]
+        type_label = 'Longitudinal' if t == 'longitudinal' else 'Age-Specific'
+
+        for col_j, (metric, mlabel) in enumerate(zip(metrics, metric_labels)):
+            ax = axes[row_i, col_j]
+            for lbl in all_deep_labels:
+                sub = deep_t[deep_t['label'] == lbl]
+                if not sub.empty:
+                    pts = sub.groupby('age')[metric].mean().reset_index()
+                    ax.plot(pts['age'], pts[metric], marker=label_marker(lbl), markersize=5,
+                            color=label_color(lbl), label=lbl, linewidth=1.5)
+            if not pysr_t.empty:
+                pts = pysr_t.groupby('age')[metric].mean().reset_index()
+                ax.plot(pts['age'], pts[metric], marker='D', markersize=6, color='black',
+                        label='PySR (reference)', linewidth=2, linestyle='--')
+            ax.set_title(f'BMI {type_label} – {mlabel}', fontsize=12, fontweight='bold')
+            ax.set_ylabel(mlabel, fontsize=10)
+            ax.set_xlabel('Age', fontsize=10)
+            ax.set_xticks(ages)
+            if ax.get_legend():
+                ax.get_legend().remove()
+
+    legend_elements = [Line2D([0], [0], color=label_color(lbl), marker=label_marker(lbl),
+                               lw=1.5, label=lbl) for lbl in all_deep_labels]
+    legend_elements.append(Line2D([0], [0], color='black', marker='D', lw=2, ls='--',
+                                  label='PySR (reference)'))
+    fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1.0, 0.5),
+               fontsize=9, frameon=True, title='Setting', title_fontsize=11)
+    plt.suptitle('Ablation: Pareto r2w/λ Effect (VPS=25, VPR=100, APS=10.0)', fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout(rect=[0, 0, 0.88, 1.0])
+    out = os.path.join(results_dir, 'ablation_pareto.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Pareto ablation plot saved to {out}")
+
+
+def _pareto_front_steps(complexity, error):
+    """Return Pareto-optimal (complexity, error) pairs sorted by complexity (both minimize)."""
+    points = sorted(zip(complexity, error), key=lambda p: (p[0], p[1]))
+    pareto = []
+    min_error = float('inf')
+    for c, e in points:
+        if e < min_error:
+            min_error = e
+            pareto.append((c, e))
+    return pareto
+
+
+def plot_pareto_front_rmse(df):
+    """Scatter plot of complexity vs RMSE showing the Pareto front, one subplot per age."""
+    results_dir = os.path.join(current_dir, 'results_bmi_all')
+    ages = sorted(df['age'].unique()) if 'age' in df.columns else [None]
+    n_ages = len(ages)
+    ncols = min(n_ages, 4)
+    nrows = (n_ages + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 6 * nrows), squeeze=False)
+    axes_flat = axes.flatten()
+
+    for idx, age in enumerate(ages):
+        ax = axes_flat[idx]
+        sub_df = df[df['age'] == age] if age is not None else df
+        deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
+        pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
+
+        deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
+        pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
+
+        if not deep_df.empty:
+            pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+            if pf:
+                px, py = zip(*pf)
+                ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
+                ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
+
+        if not pysr_df.empty:
+            pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+            if pf_pysr:
+                px, py = zip(*pf_pysr)
+                ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
+                ax.scatter(px, py, c='#cc4400', s=100, zorder=5, marker='D', label='PySR')
+
+        title = f'BMI (age={age}) – Pareto Front: Complexity vs RMSE' if age is not None else 'BMI – Pareto Front: Complexity vs RMSE'
+        ax.set_xlabel('Complexity', fontsize=12)
+        ax.set_ylabel('RMSE', fontsize=12)
+        ax.set_title(title, fontsize=12, fontweight='bold')
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.3)
+
+    for idx in range(len(ages), len(axes_flat)):
+        axes_flat[idx].set_visible(False)
+
+    plt.tight_layout()
+    out = os.path.join(results_dir, 'pareto_front_rmse.png')
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Pareto front RMSE plot saved to {out}")
+
+
 if __name__ == "__main__":
-    # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.\
+    # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.
     # The r2 is calculated by applying this formula on the entire dataset, not the fold.
 
     df = process_results()
@@ -666,3 +917,6 @@ if __name__ == "__main__":
 
     plot_settings_comparison(df)
     aggregate_feature_importance()
+    plot_vps_vpr_ablation(df)
+    plot_pareto_ablation(df)
+    plot_pareto_front_rmse(df)
