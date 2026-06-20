@@ -58,9 +58,12 @@ def actual_age(year: int) -> int:
     return year
 
 
+_BMI_TARGET_COLS = {f'y{y}bmi' for y in YEARS}
+
+
 def _is_bmi_col(c: str) -> bool:
-    """True if column is a BMI target column (y{year}bmi)."""
-    return bool(re.match(r'^y\d+bmi$', c))
+    """True if column is a BMI target column (one of the forecast years in YEARS)."""
+    return c in _BMI_TARGET_COLS
 
 
 _COL_AGE_RE = re.compile(r'(?:^|_)yr?(\d+)')
@@ -144,18 +147,24 @@ def _build_merged_bmi() -> pd.DataFrame:
     return merged
 
 
-def drop_highly_correlated(df, cols, threshold=0.95):
-    """Drop columns from cols with |r| > threshold with any earlier column, keeping the first."""
+def drop_highly_correlated(df, cols, threshold=0.98):
+    """Drop columns from cols with |r| > threshold with any earlier column, keeping the first.
+
+    y5bmi and PGS variables are always kept regardless of correlation.
+    """
     numeric_cols = [c for c in cols if c in df.select_dtypes(include="number").columns]
     if len(numeric_cols) < 2:
         return df, cols
+    protected = {c for c in numeric_cols
+                 if c == 'y5bmi' or 'pgs' in c.lower()}
     corr = df[numeric_cols].corr().abs()
     upper = corr.where(
         pd.DataFrame([[i < j for j in range(len(corr.columns))]
                       for i in range(len(corr.columns))],
                      index=corr.index, columns=corr.columns)
     )
-    to_drop = [c for c in upper.columns if (upper[c] > threshold).any()]
+    to_drop = [c for c in upper.columns
+               if c not in protected and (upper[c] > threshold).any()]
     if to_drop:
         print(f"\n[drop_highly_correlated] dropping {len(to_drop)} cols with |r|>{threshold}")
         for col in to_drop:
@@ -166,29 +175,12 @@ def drop_highly_correlated(df, cols, threshold=0.95):
     return df, cols
 
 
-def _get_newbmi_base_feature_cols(merged_df: pd.DataFrame, non_bmi_cols: list) -> list:
-    """Return feature column list used for y8bmi base model training."""
-    return [c for c in non_bmi_cols if c in merged_df.columns]
-
-
-_base_feature_cols_cache = None
-
-
-def _get_bmi_base_feature_cols(merged_df=None, non_bmi_cols=None):
-    global _base_feature_cols_cache
-    if _base_feature_cols_cache is None:
-        if merged_df is not None and non_bmi_cols is not None:
-            _base_feature_cols_cache = _get_newbmi_base_feature_cols(merged_df, non_bmi_cols)
-        else:
-            _base_feature_cols_cache = []
-    return _base_feature_cols_cache
-
 
 def prepare_base_dataset():
-    """Load merged + G1 + G2 data, impute non-BMI features, create y8bmi pred columns.
+    """Load merged + G1 + G2 data, impute non-BMI features.
 
     Returns:
-        merged (DataFrame): fully imputed dataset with model-specific y8bmi pred columns.
+        merged (DataFrame): fully imputed dataset.
         non_bmi_cols (list): non-BMI, non-id feature column names.
     """
     cache_path = _CACHE_DIR / "base_dataset.csv"
@@ -232,6 +224,13 @@ def prepare_base_dataset():
     merged = merged.drop(columns=date_cols)
     non_bmi_cols = [c for c in non_bmi_cols if c not in date_cols]
 
+    # Drop columns with >60% missingness (all-NaN is a special case)
+    high_nan_cols = [c for c in non_bmi_cols if merged[c].isna().mean() > 0.60]
+    if high_nan_cols:
+        print(f"\n[drop high-NaN cols] dropping {len(high_nan_cols)} columns with >60% missing")
+        merged = merged.drop(columns=high_nan_cols)
+        non_bmi_cols = [c for c in non_bmi_cols if c not in high_nan_cols]
+
     # Drop highly correlated non-BMI features before imputation
     merged, non_bmi_cols = drop_highly_correlated(merged, non_bmi_cols)
 
@@ -242,100 +241,6 @@ def prepare_base_dataset():
 
     print(f"\n=== Imputing non-BMI variables ({len(non_bmi_cols)} cols) ===")
     merged = smart_impute(merged, non_bmi_cols)
-
-    bmi8_col = "y8bmi"
-    if bmi8_col not in merged.columns:
-        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        merged.to_csv(cache_path, index=False)
-        return merged, non_bmi_cols
-
-    print("\n=== Creating model-specific y8bmi prediction columns ===")
-    real_mask = merged[bmi8_col].notna()
-    missing_mask = ~real_mask
-    n_missing = int(missing_mask.sum())
-    print(f"  y8bmi: {int(real_mask.sum())} observed, {n_missing} missing")
-
-    bmi8_median = merged.loc[real_mask, bmi8_col].median()
-    age8_fcols = get_age_filtered_feature_cols(
-        [c for c in non_bmi_cols if c in merged.columns], _BASE_BMI_YEAR
-    )
-
-    # Set cache for later use
-    global _base_feature_cols_cache
-    _base_feature_cols_cache = age8_fcols
-
-    import sys as _sys
-    import joblib as _jl
-    _model_utils_dir = str(Path(__file__).parents[1])
-    if _model_utils_dir not in _sys.path:
-        _sys.path.insert(0, _model_utils_dir)
-
-    try:
-        from model_utils import get_baseline_models as _get_bl_models
-    except Exception as _ie:
-        print(f"  WARNING: Could not import get_baseline_models: {_ie}")
-        _get_bl_models = None
-
-    _bl_save_dir = str(_CACHE_DIR / "age_8_baselines")
-    os.makedirs(_bl_save_dir, exist_ok=True)
-
-    if _get_bl_models is not None and age8_fcols and n_missing > 0:
-        X_train8 = merged.loc[real_mask, age8_fcols].values
-        y_train8 = merged.loc[real_mask, bmi8_col].values
-        X_miss8 = merged.loc[missing_mask, age8_fcols].values
-
-        _bl_model_instances = _get_bl_models(task="regression", input_dim=len(age8_fcols))
-        for model_name, model_template in _bl_model_instances.items():
-            pred_col = f"{bmi8_col}_{model_name}_pred"
-            merged[pred_col] = merged[bmi8_col].copy()
-
-            fitted_model = None
-            _jl_path = os.path.join(_bl_save_dir, f"{model_name}.joblib")
-            if model_name != "KAN" and os.path.exists(_jl_path):
-                try:
-                    fitted_model = _jl.load(_jl_path)
-                    print(f"  Loaded saved model: {model_name}")
-                except Exception as _le:
-                    print(f"  Could not load {model_name}, retraining: {_le}")
-
-            if fitted_model is None:
-                try:
-                    from sklearn.base import clone as _clone
-                    m = _clone(model_template) if hasattr(model_template, "get_params") else model_template
-                    m.fit(X_train8, y_train8)
-                    fitted_model = m
-                    if model_name != "KAN":
-                        _jl.dump(m, _jl_path)
-                        print(f"  Trained and saved: {model_name}")
-                except Exception as _te:
-                    print(f"  WARNING: Failed to train {model_name}: {_te}")
-
-            if fitted_model is not None:
-                try:
-                    preds = fitted_model.predict(X_miss8)
-                    merged.loc[missing_mask, pred_col] = preds
-                except Exception as _pe:
-                    print(f"  WARNING: {model_name}.predict failed: {_pe}")
-
-            still_nan = merged[pred_col].isna()
-            if still_nan.any():
-                merged.loc[still_nan, pred_col] = bmi8_median
-            n_filled = int(merged.loc[missing_mask, pred_col].notna().sum())
-            print(f"  {model_name}: {n_filled}/{n_missing} missing filled")
-
-    # Fill base y8bmi
-    if n_missing > 0:
-        pred_cols = [c for c in merged.columns
-                     if c.startswith(f"{bmi8_col}_") and c.endswith("_pred")]
-        for pc in pred_cols:
-            still_missing = merged[bmi8_col].isna()
-            if not still_missing.any():
-                break
-            merged.loc[still_missing, bmi8_col] = merged.loc[still_missing, pc]
-        still_missing = merged[bmi8_col].isna().sum()
-        if still_missing:
-            merged[bmi8_col].fillna(bmi8_median, inplace=True)
-            print(f"  Median fallback for {still_missing} remaining rows.")
 
     merged = merged.copy()
 

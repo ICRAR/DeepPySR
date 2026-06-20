@@ -184,7 +184,12 @@ def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
     return results
 
 
-def evaluate_full_baseline_models(full_models_dir, X_eval, y_eval, feature_cols):
+def evaluate_full_baseline_models(full_models_dir, get_x_eval, y_eval):
+    """Evaluate full baseline models.
+
+    get_x_eval: callable(model_name) -> X_eval DataFrame, matching the features
+                each model was trained with (i.e. using y{prior}bmi_{name}_pred cols).
+    """
     import joblib as _jl
     results = {}
     models_dir = os.path.join(full_models_dir, '_models')
@@ -197,6 +202,7 @@ def evaluate_full_baseline_models(full_models_dir, X_eval, y_eval, feature_cols)
         model_name = fname.replace('.joblib', '')
         try:
             m = _jl.load(os.path.join(models_dir, fname))
+            X_eval = get_x_eval(model_name)
             y_pred = m.predict(X_eval.values)
             mask = ~np.isnan(y_pred)
             if mask.sum() < 2:
@@ -208,11 +214,17 @@ def evaluate_full_baseline_models(full_models_dir, X_eval, y_eval, feature_cols)
     return results
 
 
-def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
+def evaluate_full_formula_models(full_models_dir, get_x_eval, y_eval):
+    """Evaluate full formula models (deeppysr / pysr / kan).
+
+    get_x_eval: callable(model_type) -> X_eval DataFrame, matching the features
+                each model was trained with (i.e. using y{prior}bmi_{model}_pred cols).
+    """
     results = {}
 
     deeppysr_dir = os.path.join(full_models_dir, 'deeppysr')
     if os.path.exists(deeppysr_dir):
+        X_eval = get_x_eval('deeppysr')
         dsr_res = {}
         for f in glob.glob(os.path.join(deeppysr_dir, '**', 'relationships_nocv.csv'), recursive=True):
             try:
@@ -239,6 +251,7 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
 
     pysr_dir = os.path.join(full_models_dir, 'pysr')
     if os.path.exists(pysr_dir):
+        X_eval = get_x_eval('pysr')
         psr_res = {}
         for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_foldnocv.csv'), recursive=True):
             try:
@@ -265,6 +278,7 @@ def evaluate_full_formula_models(full_models_dir, X_eval, y_eval):
 
     kan_dir = os.path.join(full_models_dir, 'kan')
     if os.path.exists(kan_dir):
+        X_eval = get_x_eval('kan')
         kan_res = {}
         for f in glob.glob(os.path.join(kan_dir, '**', 'formulas_foldnocv.csv'), recursive=True):
             try:
@@ -558,7 +572,7 @@ def train_full_models_for_year(merged_df, target_year, prior_bmi_cols, non_bmi_c
         merged_df, target_year, prior_bmi_cols, non_bmi_cols, model_type='KAN')
     if ids_kan is not None and len(y_kan) >= 10:
         kan_full_out = os.path.join(full_out, 'kan', 'full')
-        if os.path.exists(os.path.join(kan_full_out, 'formulas_nocv.csv')):
+        if os.path.exists(os.path.join(kan_full_out, 'formulas_foldnocv.csv')):
             print('  Skipping KAN full training (exists)')
         else:
             print('  Training KAN (full)...')
@@ -621,30 +635,48 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         return merged_df
 
     year_idx = YEARS.index(target_year)
-    prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
-                      if f'y{y}bmi' in merged_df.columns]
+    prior_bmi_cols = [
+        f'y{y}bmi_mix' if f'y{y}bmi_mix' in merged_df.columns else f'y{y}bmi'
+        for y in YEARS[:year_idx]
+        if f'y{y}bmi' in merged_df.columns or f'y{y}bmi_mix' in merged_df.columns
+    ]
     non_bmi_cols = get_age_filtered_feature_cols(
         _rolling_step_kwargs.get('non_bmi_cols_ref', non_bmi_cols), target_year)
+
+    # Mirrors load_forecast_data_for_model: substitute y{prior}bmi_{model}_pred for raw cols
+    # when available, so evaluation uses the same features each model was trained on.
+    def _model_feature_cols(model_type):
+        prior_pred = []
+        for col in prior_bmi_cols:
+            pred_col = f'{col}_{model_type}_pred'
+            prior_pred.append(pred_col if pred_col in merged_df.columns else col)
+        return [c for c in non_bmi_cols if c in merged_df.columns] + prior_pred
+
+    # Raw feature_cols (no pred substitution) — used by save_rolling_dataset_with_predictions
+    # which handles per-family substitution internally via its own _family_fcols helper.
     feature_cols = [c for c in non_bmi_cols if c in merged_df.columns] + \
                    [c for c in prior_bmi_cols if c in merged_df.columns]
 
     known_mask = merged_df[bmi_col].notna()
-    X_eval = merged_df.loc[known_mask, feature_cols].reset_index(drop=True)
     y_eval = merged_df.loc[known_mask, bmi_col].values
 
-    print(f'  Evaluating CV results on {len(X_eval)} known samples...\n')
+    def _get_x_eval(model_type):
+        fcols = _model_feature_cols(model_type)
+        return merged_df.loc[known_mask, fcols].reset_index(drop=True)
+
+    print(f'  Evaluating CV results on {known_mask.sum()} known samples...\n')
 
     print('  Evaluating DeepPySR CV formulas...')
-    cv_deeppysr = evaluate_all_deeppysr_formulas(run_out, X_eval, y_eval)
+    cv_deeppysr = evaluate_all_deeppysr_formulas(run_out, _get_x_eval('deeppysr'), y_eval)
 
     print('  Evaluating PySR CV formulas...')
-    cv_pysr = evaluate_all_pysr_formulas(run_out, X_eval, y_eval)
+    cv_pysr = evaluate_all_pysr_formulas(run_out, _get_x_eval('pysr'), y_eval)
 
     print('  Evaluating KAN CV formulas...')
-    cv_kan = evaluate_all_kan_formulas(run_out, X_eval, y_eval)
+    cv_kan = evaluate_all_kan_formulas(run_out, _get_x_eval('kan'), y_eval)
 
     print('  Reading Baseline CV predictions...')
-    cv_baseline = evaluate_all_baseline_models(run_out, X_eval, y_eval, feature_cols)
+    cv_baseline = evaluate_all_baseline_models(run_out, _get_x_eval('deeppysr'), y_eval, feature_cols)
 
     cv_results = {
         'deeppysr': cv_deeppysr,
@@ -672,8 +704,8 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
         r2w_list, lambda_list, run_out)
 
     print('\n  --- Evaluating full models ---')
-    full_formula_results = evaluate_full_formula_models(full_out, X_eval, y_eval)
-    full_baseline_results = evaluate_full_baseline_models(full_out, X_eval, y_eval, feature_cols)
+    full_formula_results = evaluate_full_formula_models(full_out, _get_x_eval, y_eval)
+    full_baseline_results = evaluate_full_baseline_models(full_out, _get_x_eval, y_eval)
 
     full_results = {**full_formula_results, 'baseline': full_baseline_results}
 
@@ -708,6 +740,13 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
 def main():
     rolling_csv = os.path.join(OUT_ROOT, 'rolling_dataset.csv')
 
+    pysr_base_kwargs = get_pysr_base_kwargs()
+    deeppysr_configs = dict([next(iter(get_deeppysr_configs().items()))])
+    pysr_configs = dict([next(iter(get_pysr_configs().items()))])
+
+    r2w_list = [1, 1.5, 2]
+    lambda_list = [0.001, 0.005, 0.01]
+
     if os.path.exists(rolling_csv):
         print(f'\n=== Loading existing rolling dataset from {rolling_csv} ===')
         merged_df = pd.read_csv(rolling_csv)
@@ -720,13 +759,6 @@ def main():
         merged_df.to_csv(_tmp, index=False)
         os.replace(_tmp, os.path.join(OUT_ROOT, 'base_dataset.csv'))
         print(f'Base dataset: {len(merged_df)} rows, {len(merged_df.columns)} cols')
-
-    pysr_base_kwargs = get_pysr_base_kwargs()
-    deeppysr_configs = get_deeppysr_configs()
-    pysr_configs = get_pysr_configs()
-
-    r2w_list = [1, 1.5, 2]
-    lambda_list = [0.001, 0.005, 0.01]
 
     print(f'\nDeepPySR configs: {len(deeppysr_configs)} combinations')
     print(f'PySR configs: {len(pysr_configs)} combinations')
@@ -741,7 +773,7 @@ def main():
         'non_bmi_cols_ref': non_bmi_cols,
     }
 
-    for year in YEARS[1:]:
+    for year in YEARS:
         year_idx = YEARS.index(year)
         prior_bmi_cols = [f'y{y}bmi' for y in YEARS[:year_idx]
                           if f'y{y}bmi' in merged_df.columns]

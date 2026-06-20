@@ -978,20 +978,6 @@ def save_rolling_dataset_with_predictions(merged_df, target_year, results_by_fam
             n_filled = int(merged_df.loc[missing_mask, pred_col].notna().sum()) if n_missing else 0
             print(f'  {model_name}: {n_filled}/{n_missing} missing {bmi_col} filled via full model')
 
-    # Fill base bmi_col using first available pred column
-    if n_missing > 0:
-        pred_cols = [c for c in merged_df.columns
-                     if c.startswith(f'{bmi_col}_') and c.endswith('_pred')]
-        for pc in pred_cols:
-            still_missing = merged_df[bmi_col].isna()
-            if not still_missing.any():
-                break
-            merged_df.loc[still_missing, bmi_col] = merged_df.loc[still_missing, pc]
-        still_missing = merged_df[bmi_col].isna().sum()
-        if still_missing:
-            merged_df[bmi_col].fillna(bmi_median, inplace=True)
-            print(f'  Median fallback for {still_missing} remaining rows of {bmi_col}.')
-
     _tmp = rolling_csv + '.tmp'
     merged_df.to_csv(_tmp, index=False)
     os.replace(_tmp, rolling_csv)

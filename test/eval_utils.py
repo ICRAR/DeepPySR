@@ -144,6 +144,8 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             X_train, y_train = sm.fit_resample(X_train, y_train)
         
         model = model_factory()
+        if hasattr(model, 'output_directory') and outdir:
+            model.output_directory = os.path.join(outdir, 'pysr_outputs', 'y')
         model.fit(X_train, y_train)
         
         y_pred = model.predict(X_test)
@@ -223,15 +225,23 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             elif hasattr(model, 'relationships_'): # DeepPySR
                 model.save_relationships(filename=f"relationships_fold{fold}.csv")
 
-    overall_metrics = calculate_metrics(np.array(all_y_true), np.array(all_y_pred), 
+    overall_metrics = calculate_metrics(np.array(all_y_true), np.array(all_y_pred),
                                         np.array(all_y_prob) if all_y_prob else None, task=task)
-    
+
     if outdir:
-        save_predictions(outdir, np.array(all_y_true), np.array(all_y_pred), 
+        save_predictions(outdir, np.array(all_y_true), np.array(all_y_pred),
                          np.array(all_y_prob) if all_y_prob else None, np.array(all_ids) if all_ids else None,
                          y_pred_sym=np.array(all_y_pred_sym) if all_y_pred_sym else None,
                          extra_data={k: np.array(v) for k, v in all_extra_data.items()})
         pd.DataFrame([overall_metrics]).to_csv(os.path.join(outdir, "overall_metrics.csv"), index=False)
+
+        # Save per-fold metrics for SE / Wilcoxon computation downstream
+        fold_metrics_rows = []
+        for fi, fm in enumerate(fold_metrics):
+            row = {'fold': fi}
+            row.update(fm)
+            fold_metrics_rows.append(row)
+        pd.DataFrame(fold_metrics_rows).to_csv(os.path.join(outdir, "fold_metrics.csv"), index=False)
         
         if fold_importances:
             avg_importance = np.mean(fold_importances, axis=0)
@@ -279,6 +289,8 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
         X_train, y_values = sm.fit_resample(X_train, y_values)
 
     model = model_factory()
+    if hasattr(model, 'output_directory') and outdir:
+        model.output_directory = os.path.join(outdir, 'pysr_outputs', 'y')
     model.fit(X_train, y_values)
     
     y_pred = model.predict(X_train)
