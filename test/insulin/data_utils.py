@@ -277,7 +277,7 @@ def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
                 limit_map[tok] = 0.0 if rank == 0 else float(thresholds[rank - 1][1])
 
             coding: dict[str, float] = {}
-            result = series.copy().astype(float, errors="ignore")
+            result = pd.Series(float("nan"), index=series.index, dtype=float)
             for i, val in series.items():
                 if pd.isna(val):
                     result[i] = float("nan")
