@@ -741,8 +741,8 @@ def main():
     rolling_csv = os.path.join(OUT_ROOT, 'rolling_dataset.csv')
 
     pysr_base_kwargs = get_pysr_base_kwargs()
-    deeppysr_configs = dict([next(iter(get_deeppysr_configs().items()))])
-    pysr_configs = dict([next(iter(get_pysr_configs().items()))])
+    deeppysr_configs = get_deeppysr_configs()
+    pysr_configs = get_pysr_configs()
 
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
