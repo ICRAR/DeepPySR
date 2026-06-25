@@ -13,7 +13,9 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from stroke_utils import load_stroke_data
-from analysis_utils import calculate_metrics, get_best_formula_from_raw
+from analysis_utils import (calculate_metrics, get_best_formula_from_raw,
+                             collect_model_fold_data, se_from_fold_data,
+                             run_wilcoxon_analysis, compute_se)
 
 def process_results():
     all_data = []
@@ -125,6 +127,71 @@ def process_results():
     result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
     return result_df
+
+
+def compute_se_and_wilcoxon(result_df):
+    """Compute per-fold SE and run Wilcoxon vs DeepPySR (best F1)."""
+    X, y = load_stroke_data()
+    task = 'classification'
+    base_dir = os.path.join(current_dir, "results_stroke_all")
+
+    fold_data = {}
+
+    baselines_dir = os.path.join(base_dir, "baselines")
+    if os.path.exists(baselines_dir):
+        for model_name in os.listdir(baselines_dir):
+            model_path = os.path.join(baselines_dir, model_name)
+            if not os.path.isdir(model_path):
+                continue
+            row = result_df[result_df['model'] == model_name]
+            formula = row['formula'].iloc[0] if not row.empty else ""
+            fold_data[model_name] = collect_model_fold_data(
+                model_path, formula, X, y, task,
+                model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+    deeppysr_df = result_df[result_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
+    if not deeppysr_df.empty:
+        best_row = deeppysr_df.loc[deeppysr_df['f1'].idxmax()]
+        fold_data['DeepPySR_best'] = collect_model_fold_data(
+            base_dir, best_row['formula'], X, y, task, model_type='deeppysr')
+
+    pysr_df = result_df[result_df['model'].str.contains('pysr', na=False)]
+    if not pysr_df.empty:
+        best_pysr = pysr_df.loc[pysr_df['f1'].idxmax()]
+        fold_data['PySR'] = collect_model_fold_data(
+            base_dir, best_pysr['formula'], X, y, task, model_type='pysr')
+
+    # SE summary — merge into best_models_metrics CSV
+    se_map = {}
+    for model_name, fd in fold_data.items():
+        if fd is not None:
+            ses = se_from_fold_data(fd)
+            ses['n_folds'] = len(fd)
+            se_map[model_name] = ses
+
+    display_to_fold = {
+        'Best DeepPySR': 'DeepPySR_best',
+        'Interpretable DeepPySR': 'DeepPySR_best',
+        'Best PySR': 'PySR',
+    }
+
+    metrics_csv_path = os.path.join(current_dir, 'stroke_best_models_metrics.csv')
+    if se_map and os.path.exists(metrics_csv_path):
+        metrics_df = pd.read_csv(metrics_csv_path)
+        se_cols = [c for c in next(iter(se_map.values())).keys() if c != 'n_folds']
+        for col in se_cols + ['n_folds']:
+            metrics_df[col] = np.nan
+        for i, row in metrics_df.iterrows():
+            fold_key = display_to_fold.get(row['display_model'], row['display_model'])
+            if fold_key in se_map:
+                for col in se_cols + ['n_folds']:
+                    metrics_df.at[i, col] = se_map[fold_key].get(col, np.nan)
+        metrics_df.to_csv(metrics_csv_path, index=False)
+        print(f"SE merged into {metrics_csv_path}")
+
+    run_wilcoxon_analysis(fold_data, 'DeepPySR_best', task,
+                          output_file=os.path.join(current_dir, "wilcoxon_results.csv"))
+
 
 def save_results(df):
     """
@@ -459,42 +526,79 @@ def _pareto_front_steps(complexity, error):
     return pareto
 
 
+def _load_hof_data(model_dir):
+    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
+    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
+    if not os.path.exists(pysr_out):
+        return pd.DataFrame()
+    rows = []
+    for ts in sorted(os.listdir(pysr_out)):
+        hof_file = os.path.join(pysr_out, ts, 'hall_of_fame.csv')
+        if not os.path.exists(hof_file):
+            continue
+        hof = pd.read_csv(hof_file)
+        if 'Complexity' not in hof.columns or 'Loss' not in hof.columns:
+            continue
+        for _, row in hof.iterrows():
+            rows.append({'complexity': int(row['Complexity']), 'loss': float(row['Loss'])})
+    if not rows:
+        return pd.DataFrame()
+    hof_df = pd.DataFrame(rows)
+    agg = hof_df.groupby('complexity')['loss'].mean().reset_index()
+    agg['rmse'] = np.sqrt(agg['loss'])
+    return agg[['complexity', 'rmse']]
+
+
 def plot_pareto_front_rmse(df):
-    """Scatter plot of complexity vs (1-F1) showing the Pareto front for DeepPySR and PySR variants."""
+    """Pareto front: DeepPySR uses hall_of_fame (training RMSE), PySR uses 1-F1 from aggregated variants."""
+    import re
     results_dir = os.path.join(current_dir, 'results_stroke_all')
 
     deep_df = df[df['model'].str.contains('fullsr', regex=False, na=False)].copy()
     pysr_df = df[df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
+    pysr_df = pysr_df[pysr_df['complexity'].notna()].copy()
+    pysr_df['error'] = 1.0 - pysr_df['f1'].fillna(0)
 
-    for d in [deep_df, pysr_df]:
-        d['error'] = 1.0 - d['f1'].fillna(0)
+    # Load full Pareto hall_of_fame for the best DeepPySR model
+    hof_data = pd.DataFrame()
+    if not deep_df.empty:
+        best_name = deep_df.loc[deep_df['f1'].idxmax(), 'model']
+        base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
+        model_dir = os.path.join(current_dir, 'results_stroke_all', 'deeppysr', base_model)
+        hof_data = _load_hof_data(model_dir)
 
-    deep_df = deep_df[deep_df['complexity'].notna()]
-    pysr_df = pysr_df[pysr_df['complexity'].notna()]
+    # Load hall_of_fame for best PySR model (only plotted once saved by save_pysr_hof.py)
+    hof_pysr = pd.DataFrame()
+    if not pysr_df.empty:
+        best_pysr_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '',
+                                pysr_df.loc[pysr_df['f1'].idxmax(), 'model'])
+        pysr_model_dir = os.path.join(current_dir, 'results_stroke_all', 'pysr', best_pysr_name)
+        hof_pysr = _load_hof_data(pysr_model_dir)
 
-    if deep_df.empty and pysr_df.empty:
-        print("No data for pareto front RMSE plot")
+    if hof_data.empty and hof_pysr.empty:
+        print("No data for pareto front plot")
         return
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    if not deep_df.empty:
-        pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['error'].tolist())
+    if not hof_data.empty:
+        pf = _pareto_front_steps(hof_data['complexity'].tolist(), hof_data['rmse'].tolist())
         if pf:
             px, py = zip(*pf)
             ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
-            ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
+            ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR (train RMSE)')
 
-    if not pysr_df.empty:
-        pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['error'].tolist())
+    if not hof_pysr.empty:
+        pf_pysr = _pareto_front_steps(hof_pysr['complexity'].tolist(), hof_pysr['rmse'].tolist())
         if pf_pysr:
             px, py = zip(*pf_pysr)
             ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
-            ax.scatter(px, py, c='#cc4400', s=100, zorder=5, marker='D', label='PySR')
+            ax.scatter(px, py, c='#cc4400', s=100, zorder=5, marker='D', label='PySR (train RMSE)')
 
     ax.set_xlabel('Complexity', fontsize=13)
-    ax.set_ylabel('1 – F1 (error)', fontsize=13)
-    ax.set_title('Stroke – Pareto Front: Complexity vs (1-F1)', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Error', fontsize=13)
+    ax.set_title('Stroke – Pareto Front: Complexity vs Error', fontsize=14, fontweight='bold')
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -511,6 +615,7 @@ if __name__ == "__main__":
     df = process_results()
 
     save_results(df)
+    compute_se_and_wilcoxon(df)
     aggregate_feature_importance()
     plot_best_models()
     plot_vps_vpr_ablation(df)

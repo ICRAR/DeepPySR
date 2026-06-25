@@ -1174,6 +1174,451 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
     print(f'Saved: {path}')
 
 
+# ── Formula demonstration ─────────────────────────────────────────────────────
+
+def _select_sparse_ids(n_obs_filter, n_sample, base_df, yr8_df, rolling_df, formula_map_precheck):
+    """Replicate the participant-selection logic from plot_sparse_trajectories."""
+    base_idx = base_df.set_index('child_id')
+    true_cols_base = [f'y{y}bmi' for y in ALL_YEARS if y != 8 and f'y{y}bmi' in base_idx.columns]
+    obs_counts = base_idx[true_cols_base].notna().sum(axis=1)
+    if yr8_df is not None:
+        yr8_obs = yr8_df['y8bmi'].notna().astype(int).reindex(obs_counts.index, fill_value=0)
+        obs_counts = obs_counts.add(yr8_obs, fill_value=0)
+    ids = obs_counts[obs_counts == n_obs_filter].index.tolist()
+    if not ids:
+        return [], base_idx, true_cols_base
+
+    all_pred_cols = [c for c in rolling_df.columns if c.endswith('_pred') and 'bmi' in c]
+    rolling_idx = rolling_df.set_index('child_id')
+
+    def _has_low_pred(cid):
+        if not all_pred_cols or cid not in rolling_idx.index:
+            return False
+        vals = rolling_idx.loc[cid, all_pred_cols].dropna()
+        return bool((vals < 10).any())
+
+    ids_valid = [cid for cid in ids if not _has_low_pred(cid)]
+    rolling_candidates = rolling_df[rolling_df['child_id'].isin(ids_valid)].set_index('child_id')
+    bad_ids = set()
+    for (_age, _label), _formula in formula_map_precheck.items():
+        try:
+            _yp = evaluate_formula(str(_formula), rolling_candidates.reset_index(),
+                                   model_type='pysr' if 'PySR' in _label else 'deeppysr')
+            if _yp is not None:
+                for _cid, _val in zip(rolling_candidates.index, _yp):
+                    if np.isfinite(float(_val)) and float(_val) < 10:
+                        bad_ids.add(_cid)
+        except Exception:
+            pass
+    ids_valid = [cid for cid in ids_valid if cid not in bad_ids]
+
+    def mean_obs_bmi(cid):
+        vals = []
+        if yr8_df is not None and cid in yr8_df.index:
+            v = yr8_df.loc[cid, 'y8bmi']
+            if pd.notna(v):
+                vals.append(float(v))
+        if cid in base_idx.index:
+            for col in true_cols_base:
+                if col in base_idx.columns:
+                    v = base_idx.loc[cid, col]
+                    if pd.notna(v):
+                        vals.append(float(v))
+        return np.mean(vals) if vals else 0.0
+
+    ids_sorted = sorted(ids_valid, key=mean_obs_bmi, reverse=True)
+    return ids_sorted[:n_sample], base_idx, true_cols_base
+
+
+def _extract_formula_vars(formula_str, available_cols):
+    """Return sorted list of column names that appear as tokens in formula_str."""
+    import re as _re
+    KNOWN_FUNCS = {'log', 'exp', 'sin', 'cos', 'sqrt', 'abs', 'inv', 'neg',
+                   'square', 'cube', 'cond', 'pi', 'E', 'nan', 'inf'}
+    tokens = set(_re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', str(formula_str)))
+    col_set = set(available_cols)
+    return sorted(t for t in tokens if t not in KNOWN_FUNCS and t in col_set)
+
+
+def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
+    """For each sampled participant (same selection as plot_sparse_trajectories),
+    show the DeepPySR best and interpretable formula, the value of every variable
+    in each formula (with population mean, SD, and this participant's percentile),
+    the predicted BMI, and the true BMI (if observed).
+
+    Outputs:
+      bmiforecast_formula_demo_{n_obs_filter}_obs.csv   — machine-readable
+      bmiforecast_formula_demo_{n_obs_filter}_obs.txt   — human-readable
+    """
+    rolling_csv = os.path.join(FORECAST_RESULTS_DIR, 'rolling_dataset.csv')
+    base_csv    = os.path.join(FORECAST_RESULTS_DIR, 'base_dataset.csv')
+    cmp_csv     = os.path.join(FORECAST_RESULTS_DIR, 'bmiforecast_comparison_metrics.csv')
+    if not os.path.exists(rolling_csv) or not os.path.exists(cmp_csv):
+        print('  Required files missing; run main analysis first.')
+        return
+
+    rolling_df = pd.read_csv(rolling_csv)
+    base_df    = pd.read_csv(base_csv) if os.path.exists(base_csv) else rolling_df
+
+    project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+    yr8_csv = os.path.join(project_root, 'test_data', 'Health', 'bmi', 'rawdata_yr8.csv')
+    yr8_df = (pd.read_csv(yr8_csv).drop_duplicates(subset='child_id').set_index('child_id')
+              if os.path.exists(yr8_csv) else None)
+
+    # Load formula map
+    cmp_df  = pd.read_csv(cmp_csv)
+    bmi_fc  = cmp_df[cmp_df['source'] == 'BMI Forecast']
+    formula_map = {(int(r['age']), r['display_model']): r['formula']
+                   for _, r in bmi_fc.iterrows()
+                   if pd.notna(r.get('formula')) and str(r['formula']) not in ('', '0.0', 'nan')}
+
+    # Only precheck with DeepPySR formulas: PySR formulas reference y{yr}bmi_pysr_pred
+    # columns absent from rolling_df, which evaluate to 0 and wrongly eliminate all participants.
+    formula_map_precheck = {k: v for k, v in formula_map.items()
+                            if k[1] in ('DeepPySR', 'DeepPySR (Interpretable)')}
+
+    sampled_ids, base_idx, true_cols_base = _select_sparse_ids(
+        n_obs_filter, n_sample, base_df, yr8_df, rolling_df, formula_map_precheck)
+
+    if not sampled_ids:
+        print(f'  No valid participants with {n_obs_filter} observed BMIs.')
+        return
+
+    rolling_sub = rolling_df[rolling_df['child_id'].isin(sampled_ids)].set_index('child_id')
+    all_cols    = list(rolling_sub.columns)
+
+    # Pre-compute population stats (mean, std, sorted values) for every numeric column
+    # using the full rolling_df so percentiles reflect the whole cohort.
+    col_stats = {}   # col -> {'mean': float, 'std': float, 'sorted': np.ndarray}
+    rolling_idx_full = rolling_df.set_index('child_id')
+    for col in all_cols:
+        if col not in rolling_idx_full.columns:
+            continue
+        vals = rolling_idx_full[col].dropna().values.astype(float)
+        if len(vals) == 0:
+            continue
+        col_stats[col] = {
+            'mean':   float(np.mean(vals)),
+            'std':    float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0,
+            'sorted': np.sort(vals),
+        }
+
+    def _percentile(col, value):
+        """Return 0-100 percentile of value within col's population distribution."""
+        if col not in col_stats or np.isnan(value):
+            return np.nan
+        arr = col_stats[col]['sorted']
+        if len(arr) == 0:
+            return np.nan
+        return float(np.searchsorted(arr, value, side='right')) / len(arr) * 100.0
+
+    DEMO_MODELS = [
+        ('DeepPySR',                 'deeppysr'),
+        ('DeepPySR (Interpretable)', 'deeppysr'),
+    ]
+
+    # True BMI per (cid, age)
+    def true_bmi_at(cid, age):
+        if age == 8:
+            if yr8_df is not None and cid in yr8_df.index:
+                v = yr8_df.loc[cid, 'y8bmi']
+                return float(v) if pd.notna(v) else np.nan
+            return np.nan
+        yr = ALL_YEARS[ALL_AGES.index(age)] if age in ALL_AGES else None
+        if yr is None:
+            return np.nan
+        col = f'y{yr}bmi'
+        if cid in base_idx.index and col in base_idx.columns:
+            v = base_idx.loc[cid, col]
+            return float(v) if pd.notna(v) else np.nan
+        return np.nan
+
+    csv_rows   = []   # one row per (cid, age, model, variable)
+    text_lines = []   # formatted text report
+
+    text_lines.append(
+        f'Formula Demonstration — {n_obs_filter} Observed BMI Participants\n'
+        + '=' * 70)
+
+    for cid in sampled_ids:
+        text_lines.append(f'\n{"─"*70}')
+        text_lines.append(f'Participant ID: {cid}')
+        text_lines.append(f'{"─"*70}')
+
+        if cid not in rolling_sub.index:
+            text_lines.append('  (no rolling-dataset row for this participant)')
+            continue
+
+        row_data = rolling_sub.loc[cid]
+        X_row    = pd.DataFrame([row_data])
+
+        for year, age in zip(FORECAST_YEARS, FORECAST_AGES):
+            true_val = true_bmi_at(cid, age)
+            text_lines.append(f'\n  Age {age}   |   True BMI: '
+                              + (f'{true_val:.2f}' if not np.isnan(true_val) else 'not observed'))
+
+            for label, model_type in DEMO_MODELS:
+                formula = formula_map.get((age, label))
+                if not formula:
+                    text_lines.append(f'    [{label}]  formula not available')
+                    continue
+
+                var_names = _extract_formula_vars(formula, all_cols)
+
+                # Gather value, mean, std, percentile per variable
+                var_info = {}   # varname -> (value, mean, std, pct)
+                for v in var_names:
+                    raw = row_data[v] if v in row_data.index else np.nan
+                    val = float(raw) if pd.notna(raw) else np.nan
+                    st  = col_stats.get(v, {})
+                    var_info[v] = (
+                        val,
+                        st.get('mean', np.nan),
+                        st.get('std',  np.nan),
+                        _percentile(v, val),
+                    )
+
+                try:
+                    yp_arr = evaluate_formula(str(formula), X_row, model_type=model_type)
+                    bmi_pred = float(yp_arr[0]) if (yp_arr is not None and len(yp_arr) > 0
+                                                     and np.isfinite(yp_arr[0])) else np.nan
+                except Exception:
+                    bmi_pred = np.nan
+
+                text_lines.append(f'    [{label}]')
+                text_lines.append(f'      Formula : {formula}')
+                text_lines.append(f'      {"Variable":<35}  {"Value":>9}  {"Mean":>9}  {"SD":>9}  {"Pctile":>7}')
+                text_lines.append(f'      {"─"*35}  {"─"*9}  {"─"*9}  {"─"*9}  {"─"*7}')
+                for vname, (val, mean, std, pct) in sorted(var_info.items()):
+                    v_str    = f'{val:.4f}'   if not np.isnan(val)  else 'NaN'
+                    mean_str = f'{mean:.4f}'  if not np.isnan(mean) else 'NaN'
+                    std_str  = f'{std:.4f}'   if not np.isnan(std)  else 'NaN'
+                    pct_str  = f'{pct:.1f}%'  if not np.isnan(pct)  else 'NaN'
+                    text_lines.append(f'      {vname:<35}  {v_str:>9}  {mean_str:>9}  {std_str:>9}  {pct_str:>7}')
+                text_lines.append(f'      Predicted BMI : '
+                                  + (f'{bmi_pred:.4f}' if not np.isnan(bmi_pred) else 'NaN'))
+
+                # One CSV row per variable (long format)
+                for vname, (val, mean, std, pct) in sorted(var_info.items()):
+                    csv_rows.append({
+                        'n_obs':      n_obs_filter,
+                        'child_id':   cid,
+                        'age':        age,
+                        'model':      label,
+                        'formula':    formula,
+                        'variable':   vname,
+                        'value':      round(val,  4) if not np.isnan(val)  else np.nan,
+                        'pop_mean':   round(mean, 4) if not np.isnan(mean) else np.nan,
+                        'pop_sd':     round(std,  4) if not np.isnan(std)  else np.nan,
+                        'percentile': round(pct,  1) if not np.isnan(pct)  else np.nan,
+                        'bmi_pred':   round(bmi_pred, 4) if not np.isnan(bmi_pred) else np.nan,
+                        'bmi_true':   round(true_val, 4) if not np.isnan(true_val) else np.nan,
+                    })
+
+    # Save CSV
+    csv_path = os.path.join(out_dir, f'bmiforecast_formula_demo_{n_obs_filter}_obs.csv')
+    pd.DataFrame(csv_rows).to_csv(csv_path, index=False)
+    print(f'  Saved: {csv_path}')
+
+    # Save text report
+    txt_path = os.path.join(out_dir, f'bmiforecast_formula_demo_{n_obs_filter}_obs.txt')
+    with open(txt_path, 'w') as f:
+        f.write('\n'.join(text_lines) + '\n')
+    print(f'  Saved: {txt_path}')
+
+
+# ── Sobol sensitivity analysis ───────────────────────────────────────────────
+
+def compute_sobol_sensitivity(out_dir, n_base=2048):
+    """Variance-based (Sobol) sensitivity analysis for DeepPySR best and interpretable
+    formulas at each forecast age.
+
+    For each (age, model) formula:
+      - Variables are sampled jointly using Saltelli's scheme.
+      - Each variable's marginal distribution is taken from the full rolling_dataset
+        (uniform between the observed 1st–99th percentile to avoid extreme outliers).
+      - First-order (S1) and total-order (ST) Sobol indices are computed.
+
+    Outputs:
+      bmiforecast_sobol_sensitivity.csv   — all indices in long format
+      bmiforecast_sobol_sensitivity.png   — heatmap (variables × ages per model)
+    """
+    from SALib.sample import saltelli
+    from SALib.analyze import sobol as sobol_analyze
+
+    rolling_csv = os.path.join(FORECAST_RESULTS_DIR, 'rolling_dataset.csv')
+    cmp_csv     = os.path.join(FORECAST_RESULTS_DIR, 'bmiforecast_comparison_metrics.csv')
+    if not os.path.exists(rolling_csv) or not os.path.exists(cmp_csv):
+        print('  Required files missing; skipping Sobol analysis.')
+        return
+
+    rolling_df = pd.read_csv(rolling_csv)
+    cmp_df     = pd.read_csv(cmp_csv)
+    bmi_fc     = cmp_df[cmp_df['source'] == 'BMI Forecast']
+
+    # Build formula map for DeepPySR only
+    formula_map = {}
+    for _, r in bmi_fc.iterrows():
+        if r['display_model'] not in ('DeepPySR', 'DeepPySR (Interpretable)'):
+            continue
+        if pd.isna(r.get('formula')) or str(r['formula']) in ('', '0.0', 'nan'):
+            continue
+        formula_map[(int(r['age']), r['display_model'])] = str(r['formula'])
+
+    all_cols = [c for c in rolling_df.columns if c != 'child_id']
+
+    # Pre-compute 1st–99th percentile bounds per column from the full cohort
+    col_bounds = {}   # col -> (low, high)
+    col_vals   = {}   # col -> sorted array (for ppf via interpolation)
+    for col in all_cols:
+        vals = rolling_df[col].dropna().values.astype(float)
+        if len(vals) < 10:
+            continue
+        lo, hi = np.percentile(vals, 1), np.percentile(vals, 99)
+        if lo == hi:       # constant column — expand slightly so SALib doesn't crash
+            lo, hi = lo - 0.5, hi + 0.5
+        col_bounds[col] = (lo, hi)
+        col_vals[col]   = np.sort(vals)
+
+    DEMO_MODELS = ['DeepPySR', 'DeepPySR (Interpretable)']
+
+    rows = []   # collected Sobol results
+
+    for age in FORECAST_AGES:
+        for label in DEMO_MODELS:
+            formula = formula_map.get((age, label))
+            if not formula:
+                continue
+
+            var_names = _extract_formula_vars(formula, all_cols)
+            if not var_names:
+                continue
+
+            # Drop variables with no usable bounds
+            var_names = [v for v in var_names if v in col_bounds]
+            if not var_names:
+                continue
+
+            # SALib problem definition — uniform bounds over [p1, p99]
+            problem = {
+                'num_vars': len(var_names),
+                'names':    var_names,
+                'bounds':   [list(col_bounds[v]) for v in var_names],
+            }
+
+            # Saltelli sample matrix: N*(2+k) evaluations
+            param_values = saltelli.sample(problem, n_base, calc_second_order=False)
+
+            # Build DataFrame with correct column names and evaluate formula
+            X_sample = pd.DataFrame(param_values, columns=var_names)
+            try:
+                Y = evaluate_formula(formula, X_sample, model_type='deeppysr')
+            except Exception as e:
+                print(f'  Skipping age={age} {label}: formula eval error — {e}')
+                continue
+
+            Y = np.asarray(Y, dtype=float)
+            # Clip outputs to a realistic BMI range to suppress singularity-driven
+            # variance (e.g. denominators near zero inflating ST far above 1).
+            Y = np.clip(Y, 5.0, 80.0)
+            finite_mask = np.isfinite(Y)
+            if finite_mask.sum() < len(Y) * 0.5:
+                print(f'  Skipping age={age} {label}: >50% non-finite outputs')
+                continue
+            Y[~finite_mask] = np.nanmedian(Y[finite_mask])
+
+            try:
+                si = sobol_analyze.analyze(problem, Y, calc_second_order=False,
+                                           print_to_console=False)
+            except Exception as e:
+                print(f'  Sobol analysis failed for age={age} {label}: {e}')
+                continue
+
+            for i, vname in enumerate(var_names):
+                rows.append({
+                    'age':      age,
+                    'model':    label,
+                    'variable': vname,
+                    'S1':       float(si['S1'][i]),
+                    'S1_conf':  float(si['S1_conf'][i]),
+                    'ST':       float(si['ST'][i]),
+                    'ST_conf':  float(si['ST_conf'][i]),
+                })
+
+            print(f'  age={age} [{label}]: {len(var_names)} vars, '
+                  f'top S1={max(si["S1"]):.3f}, top ST={max(si["ST"]):.3f}')
+
+    if not rows:
+        print('  No Sobol results to save.')
+        return
+
+    result_df = pd.DataFrame(rows)
+    csv_path  = os.path.join(out_dir, 'bmiforecast_sobol_sensitivity.csv')
+    result_df.to_csv(csv_path, index=False)
+    print(f'  Saved: {csv_path}')
+
+    # ── Heatmap plots — one figure per model so every y-label fits ───────────
+    ROW_HEIGHT  = 0.45   # inches per variable row
+    COL_WIDTH   = 1.2    # inches per age column
+    LABEL_PAD   = 4.0    # extra inches for y-axis labels
+    HEADER_PAD  = 1.8    # inches for title + x-axis
+    LABEL_FS    = 14     # y-axis variable label font size
+
+    for model in ['DeepPySR', 'DeepPySR (Interpretable)']:
+        sub = result_df[result_df['model'] == model]
+        if sub.empty:
+            continue
+
+        # Build pivot sorted by mean ST descending (same order for both S1 and ST plots)
+        pivot_s1 = sub.pivot_table(index='variable', columns='age', values='S1', aggfunc='mean').fillna(0).clip(lower=0)
+        pivot_st = sub.pivot_table(index='variable', columns='age', values='ST', aggfunc='mean').fillna(0).clip(lower=0)
+        order = pivot_st.mean(axis=1).sort_values(ascending=False).index
+        pivot_s1 = pivot_s1.loc[order]
+        pivot_st = pivot_st.loc[order]
+
+        n_vars = len(order)
+        n_ages = pivot_s1.shape[1]
+
+        fig_h = max(8, n_vars * ROW_HEIGHT + HEADER_PAD)
+        fig_w = n_ages * COL_WIDTH * 2 + LABEL_PAD + 2
+
+        fig, (ax_s1, ax_st) = plt.subplots(1, 2, figsize=(fig_w, fig_h))
+        plt.rcParams.update({'font.size': 11})
+
+        annot_fs = max(9, min(13, int(320 / n_vars)))
+
+        for ax, pivot, metric in [(ax_s1, pivot_s1, 'S1'), (ax_st, pivot_st, 'ST')]:
+            sns.heatmap(
+                pivot, ax=ax,
+                cmap='YlOrRd', vmin=0, vmax=1,
+                linewidths=0.5, linecolor='white',
+                annot=True, fmt='.2f', annot_kws={'size': annot_fs},
+                cbar_kws={'label': metric, 'shrink': 0.3, 'aspect': 30},
+                yticklabels=True,
+            )
+            ax.set_title(f'{model}\n{metric} ({"First" if metric=="S1" else "Total"}-order Sobol)',
+                         fontsize=15, fontweight='bold', pad=10)
+            ax.set_xlabel('Age', fontsize=13)
+            ax.set_ylabel('Variable', fontsize=13)
+            ax.tick_params(axis='x', labelsize=12)
+
+            # Align every label to the centre of its cell.
+            # Seaborn places cells at [0, n_vars] with centres at i+0.5 (y-axis inverted).
+            ax.set_yticks([i + 0.5 for i in range(n_vars)])
+            ax.set_yticklabels(order, fontsize=LABEL_FS, va='center')
+
+        plt.suptitle(f'Sobol Sensitivity — {model}', fontsize=14, fontweight='bold', y=1.005)
+        plt.tight_layout()
+
+        suffix = 'best' if model == 'DeepPySR' else 'interpretable'
+        png_path = os.path.join(out_dir, f'bmiforecast_sobol_sensitivity_{suffix}.png')
+        plt.savefig(png_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        print(f'  Saved: {png_path}')
+
+    return result_df
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
@@ -1227,5 +1672,13 @@ if __name__ == '__main__':
     print('=== Plotting sparse trajectories ===')
     for n in [2, 3, 4, 5]:
         plot_sparse_trajectories(out_dir, n_obs_filter=n, mlp_model=_mlp_model)
+
+    print('=== Saving formula demonstrations ===')
+    for n in [2, 3, 4, 5]:
+        print(f'  n_obs={n}')
+        save_formula_demonstration(out_dir, n_obs_filter=n)
+
+    print('=== Computing Sobol sensitivity indices ===')
+    compute_sobol_sensitivity(out_dir)
 
     print('\nDone.')

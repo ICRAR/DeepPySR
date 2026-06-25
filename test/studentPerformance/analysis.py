@@ -13,7 +13,9 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from student_utils import load_student_data
-from analysis_utils import calculate_metrics, get_best_formula_from_raw
+from analysis_utils import (calculate_metrics, get_best_formula_from_raw,
+                             collect_model_fold_data, se_from_fold_data,
+                             run_wilcoxon_analysis, compute_se)
 
 def process_results():
     subjects = ['mat', 'por']
@@ -109,6 +111,82 @@ def process_results():
     result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
     return result_df
+
+
+def compute_se_and_wilcoxon(result_df):
+    """Compute per-fold SE and Wilcoxon vs DeepPySR (best R²) for each subject."""
+    task = 'regression'
+
+    display_to_fold = {
+        'Best DeepPySR': 'DeepPySR_best',
+        'Interpretable DeepPySR': 'DeepPySR_best',
+        'Best PySR': 'PySR',
+    }
+
+    all_se_maps = {}  # subject -> se_map
+
+    for subject in ['mat', 'por']:
+        df_sub = load_student_data(subject)
+        X = df_sub.drop(columns=['G3'])
+        y = df_sub['G3']
+        base_dir = os.path.join(current_dir, f"results_{subject}_all")
+        sub_df = result_df[result_df['subject'] == subject]
+
+        fold_data = {}
+
+        baselines_dir = os.path.join(base_dir, "baselines")
+        if os.path.exists(baselines_dir):
+            for model_name in os.listdir(baselines_dir):
+                model_path = os.path.join(baselines_dir, model_name)
+                if not os.path.isdir(model_path):
+                    continue
+                row = sub_df[sub_df['model'] == model_name]
+                formula = row['formula'].iloc[0] if not row.empty else ""
+                fold_data[model_name] = collect_model_fold_data(
+                    model_path, formula, X, y, task,
+                    model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+        deeppysr_sub = sub_df[sub_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
+        if not deeppysr_sub.empty:
+            best_row = deeppysr_sub.loc[deeppysr_sub['r2'].idxmax()]
+            fold_data['DeepPySR_best'] = collect_model_fold_data(
+                base_dir, best_row['formula'], X, y, task, model_type='deeppysr')
+
+        pysr_sub = sub_df[sub_df['model'].str.contains('pysr', na=False)]
+        if not pysr_sub.empty:
+            best_pysr = pysr_sub.loc[pysr_sub['r2'].idxmax()]
+            fold_data['PySR'] = collect_model_fold_data(
+                base_dir, best_pysr['formula'], X, y, task, model_type='pysr')
+
+        se_map = {}
+        for model_name, fd in fold_data.items():
+            if fd is not None:
+                ses = se_from_fold_data(fd)
+                ses['n_folds'] = len(fd)
+                se_map[model_name] = ses
+        all_se_maps[subject] = se_map
+
+        run_wilcoxon_analysis(fold_data, 'DeepPySR_best', task,
+                              output_file=os.path.join(current_dir, f"wilcoxon_results_{subject}.csv"))
+
+    # Merge SE into student_best_models_metrics.csv
+    metrics_csv_path = os.path.join(current_dir, 'student_best_models_metrics.csv')
+    if all_se_maps and os.path.exists(metrics_csv_path):
+        metrics_df = pd.read_csv(metrics_csv_path)
+        first_se = next((s for sm in all_se_maps.values() for s in sm.values()), {})
+        se_cols = [c for c in first_se.keys() if c != 'n_folds']
+        for col in se_cols + ['n_folds']:
+            metrics_df[col] = np.nan
+        for i, row in metrics_df.iterrows():
+            subj = row['subject']
+            sm = all_se_maps.get(subj, {})
+            fold_key = display_to_fold.get(row['display_model'], row['display_model'])
+            if fold_key in sm:
+                for col in se_cols + ['n_folds']:
+                    metrics_df.at[i, col] = sm[fold_key].get(col, np.nan)
+        metrics_df.to_csv(metrics_csv_path, index=False)
+        print(f"SE merged into {metrics_csv_path}")
+
 
 def save_results(df):
     df = df.copy()
@@ -288,20 +366,20 @@ def plot_vps_vpr_ablation(df):
     metrics = ['r2', 'rmse', 'mae', 'complexity']
     metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
 
-    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False) &
-                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_mask = df['model'].str.contains('fullsr', regex=False, na=False)
     deep_df = df[deep_mask].copy()
 
     def vps_vpr_label(m):
         match = re.search(r'vps(\d+)_vpr(\d+)', m)
         return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
     deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+    # Best R² per (subject, vps/vpr config) across all aps/r2w/λ
+    deep_df = deep_df.loc[deep_df.groupby(['subject', 'label'])['r2'].idxmax()].reset_index(drop=True)
     deep_agg = deep_df.groupby('label')[metrics].mean().reset_index()
 
-    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_mask = df['model'].str.contains(r'^pysr', regex=True, na=False)
     pysr_sub = df[pysr_mask].copy()
+    pysr_sub = pysr_sub.loc[pysr_sub.groupby('subject')['r2'].idxmax()].reset_index(drop=True)
     pysr_sub['label'] = 'PySR (no VPS/VPR)'
 
     csv_df = pd.concat([deep_df[['label'] + metrics], pysr_sub[['label'] + metrics]], ignore_index=True)
@@ -438,29 +516,71 @@ def _pareto_front_steps(complexity, error):
     return pareto
 
 
+def _load_hof_data(model_dir):
+    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
+    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
+    if not os.path.exists(pysr_out):
+        return pd.DataFrame()
+    rows = []
+    for ts in sorted(os.listdir(pysr_out)):
+        hof_file = os.path.join(pysr_out, ts, 'hall_of_fame.csv')
+        if not os.path.exists(hof_file):
+            continue
+        hof = pd.read_csv(hof_file)
+        if 'Complexity' not in hof.columns or 'Loss' not in hof.columns:
+            continue
+        for _, row in hof.iterrows():
+            rows.append({'complexity': int(row['Complexity']), 'loss': float(row['Loss'])})
+    if not rows:
+        return pd.DataFrame()
+    hof_df = pd.DataFrame(rows)
+    agg = hof_df.groupby('complexity')['loss'].mean().reset_index()
+    agg['rmse'] = np.sqrt(agg['loss'])
+    return agg[['complexity', 'rmse']]
+
+
 def plot_pareto_front_rmse(df):
-    """Scatter plot of complexity vs RMSE showing the Pareto front per subject."""
+    """Pareto front per subject: DeepPySR from hall_of_fame, PySR from aggregated variants."""
+    import re
     subjects = df['subject'].unique() if 'subject' in df.columns else [None]
     n_sub = len(subjects)
     fig, axes = plt.subplots(1, n_sub, figsize=(8 * n_sub, 7), squeeze=False)
+
+    subject_to_results_dir = {'mat': 'results_mat_all', 'por': 'results_por_all'}
 
     for ax, subject in zip(axes[0], subjects):
         sub_df = df[df['subject'] == subject] if subject is not None else df
         deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
         pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
-
-        deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
         pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
 
+        # Load full Pareto hall_of_fame for the best DeepPySR model
+        hof_data = pd.DataFrame()
         if not deep_df.empty:
-            pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+            best_name = deep_df.loc[deep_df['r2'].idxmax(), 'model']
+            base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
+            res_dir = subject_to_results_dir.get(subject, f'results_{subject}_all') if subject else 'results_all'
+            model_dir = os.path.join(current_dir, res_dir, 'deeppysr', base_model)
+            hof_data = _load_hof_data(model_dir)
+
+        # Load hall_of_fame for best PySR model (only plotted once saved by save_pysr_hof.py)
+        hof_pysr = pd.DataFrame()
+        if not pysr_df.empty:
+            best_pysr_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '',
+                                    pysr_df.loc[pysr_df['r2'].idxmax(), 'model'])
+            pysr_model_dir = os.path.join(current_dir, res_dir, 'pysr', best_pysr_name)
+            hof_pysr = _load_hof_data(pysr_model_dir)
+
+        if not hof_data.empty:
+            pf = _pareto_front_steps(hof_data['complexity'].tolist(), hof_data['rmse'].tolist())
             if pf:
                 px, py = zip(*pf)
                 ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
                 ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
 
-        if not pysr_df.empty:
-            pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+        if not hof_pysr.empty:
+            pf_pysr = _pareto_front_steps(hof_pysr['complexity'].tolist(), hof_pysr['rmse'].tolist())
             if pf_pysr:
                 px, py = zip(*pf_pysr)
                 ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
@@ -483,6 +603,7 @@ def plot_pareto_front_rmse(df):
 if __name__ == "__main__":
     df = process_results()
     save_results(df)
+    compute_se_and_wilcoxon(df)
     aggregate_feature_importance()
     plot_best_models()
     plot_vps_vpr_ablation(df)

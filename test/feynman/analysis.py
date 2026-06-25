@@ -13,7 +13,9 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from feynman_utils import equations
-from analysis_utils import calculate_metrics, get_best_formula_from_raw
+from analysis_utils import (calculate_metrics, get_best_formula_from_raw,
+                             collect_model_fold_data, se_from_fold_data,
+                             run_wilcoxon_analysis, compute_se)
 
 def select_pareto_optimal(formulas_dict):
     """
@@ -130,6 +132,91 @@ def process_results():
     result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
     return result_df
+
+
+def _best_model_subdir(parent_dir):
+    """Return the subdirectory under parent_dir whose overall_metrics.csv has the highest R²."""
+    if not os.path.isdir(parent_dir):
+        return None
+    best_r2, best_dir = -1.0, None
+    for name in os.listdir(parent_dir):
+        path = os.path.join(parent_dir, name)
+        metrics_path = os.path.join(path, 'overall_metrics.csv')
+        if os.path.isdir(path) and os.path.exists(metrics_path):
+            try:
+                r2 = pd.read_csv(metrics_path)['r2'].max()
+                if r2 > best_r2:
+                    best_r2, best_dir = r2, path
+            except Exception:
+                pass
+    return best_dir
+
+
+def compute_se_and_wilcoxon(result_df):
+    """Compute per-fold SE and Wilcoxon vs DeepPySR for each Feynman equation."""
+    from feynman_utils import load_feynman_data
+    task = 'regression'
+
+    all_se_data = {}  # (eq_name, model_name) -> se_dict
+
+    for eq_name in equations.keys():
+        eq_key = eq_name.replace('.', '_')
+        base_dir = os.path.join(current_dir, f"results_{eq_key}_all")
+        X_df, y_true = load_feynman_data(eq_name, n_samples=1000)
+        eq_df = result_df[result_df['equation'] == eq_name]
+
+        fold_data = {}
+
+        baselines_dir = os.path.join(base_dir, "baselines")
+        if os.path.exists(baselines_dir):
+            for model_name in os.listdir(baselines_dir):
+                model_path = os.path.join(baselines_dir, model_name)
+                if not os.path.isdir(model_path):
+                    continue
+                row = eq_df[eq_df['model'] == model_name]
+                formula = row['formula'].iloc[0] if not row.empty else ""
+                fold_data[model_name] = collect_model_fold_data(
+                    model_path, formula, X_df, y_true, task,
+                    model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+        deep_row = eq_df[eq_df['model'] == 'DeepPySR']
+        if not deep_row.empty:
+            deep_model_dir = _best_model_subdir(os.path.join(base_dir, 'deeppysr'))
+            fold_data['DeepPySR'] = collect_model_fold_data(
+                deep_model_dir or base_dir, deep_row.iloc[0]['formula'],
+                X_df, y_true, task, model_type='deeppysr')
+
+        pysr_row = eq_df[eq_df['model'] == 'PySR']
+        if not pysr_row.empty:
+            pysr_model_dir = _best_model_subdir(os.path.join(base_dir, 'pysr'))
+            fold_data['PySR'] = collect_model_fold_data(
+                pysr_model_dir or base_dir, pysr_row.iloc[0]['formula'],
+                X_df, y_true, task, model_type='pysr')
+
+        for model_name, fd in fold_data.items():
+            if fd is not None:
+                ses = se_from_fold_data(fd)
+                ses['n_folds'] = len(fd)
+                all_se_data[(eq_name, model_name)] = ses
+
+        run_wilcoxon_analysis(fold_data, 'DeepPySR', task,
+                              output_file=os.path.join(current_dir, f"wilcoxon_results_{eq_key}.csv"))
+
+    # Merge SE into aggregated_results.csv
+    agg_csv = os.path.join(current_dir, 'aggregated_results.csv')
+    if all_se_data and os.path.exists(agg_csv):
+        agg_df = pd.read_csv(agg_csv)
+        first_se = next(iter(all_se_data.values()))
+        se_cols = [c for c in first_se.keys() if c != 'n_folds']
+        for col in se_cols + ['n_folds']:
+            agg_df[col] = np.nan
+        for i, row in agg_df.iterrows():
+            key = (row['equation'], row['model'])
+            if key in all_se_data:
+                for col in se_cols + ['n_folds']:
+                    agg_df.at[i, col] = all_se_data[key].get(col, np.nan)
+        agg_df.to_csv(agg_csv, index=False)
+        print(f"SE merged into {agg_csv}")
 
 def save_best_formulas(df):
     """
@@ -329,7 +416,7 @@ def process_ablation_data():
 
 
 def plot_vps_vpr_ablation(ablation_df):
-    """Ablation: VPS/VPR effect with fixed APS=10.0, r2w=1.0, λ=0.01. Per-equation bar charts."""
+    """Ablation: VPS/VPR effect — best R² across all aps/r2w/λ per config. Per-equation bar charts."""
     import re
     from matplotlib.patches import Patch
 
@@ -337,19 +424,20 @@ def plot_vps_vpr_ablation(ablation_df):
     metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
     df = ablation_df
 
-    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False) &
-                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_mask = df['model'].str.contains('fullsr', regex=False, na=False)
     deep_df = df[deep_mask].copy()
 
     def vps_vpr_label(m):
         match = re.search(r'vps(\d+)_vpr(\d+)', m)
         return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
     deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+    # For each (equation, vps/vpr config), keep the row with highest R²
+    deep_df = deep_df.loc[deep_df.groupby(['equation', 'label'])['r2'].idxmax()].reset_index(drop=True)
 
-    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_mask = df['model'].str.contains(r'^pysr', regex=True, na=False)
     pysr_df = df[pysr_mask].copy()
+    # Best PySR per equation across all aps/r2w/λ
+    pysr_df = pysr_df.loc[pysr_df.groupby('equation')['r2'].idxmax()].reset_index(drop=True)
     pysr_df['label'] = 'PySR (no VPS/VPR)'
 
     # Save CSV
@@ -519,11 +607,36 @@ def _pareto_front_steps(complexity, error):
     return pareto
 
 
+def _load_hof_data(model_dir):
+    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
+    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
+    if not os.path.exists(pysr_out):
+        return pd.DataFrame()
+    rows = []
+    for ts in sorted(os.listdir(pysr_out)):
+        hof_file = os.path.join(pysr_out, ts, 'hall_of_fame.csv')
+        if not os.path.exists(hof_file):
+            continue
+        hof = pd.read_csv(hof_file)
+        if 'Complexity' not in hof.columns or 'Loss' not in hof.columns:
+            continue
+        for _, row in hof.iterrows():
+            rows.append({'complexity': int(row['Complexity']), 'loss': float(row['Loss'])})
+    if not rows:
+        return pd.DataFrame()
+    hof_df = pd.DataFrame(rows)
+    agg = hof_df.groupby('complexity')['loss'].mean().reset_index()
+    agg['rmse'] = np.sqrt(agg['loss'])
+    return agg[['complexity', 'rmse']]
+
+
 def plot_pareto_front_rmse(ablation_df):
-    """Scatter plot of complexity vs RMSE showing the Pareto front per Feynman equation."""
-    eq_names = list(equations.keys())
+    """Pareto front per Feynman equation: DeepPySR from hall_of_fame, PySR from aggregated variants."""
+    import re
+    eq_names = [e for e in equations.keys() if e != 'I.8.14']
     n_eq = len(eq_names)
-    ncols = min(n_eq, 3)
+    ncols = 2
     nrows = (n_eq + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows, ncols, figsize=(8 * ncols, 6 * nrows), squeeze=False)
     axes_flat = axes.flatten()
@@ -533,19 +646,38 @@ def plot_pareto_front_rmse(ablation_df):
         sub_df = ablation_df[ablation_df['equation'] == eq_name]
         deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
         pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
-
-        deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
         pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
 
+        # Load full Pareto hall_of_fame for the best DeepPySR model for this equation
+        hof_data = pd.DataFrame()
+        eq_key = eq_name.replace('.', '_')
         if not deep_df.empty:
-            pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+            best_name = deep_df.loc[deep_df['r2'].idxmax(), 'model']
+            base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
+            model_dir = os.path.join(current_dir, f'results_{eq_key}_all', 'deeppysr', base_model)
+            hof_data = _load_hof_data(model_dir)
+
+        # Load hall_of_fame for best PySR model with available data.
+        # Multiple variants may tie on r2; iterate in descending r2 order and pick
+        # the first variant that actually has pysr_outputs/y/ hall_of_fame files.
+        hof_pysr = pd.DataFrame()
+        if not pysr_df.empty:
+            for _, pysr_row in pysr_df.sort_values('r2', ascending=False).iterrows():
+                candidate_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', pysr_row['model'])
+                candidate_dir = os.path.join(current_dir, f'results_{eq_key}_all', 'pysr', candidate_name)
+                hof_pysr = _load_hof_data(candidate_dir)
+                if not hof_pysr.empty:
+                    break
+
+        if not hof_data.empty:
+            pf = _pareto_front_steps(hof_data['complexity'].tolist(), hof_data['rmse'].tolist())
             if pf:
                 px, py = zip(*pf)
                 ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
                 ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
 
-        if not pysr_df.empty:
-            pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+        if not hof_pysr.empty:
+            pf_pysr = _pareto_front_steps(hof_pysr['complexity'].tolist(), hof_pysr['rmse'].tolist())
             if pf_pysr:
                 px, py = zip(*pf_pysr)
                 ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
@@ -570,6 +702,7 @@ def plot_pareto_front_rmse(ablation_df):
 if __name__ == "__main__":
     df = process_results()
     save_best_formulas(df)
+    compute_se_and_wilcoxon(df)
     plot_best_models()
     ablation_df = process_ablation_data()
     plot_vps_vpr_ablation(ablation_df)

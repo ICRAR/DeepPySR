@@ -85,6 +85,120 @@ def get_age_filtered_feature_cols(non_bmi_cols: list, target_year: int) -> list:
             if (age := _col_age(c)) is None or age < target_year]
 
 
+def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
+    """Add birthbmiz, y1bmiz (WHO pygrowup), and y5bmiz (CDC zscore.py) columns.
+
+    birth_weight is in grams, heights in cm, y1/y5 weights in kg — consistent
+    with the prep.py convention in Projects/pgs.
+    """
+    import sys as _sys
+    _pgs_root = str(Path('/home/00101787/Projects/pgs'))
+    if _pgs_root not in _sys.path:
+        _sys.path.insert(0, _pgs_root)
+    from bmizscore.zscore import get_bmiz_singlevalue
+    from pygrowup import Calculator
+
+    df = df.copy()
+
+    sex_col = next((c for c in ('sex_x', 'sex') if c in df.columns), None)
+    if sex_col is None:
+        print("  [early_bmiz] WARNING: no sex column found; skipping")
+        return df
+
+    def _sex_str(val):
+        """1→'M', 2→'F', else None."""
+        try:
+            return {1: 'M', 2: 'F'}.get(int(float(val)))
+        except (TypeError, ValueError):
+            return None
+
+    def _sex_int(val):
+        """1 or 2 for CDC calculator, else None."""
+        try:
+            v = int(float(val))
+            return v if v in (1, 2) else None
+        except (TypeError, ValueError):
+            return None
+
+    # WHO growth standard Calculator for birth and age-1
+    _calc_who = Calculator(
+        adjust_height_data=False,
+        adjust_weight_scores=False,
+        include_cdc=False,
+        logger_name='pygrowup',
+        log_level='ERROR',
+    )
+
+    # ── birthbmiz ─────────────────────────────────────────────────────────────
+    if 'birth_weight' in df.columns and 'birth_length' in df.columns:
+        birth_bmiz = []
+        for _, row in df.iterrows():
+            try:
+                bw = float(row['birth_weight'])   # grams
+                bl = float(row['birth_length'])   # cm
+                sx = _sex_str(row[sex_col])
+                if pd.isna(bw) or pd.isna(bl) or sx is None:
+                    birth_bmiz.append(np.nan)
+                    continue
+                bmi = bw / 1000.0 / (bl ** 2) * 10000.0
+                z = _calc_who.bmifa(measurement=bmi, age_in_months=0, sex=sx, height=bl)
+                birth_bmiz.append(float(z) if z is not None else np.nan)
+            except Exception:
+                birth_bmiz.append(np.nan)
+        df['birthbmiz'] = birth_bmiz
+        print(f"  birthbmiz: {int(pd.Series(birth_bmiz).notna().sum())}/{len(df)} valid")
+    else:
+        print("  [early_bmiz] WARNING: birth_weight or birth_length missing; skipping birthbmiz")
+
+    # ── y1bmiz ────────────────────────────────────────────────────────────────
+    if 'y1_a1' in df.columns and 'y1_a2' in df.columns:
+        age1_col = next((c for c in ('height_age12', 'weight_age12') if c in df.columns), None)
+        y1_bmiz = []
+        for _, row in df.iterrows():
+            try:
+                w1 = float(row['y1_a1'])   # kg
+                h1 = float(row['y1_a2'])   # cm
+                sx = _sex_str(row[sex_col])
+                agemos = (float(row[age1_col])
+                          if age1_col and pd.notna(row.get(age1_col)) else 12.0)
+                if pd.isna(w1) or pd.isna(h1) or sx is None:
+                    y1_bmiz.append(np.nan)
+                    continue
+                bmi = w1 / (h1 ** 2) * 10000.0
+                z = _calc_who.bmifa(measurement=bmi, age_in_months=agemos, sex=sx, height=h1)
+                y1_bmiz.append(float(z) if z is not None else np.nan)
+            except Exception:
+                y1_bmiz.append(np.nan)
+        df['y1bmiz'] = y1_bmiz
+        print(f"  y1bmiz: {int(pd.Series(y1_bmiz).notna().sum())}/{len(df)} valid")
+    else:
+        print("  [early_bmiz] WARNING: y1_a1 or y1_a2 missing; skipping y1bmiz")
+
+    # ── y5bmiz ────────────────────────────────────────────────────────────────
+    if 'y5_a1' in df.columns and 'y5_a2' in df.columns and 'y5_age' in df.columns:
+        y5_bmiz = []
+        for _, row in df.iterrows():
+            try:
+                w5 = float(row['y5_a1'])    # kg
+                h5 = float(row['y5_a2'])    # cm
+                agey = float(row['y5_age']) # years
+                sx = _sex_int(row[sex_col])
+                if pd.isna(w5) or pd.isna(h5) or pd.isna(agey) or sx is None:
+                    y5_bmiz.append(np.nan)
+                    continue
+                z = get_bmiz_singlevalue(agemos=agey * 12, sex_m1f2=sx,
+                                         height_cm=h5, weight_kg=w5)
+                y5_bmiz.append(float(z) if z is not None else np.nan)
+            except Exception:
+                y5_bmiz.append(np.nan)
+        df['y5bmiz'] = y5_bmiz
+        print(f"  y5bmiz: {int(pd.Series(y5_bmiz).notna().sum())}/{len(df)} valid")
+    else:
+        print("  [early_bmiz] WARNING: y5_a1, y5_a2, or y5_age missing; skipping y5bmiz")
+
+    return df
+
+
 def _build_merged_bmi() -> pd.DataFrame:
     """Load merged.csv + G1 + G2 and return a preprocessed DataFrame."""
     raine = pd.read_csv(_RAINE_PATH, low_memory=False)
@@ -241,6 +355,11 @@ def prepare_base_dataset():
 
     print(f"\n=== Imputing non-BMI variables ({len(non_bmi_cols)} cols) ===")
     merged = smart_impute(merged, non_bmi_cols)
+
+    print("\n=== Computing early BMI z-scores (birthbmiz, y1bmiz, y5bmiz) ===")
+    merged = _compute_early_bmiz(merged)
+    new_bmiz_cols = [c for c in ('birthbmiz', 'y1bmiz', 'y5bmiz') if c in merged.columns]
+    non_bmi_cols = non_bmi_cols + [c for c in new_bmiz_cols if c not in non_bmi_cols]
 
     merged = merged.copy()
 

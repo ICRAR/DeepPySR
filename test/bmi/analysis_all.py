@@ -19,7 +19,9 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from bmi_utils import load_bmi_agg_data
-from analysis_utils import calculate_metrics, evaluate_formula, get_best_formula_from_raw
+from analysis_utils import (calculate_metrics, evaluate_formula, get_best_formula_from_raw,
+                             collect_model_fold_data, se_from_fold_data,
+                             run_wilcoxon_analysis, compute_se)
 
 def process_results():
     base_dir = os.path.join(current_dir, "results_bmi_all")
@@ -207,6 +209,130 @@ def process_results():
     result_df.to_csv(os.path.join(base_dir, "bmi_aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(base_dir, 'bmi_aggregated_results.csv')}")
     return result_df
+
+
+def compute_se_and_wilcoxon(result_df):
+    """Compute per-fold SE and Wilcoxon vs DeepPySR (best R²) for each BMI age target.
+
+    BMI uses GroupKFold (participant IDs as groups), so fold_metrics.csv from run_cv
+    is the primary source.  Formula evaluation uses KFold as a close approximation
+    when fold_metrics.csv is not available.
+    """
+    task = 'regression'
+    base_dir = os.path.join(current_dir, "results_bmi_all")
+    ages = [8, 10, 14, 17, 20, 23, 27]
+
+    age_se_maps = {}  # age -> se_map
+
+    for age in ages:
+        _, X_age, y_age = load_bmi_agg_data(age=age)
+        age_dir = os.path.join(base_dir, "age_specific", f"age_{age}")
+        age_df = result_df[(result_df['age'] == age) & (result_df['type'] == 'age-specific')]
+
+        fold_data = {}
+
+        baselines_dir = os.path.join(age_dir, "baselines")
+        if os.path.exists(baselines_dir):
+            for model_name in os.listdir(baselines_dir):
+                model_path = os.path.join(baselines_dir, model_name)
+                if not os.path.isdir(model_path):
+                    continue
+                row = age_df[age_df['model'] == model_name]
+                formula = row['formula'].iloc[0] if not row.empty else ""
+                fold_data[model_name] = collect_model_fold_data(
+                    model_path, formula, X_age, y_age, task,
+                    model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+        deep_row = age_df[age_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
+        if not deep_row.empty:
+            best_row = deep_row.loc[deep_row['r2'].idxmax()]
+            fold_data['DeepPySR_best'] = collect_model_fold_data(
+                age_dir, best_row['formula'], X_age, y_age, task, model_type='deeppysr')
+
+        pysr_row = age_df[age_df['model'].str.contains('pysr', na=False)]
+        if not pysr_row.empty:
+            best_pysr = pysr_row.loc[pysr_row['r2'].idxmax()]
+            fold_data['PySR'] = collect_model_fold_data(
+                age_dir, best_pysr['formula'], X_age, y_age, task, model_type='pysr')
+
+        se_map = {}
+        for model_name, fd in fold_data.items():
+            if fd is not None:
+                ses = se_from_fold_data(fd)
+                ses['n_folds'] = len(fd)
+                se_map[model_name] = ses
+        age_se_maps[age] = se_map
+
+        run_wilcoxon_analysis(fold_data, 'DeepPySR_best', task,
+                              output_file=os.path.join(current_dir, f"wilcoxon_results_age{age}.csv"))
+
+    # Longitudinal SE
+    ids_all, X_all, y_all = load_bmi_agg_data()
+    long_dir = os.path.join(base_dir, "longitudinal")
+    long_df = result_df[result_df['type'] == 'longitudinal']
+
+    long_fold_data = {}
+    long_baselines_dir = os.path.join(long_dir, "baselines")
+    if os.path.exists(long_baselines_dir):
+        for model_name in os.listdir(long_baselines_dir):
+            model_path = os.path.join(long_baselines_dir, model_name)
+            if not os.path.isdir(model_path):
+                continue
+            row = long_df[long_df['model'] == model_name]
+            formula = row['formula'].iloc[0] if not row.empty else ""
+            long_fold_data[model_name] = collect_model_fold_data(
+                model_path, formula, X_all, y_all, task,
+                model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+    deep_long = long_df[long_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
+    if not deep_long.empty:
+        best_row = deep_long.loc[deep_long['r2'].idxmax()]
+        long_fold_data['DeepPySR_best'] = collect_model_fold_data(
+            long_dir, best_row['formula'], X_all, y_all, task, model_type='deeppysr')
+
+    pysr_long = long_df[long_df['model'].str.contains('pysr', na=False)]
+    if not pysr_long.empty:
+        best_pysr = pysr_long.loc[pysr_long['r2'].idxmax()]
+        long_fold_data['PySR'] = collect_model_fold_data(
+            long_dir, best_pysr['formula'], X_all, y_all, task, model_type='pysr')
+
+    long_se_map = {}
+    for model_name, fd in long_fold_data.items():
+        if fd is not None:
+            ses = se_from_fold_data(fd)
+            ses['n_folds'] = len(fd)
+            long_se_map[model_name] = ses
+
+    run_wilcoxon_analysis(long_fold_data, 'DeepPySR_best', task,
+                          output_file=os.path.join(current_dir, 'wilcoxon_results_longitudinal.csv'))
+
+    # Merge SE into bmi_best_models_metrics.csv
+    metrics_csv_path = os.path.join(current_dir, 'results_bmi_all', 'bmi_best_models_metrics.csv')
+    display_to_fold = {
+        'Best DeepPySR': 'DeepPySR_best',
+        'Interpretable DeepPySR': 'DeepPySR_best',
+        'PySR': 'PySR',
+    }
+    if os.path.exists(metrics_csv_path):
+        metrics_df = pd.read_csv(metrics_csv_path)
+        first_se = next(
+            (s for sm in [age_se_maps.get(a, {}) for a in ages] + [long_se_map]
+             for s in sm.values()), {}
+        )
+        se_cols = [c for c in first_se.keys() if c != 'n_folds']
+        for col in se_cols + ['n_folds']:
+            metrics_df[col] = np.nan
+        for i, row in metrics_df.iterrows():
+            fold_key = display_to_fold.get(row['display_model'], row['display_model'])
+            if row['type'] == 'age-specific':
+                sm = age_se_maps.get(int(row['age']), {})
+            else:
+                sm = long_se_map
+            if fold_key in sm:
+                for col in se_cols + ['n_folds']:
+                    metrics_df.at[i, col] = sm[fold_key].get(col, np.nan)
+        metrics_df.to_csv(metrics_csv_path, index=False)
+        print(f"SE merged into {metrics_csv_path}")
 
 def plot_results(df):
     """
@@ -659,19 +785,20 @@ def plot_vps_vpr_ablation(df):
     types = ['longitudinal', 'age-specific']
     results_dir = os.path.join(current_dir, 'results_bmi_all')
 
-    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False) &
-                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_mask = df['model'].str.contains('fullsr', regex=False, na=False)
     deep_df = df[deep_mask].copy()
 
     def vps_vpr_label(m):
         match = re.search(r'vps(\d+)_vpr(\d+)', m)
         return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
     deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+    # Best R² per (age, type, vps/vpr config) across all aps/r2w/λ
+    deep_df = deep_df.loc[deep_df.groupby(['age', 'type', 'label'])['r2'].idxmax()].reset_index(drop=True)
 
-    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_mask = df['model'].str.contains(r'^pysr', regex=True, na=False)
     pysr_df = df[pysr_mask].copy()
+    # Best PySR per (age, type)
+    pysr_df = pysr_df.loc[pysr_df.groupby(['age', 'type'])['r2'].idxmax()].reset_index(drop=True)
     pysr_df['label'] = 'PySR (no VPS/VPR)'
 
     # Save CSV with per-age data
@@ -850,12 +977,36 @@ def _pareto_front_steps(complexity, error):
     return pareto
 
 
+def _load_hof_data(model_dir):
+    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
+    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
+    if not os.path.exists(pysr_out):
+        return pd.DataFrame()
+    rows = []
+    for ts in sorted(os.listdir(pysr_out)):
+        hof_file = os.path.join(pysr_out, ts, 'hall_of_fame.csv')
+        if not os.path.exists(hof_file):
+            continue
+        hof = pd.read_csv(hof_file)
+        if 'Complexity' not in hof.columns or 'Loss' not in hof.columns:
+            continue
+        for _, row in hof.iterrows():
+            rows.append({'complexity': int(row['Complexity']), 'loss': float(row['Loss'])})
+    if not rows:
+        return pd.DataFrame()
+    hof_df = pd.DataFrame(rows)
+    agg = hof_df.groupby('complexity')['loss'].mean().reset_index()
+    agg['rmse'] = np.sqrt(agg['loss'])
+    return agg[['complexity', 'rmse']]
+
+
 def plot_pareto_front_rmse(df):
-    """Scatter plot of complexity vs RMSE showing the Pareto front, one subplot per age."""
+    """Pareto front per age: DeepPySR from hall_of_fame, PySR from aggregated variants."""
     results_dir = os.path.join(current_dir, 'results_bmi_all')
     ages = sorted(df['age'].unique()) if 'age' in df.columns else [None]
     n_ages = len(ages)
-    ncols = min(n_ages, 4)
+    ncols = 2
     nrows = (n_ages + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 6 * nrows), squeeze=False)
     axes_flat = axes.flatten()
@@ -865,19 +1016,33 @@ def plot_pareto_front_rmse(df):
         sub_df = df[df['age'] == age] if age is not None else df
         deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
         pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
-
-        deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
         pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
 
+        # Load full Pareto hall_of_fame for the best DeepPySR model for this age
+        hof_data = pd.DataFrame()
         if not deep_df.empty:
-            pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+            best_name = deep_df.loc[deep_df['r2'].idxmax(), 'model']
+            base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
+            age_dir = os.path.join(results_dir, 'age_specific', f'age_{age}', 'deeppysr', base_model)
+            hof_data = _load_hof_data(age_dir)
+
+        # Load hall_of_fame for best PySR model (only plotted once saved by save_pysr_hof.py)
+        hof_pysr = pd.DataFrame()
+        if not pysr_df.empty:
+            best_pysr_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '',
+                                    pysr_df.loc[pysr_df['r2'].idxmax(), 'model'])
+            pysr_age_dir = os.path.join(results_dir, 'age_specific', f'age_{age}', 'pysr', best_pysr_name)
+            hof_pysr = _load_hof_data(pysr_age_dir)
+
+        if not hof_data.empty:
+            pf = _pareto_front_steps(hof_data['complexity'].tolist(), hof_data['rmse'].tolist())
             if pf:
                 px, py = zip(*pf)
                 ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
                 ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
 
-        if not pysr_df.empty:
-            pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+        if not hof_pysr.empty:
+            pf_pysr = _pareto_front_steps(hof_pysr['complexity'].tolist(), hof_pysr['rmse'].tolist())
             if pf_pysr:
                 px, py = zip(*pf_pysr)
                 ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
@@ -914,6 +1079,7 @@ if __name__ == "__main__":
     # For other models, we do it by assessing the metrics on the predictions.csv
 
     plot_results(df)
+    compute_se_and_wilcoxon(df)
 
     plot_settings_comparison(df)
     aggregate_feature_importance()

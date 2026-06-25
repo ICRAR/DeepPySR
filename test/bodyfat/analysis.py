@@ -13,7 +13,9 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from bodyfat_utils import load_bodyfat_data
-from analysis_utils import calculate_metrics, get_best_formula_from_raw
+from analysis_utils import (calculate_metrics, get_best_formula_from_raw,
+                             collect_model_fold_data, se_from_fold_data,
+                             run_wilcoxon_analysis, compute_se)
 
 def process_results():
     all_data = []
@@ -123,6 +125,75 @@ def process_results():
     result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
     return result_df
+
+
+def compute_se_and_wilcoxon(result_df):
+    """Compute per-fold SE for each model and run Wilcoxon vs DeepPySR (best)."""
+    X, y = load_bodyfat_data()
+    task = 'regression'
+    base_dir = os.path.join(current_dir, "results_bodyfat_all")
+
+    fold_data = {}
+
+    # Baselines
+    baselines_dir = os.path.join(base_dir, "baselines")
+    if os.path.exists(baselines_dir):
+        for model_name in os.listdir(baselines_dir):
+            model_path = os.path.join(baselines_dir, model_name)
+            if not os.path.isdir(model_path):
+                continue
+            row = result_df[result_df['model'] == model_name]
+            formula = row['formula'].iloc[0] if not row.empty else ""
+            fold_data[model_name] = collect_model_fold_data(
+                model_path, formula, X, y, task, model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
+
+    # DeepPySR best
+    deeppysr_df = result_df[result_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
+    if not deeppysr_df.empty:
+        best_row = deeppysr_df.loc[deeppysr_df['r2'].idxmax()]
+        formula = best_row['formula']
+        fold_data['DeepPySR_best'] = collect_model_fold_data(
+            base_dir, formula, X, y, task, model_type='deeppysr')
+
+    # PySR best
+    pysr_df = result_df[result_df['model'].str.contains('pysr', na=False)]
+    if not pysr_df.empty:
+        best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()]
+        formula = best_pysr['formula']
+        fold_data['PySR'] = collect_model_fold_data(
+            base_dir, formula, X, y, task, model_type='pysr')
+
+    # SE summary — merge into best_models_metrics CSV
+    se_map = {}
+    for model_name, fd in fold_data.items():
+        if fd is not None:
+            ses = se_from_fold_data(fd)
+            ses['n_folds'] = len(fd)
+            se_map[model_name] = ses
+
+    display_to_fold = {
+        'Best DeepPySR': 'DeepPySR_best',
+        'Interpretable DeepPySR': 'DeepPySR_best',
+        'Best PySR': 'PySR',
+    }
+
+    metrics_csv_path = os.path.join(current_dir, 'bodyfat_best_models_metrics.csv')
+    if se_map and os.path.exists(metrics_csv_path):
+        metrics_df = pd.read_csv(metrics_csv_path)
+        se_cols = [c for c in next(iter(se_map.values())).keys() if c != 'n_folds']
+        for col in se_cols + ['n_folds']:
+            metrics_df[col] = np.nan
+        for i, row in metrics_df.iterrows():
+            fold_key = display_to_fold.get(row['display_model'], row['display_model'])
+            if fold_key in se_map:
+                for col in se_cols + ['n_folds']:
+                    metrics_df.at[i, col] = se_map[fold_key].get(col, np.nan)
+        metrics_df.to_csv(metrics_csv_path, index=False)
+        print(f"SE merged into {metrics_csv_path}")
+
+    # Wilcoxon
+    wilcoxon_out = os.path.join(current_dir, "wilcoxon_results.csv")
+    run_wilcoxon_analysis(fold_data, 'DeepPySR_best', task, output_file=wilcoxon_out)
 
 def save_results(df):
     """
@@ -302,7 +373,7 @@ def plot_best_models():
     print(f"Plot saved to {plot_path}")
 
 def plot_vps_vpr_ablation(df):
-    """Ablation: VPS/VPR effect with fixed APS=10.0, r2w=1.0, λ=0.01."""
+    """Ablation: VPS/VPR effect — best R² across all aps/r2w/λ per config."""
     import re
     from matplotlib.patches import Patch
 
@@ -310,19 +381,19 @@ def plot_vps_vpr_ablation(df):
     metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
     results_dir = os.path.join(current_dir, 'results_bodyfat_all')
 
-    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False) &
-                 df['model'].str.contains('_r2w1.0_L0.01', regex=False, na=False))
+    deep_mask = df['model'].str.contains('fullsr', regex=False, na=False)
     deep_df = df[deep_mask].copy()
 
     def vps_vpr_label(m):
         match = re.search(r'vps(\d+)_vpr(\d+)', m)
         return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
     deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
+    # Keep best R² per vps/vpr config across all aps/r2w/λ
+    deep_df = deep_df.loc[deep_df.groupby('label')['r2'].idxmax()].reset_index(drop=True)
 
-    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
+    pysr_mask = df['model'].str.contains(r'^pysr', regex=True, na=False)
     pysr_sub = df[pysr_mask].copy()
+    pysr_sub = pysr_sub.loc[[pysr_sub['r2'].idxmax()]].reset_index(drop=True)
     pysr_sub['label'] = 'PySR (no VPS/VPR)'
 
     csv_df = pd.concat([deep_df[['label'] + metrics], pysr_sub[['label'] + metrics]], ignore_index=True)
@@ -459,31 +530,70 @@ def _pareto_front_steps(complexity, error):
     return pareto
 
 
+def _load_hof_data(model_dir):
+    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
+    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
+    if not os.path.exists(pysr_out):
+        return pd.DataFrame()
+    rows = []
+    for ts in sorted(os.listdir(pysr_out)):
+        hof_file = os.path.join(pysr_out, ts, 'hall_of_fame.csv')
+        if not os.path.exists(hof_file):
+            continue
+        hof = pd.read_csv(hof_file)
+        if 'Complexity' not in hof.columns or 'Loss' not in hof.columns:
+            continue
+        for _, row in hof.iterrows():
+            rows.append({'complexity': int(row['Complexity']), 'loss': float(row['Loss'])})
+    if not rows:
+        return pd.DataFrame()
+    hof_df = pd.DataFrame(rows)
+    agg = hof_df.groupby('complexity')['loss'].mean().reset_index()
+    agg['rmse'] = np.sqrt(agg['loss'])
+    return agg[['complexity', 'rmse']]
+
+
 def plot_pareto_front_rmse(df):
-    """Scatter plot of complexity vs RMSE showing the Pareto front for DeepPySR and PySR variants."""
+    """Pareto front of complexity vs RMSE: DeepPySR from hall_of_fame, PySR from aggregated variants."""
+    import re
     results_dir = os.path.join(current_dir, 'results_bodyfat_all')
 
     deep_df = df[df['model'].str.contains('fullsr', regex=False, na=False)].copy()
     pysr_df = df[df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
-
-    deep_df = deep_df[deep_df['rmse'].notna() & deep_df['complexity'].notna()]
     pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
 
-    if deep_df.empty and pysr_df.empty:
+    # Load full Pareto hall_of_fame for the best DeepPySR model
+    hof_data = pd.DataFrame()
+    if not deep_df.empty:
+        best_name = deep_df.loc[deep_df['r2'].idxmax(), 'model']
+        base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
+        model_dir = os.path.join(current_dir, 'results_bodyfat_all', 'deeppysr', base_model)
+        hof_data = _load_hof_data(model_dir)
+
+    # Load hall_of_fame for best PySR model (only plotted once saved by save_pysr_hof.py)
+    hof_pysr = pd.DataFrame()
+    if not pysr_df.empty:
+        best_pysr_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '',
+                                pysr_df.loc[pysr_df['r2'].idxmax(), 'model'])
+        pysr_model_dir = os.path.join(current_dir, 'results_bodyfat_all', 'pysr', best_pysr_name)
+        hof_pysr = _load_hof_data(pysr_model_dir)
+
+    if hof_data.empty and hof_pysr.empty:
         print("No data for pareto front RMSE plot")
         return
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    if not deep_df.empty:
-        pf = _pareto_front_steps(deep_df['complexity'].tolist(), deep_df['rmse'].tolist())
+    if not hof_data.empty:
+        pf = _pareto_front_steps(hof_data['complexity'].tolist(), hof_data['rmse'].tolist())
         if pf:
             px, py = zip(*pf)
             ax.step(px, py, where='post', color='#2166ac', linewidth=2, zorder=4)
             ax.scatter(px, py, c='#2166ac', s=100, zorder=5, marker='D', label='DeepPySR')
 
-    if not pysr_df.empty:
-        pf_pysr = _pareto_front_steps(pysr_df['complexity'].tolist(), pysr_df['rmse'].tolist())
+    if not hof_pysr.empty:
+        pf_pysr = _pareto_front_steps(hof_pysr['complexity'].tolist(), hof_pysr['rmse'].tolist())
         if pf_pysr:
             px, py = zip(*pf_pysr)
             ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
@@ -508,6 +618,7 @@ if __name__ == "__main__":
     df = process_results()
 
     save_results(df)
+    compute_se_and_wilcoxon(df)
     aggregate_feature_importance()
     plot_best_models()
     plot_vps_vpr_ablation(df)
