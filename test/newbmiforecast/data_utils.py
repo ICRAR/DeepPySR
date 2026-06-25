@@ -91,10 +91,6 @@ def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
     birth_weight is in grams, heights in cm, y1/y5 weights in kg — consistent
     with the prep.py convention in Projects/pgs.
     """
-    import sys as _sys
-    _pgs_root = str(Path('/home/00101787/Projects/pgs'))
-    if _pgs_root not in _sys.path:
-        _sys.path.insert(0, _pgs_root)
     from bmizscore.zscore import get_bmiz_singlevalue
     from pygrowup import Calculator
 
