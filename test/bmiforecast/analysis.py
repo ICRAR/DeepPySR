@@ -788,9 +788,194 @@ def save_all_model_details(out_dir):
     return df
 
 
+# ── CDC / WHO growth chart helpers ────────────────────────────────────────────
+
+_CDC_BMI_LMS_CACHE = {}
+_CDC_BMI_EXT_CACHE = {}
+
+_CDC_BMI_EXT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'newbmiforecast', 'bmizscore', 'bmi-age-2022.csv',
+)
+
+def _load_cdc_bmi_extended(sex):
+    """Load pre-computed CDC extended BMI-for-age percentiles. sex: 1=male, 2=female."""
+    if sex in _CDC_BMI_EXT_CACHE:
+        return _CDC_BMI_EXT_CACHE[sex]
+    if not os.path.exists(_CDC_BMI_EXT_PATH):
+        return None
+    df = pd.read_csv(_CDC_BMI_EXT_PATH)
+    sub = df[df['sex'] == sex].sort_values('agemos').reset_index(drop=True)
+    _CDC_BMI_EXT_CACHE[sex] = sub
+    return sub
+
+def _load_cdc_bmi_lms(sex):
+    """Load CDC BMI-for-age LMS data from CDCref_d.csv. sex: 1=male, 2=female."""
+    if sex in _CDC_BMI_LMS_CACHE:
+        return _CDC_BMI_LMS_CACHE[sex]
+    cdc_path = os.path.join('/home/00101787/Projects/pgs', 'bmizscore', 'CDCref_d.csv')
+    if not os.path.exists(cdc_path):
+        return None
+    df = pd.read_csv(cdc_path)
+    bmi = df[(df['SEX'] == sex) & df['_LBMI1'].notna()].copy()
+    bmi['age_mid_months'] = (bmi['_AGEMOS1'] + bmi['_AGEMOS2']) / 2.0
+    bmi = bmi.sort_values('age_mid_months').reset_index(drop=True)
+    _CDC_BMI_LMS_CACHE[sex] = bmi
+    return bmi
+
+
+def _bmi_from_z_lms(z, L, M, S):
+    """Convert LMS z-score to actual BMI.
+
+    Uses M*(1+L*S*z)^(1/L) for |z|≤3; beyond ±3 SD applies the WHO/CDC
+    linear extrapolation to avoid formula breakdown at extreme percentiles.
+    """
+    L, M, S, z = float(L), float(M), float(S), float(z)
+
+    def _lms(zz):
+        if abs(L) >= 0.01:
+            val = 1.0 + L * S * zz
+            return M * val ** (1.0 / L) if val > 0 else np.nan
+        return M * np.exp(S * zz)
+
+    if z > 3.0:
+        sd3 = _lms(3.0)
+        sd2 = _lms(2.0)
+        if not (np.isfinite(sd3) and np.isfinite(sd2)):
+            return np.nan
+        return sd3 + (z - 3.0) * (sd3 - sd2)
+    if z < -3.0:
+        sd3n = _lms(-3.0)
+        sd2n = _lms(-2.0)
+        if not (np.isfinite(sd3n) and np.isfinite(sd2n)):
+            return np.nan
+        return sd3n + (z + 3.0) * (sd2n - sd3n)
+    return _lms(z)
+
+
+_WHO_CALC_CACHE = [None]
+
+def _get_who_calc():
+    if _WHO_CALC_CACHE[0] is None:
+        import sys as _sys
+        _pgs = '/home/00101787/Projects/pgs'
+        if _pgs not in _sys.path:
+            _sys.path.insert(0, _pgs)
+        try:
+            from pygrowup import Calculator
+            _WHO_CALC_CACHE[0] = Calculator(
+                adjust_height_data=False, adjust_weight_scores=False,
+                include_cdc=False, logger_name='pygrowup', log_level='ERROR')
+        except Exception:
+            pass
+    return _WHO_CALC_CACHE[0]
+
+
+def _who_bmi_from_z(z, age_months, sex):
+    """Convert WHO BMI-for-age z-score to actual BMI at given age (months)."""
+    if pd.isna(z):
+        return np.nan
+    calc = _get_who_calc()
+    if calc is None:
+        return np.nan
+    try:
+        sex_str = 'M' if int(sex) == 1 else 'F'
+        age_int = int(round(float(age_months)))
+        if float(age_months) <= 24:
+            table = calc.bmifa_boys_0_2 if sex_str == 'M' else calc.bmifa_girls_0_2
+        elif float(age_months) <= 60:
+            table = calc.bmifa_boys_2_5 if sex_str == 'M' else calc.bmifa_girls_2_5
+        else:
+            return np.nan
+        entry = table.get(str(age_int))
+        if entry is None:
+            return np.nan
+        return _bmi_from_z_lms(z, entry['L'], entry['M'], entry['S'])
+    except Exception:
+        return np.nan
+
+
+def _cdc_bmi_from_z(z, age_months, sex):
+    """Convert CDC BMI-for-age z-score to actual BMI at given age (months)."""
+    if pd.isna(z):
+        return np.nan
+    lms = _load_cdc_bmi_lms(int(sex))
+    if lms is None:
+        return np.nan
+    idx = (lms['age_mid_months'] - float(age_months)).abs().idxmin()
+    row = lms.iloc[idx]
+    return _bmi_from_z_lms(z, row['_LBMI1'], row['_MBMI1'], row['_SBMI1'])
+
+
+
+def _draw_cdc_background(ax, sex):
+    """Draw sex-specific CDC BMI-for-age percentile bands and reference lines.
+
+    Data source: bmi-age-2022.csv (CDC extended BMI-for-age, pre-computed percentiles).
+    Coverage: age 2–20 yr + flat extension to 27 yr.  No background before age 2.
+
+    Bands: <5th underweight (blue), 5–85th healthy (green),
+           85–95th overweight (yellow), >95th obese (orange).
+    Reference lines: 5th, 50th, 85th, 95th, 98th, 99th, 99.9th.
+    """
+    df = _load_cdc_bmi_extended(int(sex))
+    if df is None:
+        return
+
+    # ── CDC 2–20 yr (agemos 24–240) ───────────────────────────────────────────
+    sub      = df[(df['agemos'] >= 24.0) & (df['agemos'] <= 240.0)].copy()
+    ages_cdc = sub['agemos'].values / 12.0
+
+    # Map percentile key → column name
+    col = {5: 'P5', 50: 'P50', 85: 'P85', 95: 'P95', 98: 'P98', 99: 'P99', 99.9: 'P99_9'}
+
+    # Values at age 20 for flat extension
+    v20 = {p: sub[c].values[-1] for p, c in col.items()}
+
+    fwd_ages = np.array([20.0, 27.0])
+    all_ages = np.concatenate([ages_cdc, fwd_ages])
+
+    def _curve(p):
+        return np.concatenate([sub[col[p]].values, [v20[p], v20[p]]])
+
+    y_floor, y_ceil = 8.0, 55.0
+
+    # ── Colour bands between every adjacent pair of reference curves ──────────
+    # Order matches the sorted reference lines: 5, 50, 85, 95, 98, 99, 99.9
+    band_defs = [
+        (None, 5,    '#4393c3', 0.35),   # < 5th        underweight (blue)
+        (5,   50,    '#92c5de', 0.30),   # 5th–50th     below median (light blue)
+        (50,  85,    '#a8d5a2', 0.30),   # 50th–85th    above median healthy (green)
+        (85,  95,    '#fee090', 0.40),   # 85th–95th    overweight (yellow)
+        (95,  98,    '#fdae61', 0.40),   # 95th–98th    obese class I (light orange)
+        (98,  99,    '#f46d43', 0.40),   # 98th–99th    obese class II (orange)
+        (99,  99.9,  '#d73027', 0.40),   # 99th–99.9th  obese class III (red)
+        (99.9, None, '#a50026', 0.40),   # > 99.9th     extreme obesity (dark red)
+    ]
+    for lo_p, hi_p, color, alpha in band_defs:
+        lo_v = _curve(lo_p) if lo_p is not None else np.full(len(all_ages), y_floor)
+        hi_v = _curve(hi_p) if hi_p is not None else np.full(len(all_ages), y_ceil)
+        ax.fill_between(all_ages, lo_v, hi_v,
+                        color=color, alpha=alpha, zorder=0, linewidth=0)
+
+    # ── Reference lines ───────────────────────────────────────────────────────
+    line_specs = {
+        5:    ('--', 0.7, 0.55, 'dimgray'),
+        50:   ('-',  0.8, 0.60, 'dimgray'),
+        85:   (':',  0.7, 0.55, 'dimgray'),
+        95:   ('--', 0.9, 0.70, '#d6604d'),
+        98:   (':',  0.8, 0.65, '#d6604d'),
+        99:   ('-.',  0.8, 0.65, '#b2182b'),
+        99.9: ('-',  0.9, 0.70, '#67001f'),
+    }
+    for p, (ls, lw, alpha, color) in line_specs.items():
+        ax.plot(all_ages, _curve(p), color=color, linestyle=ls,
+                linewidth=lw, alpha=alpha, zorder=1)
+
+
 # ── Sparse trajectory plots ───────────────────────────────────────────────────
 
-def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_model=None):
+def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=12, seed=42, mlp_model=None):
     """Plot BMI trajectories for participants with few observed values.
 
     At each age:
@@ -980,6 +1165,39 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
     base_sub    = base_idx[base_idx.index.isin(sampled_ids)]
     yr8_sub     = yr8_df[yr8_df.index.isin(sampled_ids)]     if yr8_df is not None else None
 
+    # ── Sex lookup for CDC chart ───────────────────────────────────────────────
+    sex_map = {}
+    for _cid in sampled_ids:
+        sv = rolling_sub.loc[_cid, 'sex'] if (_cid in rolling_sub.index and
+                                               'sex' in rolling_sub.columns) else np.nan
+        sex_map[_cid] = int(sv) if pd.notna(sv) and int(sv) in (1, 2) else 1
+
+    # ── Early BMI from z-scores (birth=0 yr, y1=1 yr, y5=5 yr) ───────────────
+    early_bmi_obs = {_cid: {} for _cid in sampled_ids}
+    for _cid in sampled_ids:
+        _sex = sex_map[_cid]
+        if _cid not in rolling_sub.index:
+            continue
+        _row = rolling_sub.loc[_cid]
+        if 'birth_bmifa' in rolling_sub.columns:
+            _z = _row['birth_bmifa']
+            if pd.notna(_z):
+                _bmi = _who_bmi_from_z(float(_z), 0, _sex)
+                if np.isfinite(_bmi) and 8.0 < _bmi < 25.0:
+                    early_bmi_obs[_cid][0] = _bmi
+        if 'y1_bmifa' in rolling_sub.columns:
+            _z = _row['y1_bmifa']
+            if pd.notna(_z):
+                _bmi = _who_bmi_from_z(float(_z), 12, _sex)
+                if np.isfinite(_bmi) and 10.0 < _bmi < 25.0:
+                    early_bmi_obs[_cid][1] = _bmi
+        if 'y5_bmiz' in rolling_sub.columns:
+            _z = _row['y5_bmiz']
+            if pd.notna(_z):
+                _bmi = _cdc_bmi_from_z(float(_z), 60, _sex)
+                if np.isfinite(_bmi) and 10.0 < _bmi < 30.0:
+                    early_bmi_obs[_cid][5] = _bmi
+
     # ── Observed BMI presence per (cid, age) ──────────────────────────────────
     # Map year→age for lookup
     year_to_age = dict(zip(ALL_YEARS, ALL_AGES))
@@ -1103,10 +1321,10 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
         'XGBoost':                  ('tab:pink',   '-',  1.2),
     }
 
-    ncols = 5
-    nrows = int(np.ceil(len(sampled_ids) / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4, nrows * 3.8), squeeze=False)
-    plt.rcParams.update({'font.size': 9})
+    ncols = 3
+    nrows = 4
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 4.2), squeeze=False)
+    plt.rcParams.update({'font.size': 12})
 
     for i, cid in enumerate(sampled_ids):
         ax = axes[i // ncols][i % ncols]
@@ -1119,7 +1337,9 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
             vals_p = [pts[a] for a in ages_p]
             ax.plot(ages_p, vals_p, color=color, linestyle=ls, linewidth=lw, label=label)
 
-        # True observed BMI dots — age 8 from rawdata, ages 10+ from base_dataset
+        # Observed BMI dots — early (birth/y1/y5), age 8, ages 10+ from base
+        for _early_age, _early_val in early_bmi_obs[cid].items():
+            ax.scatter(_early_age, _early_val, color='black', s=60, zorder=6)
         if yr8_sub is not None and cid in yr8_sub.index:
             val = yr8_sub.loc[cid, 'y8bmi']
             if pd.notna(val):
@@ -1132,16 +1352,17 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
                         ax.scatter(ALL_AGES[ALL_YEARS.index(yr)], float(val),
                                    color='black', s=60, zorder=6)
 
-        ax.axhspan(18.5, 25, color='lightgreen', alpha=0.15, zorder=0)
-        ax.axhspan(25,   30, color='gold',       alpha=0.15, zorder=0)
-        ax.axhspan(30,   35, color='orange',     alpha=0.15, zorder=0)
-        ax.axhspan(35,   40, color='tomato',     alpha=0.15, zorder=0)
-        ax.axhspan(40,   60, color='firebrick',  alpha=0.15, zorder=0)
-        ax.set_title(f'ID {cid}', fontsize=8)
-        ax.set_xticks(ALL_AGES)
-        ax.tick_params(labelsize=7)
-        ax.set_xlabel('Age', fontsize=8)
-        ax.set_ylabel('BMI', fontsize=8)
+        # CDC growth chart background — drawn last so ylim is set by data first
+        _draw_cdc_background(ax, sex_map[cid])
+        ax.set_ylim(9, 52)
+
+        sex_label = 'M' if sex_map[cid] == 1 else 'F'
+        ax.set_title(f'ID {cid} ({sex_label})', fontsize=12)
+        ax.set_xlim(-0.5, 27.5)
+        ax.set_xticks([0, 5, 8, 14, 20, 27])
+        ax.tick_params(labelsize=11)
+        ax.set_xlabel('Age (years)', fontsize=12)
+        ax.set_ylabel('BMI', fontsize=12)
 
     for j in range(len(sampled_ids), nrows * ncols):
         axes[j // ncols][j % ncols].set_visible(False)
@@ -1153,19 +1374,22 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=10, seed=42, mlp_
                for lbl, (c, ls, lw) in model_styles.items() if lbl in present]
     handles.append(mlines.Line2D([0], [0], marker='o', color='black', lw=0,
                                   markersize=7, label='Observed BMI'))
-    handles.append(mpatches.Patch(facecolor='lightgreen', alpha=0.5, label='Normal (18.5–25)'))
-    handles.append(mpatches.Patch(facecolor='gold',       alpha=0.5, label='Overweight (25–30)'))
-    handles.append(mpatches.Patch(facecolor='orange',     alpha=0.5, label='Obese I (30–35)'))
-    handles.append(mpatches.Patch(facecolor='tomato',     alpha=0.5, label='Obese II (35–40)'))
-    handles.append(mpatches.Patch(facecolor='firebrick',  alpha=0.5, label='Obese III (≥40)'))
+    handles.append(mpatches.Patch(facecolor='#4393c3', alpha=0.5, label='CDC <5th (underweight)'))
+    handles.append(mpatches.Patch(facecolor='#92c5de', alpha=0.5, label='CDC 5th–50th (below median)'))
+    handles.append(mpatches.Patch(facecolor='#a8d5a2', alpha=0.5, label='CDC 50th–85th (healthy)'))
+    handles.append(mpatches.Patch(facecolor='#fee090', alpha=0.6, label='CDC 85th–95th (overweight)'))
+    handles.append(mpatches.Patch(facecolor='#fdae61', alpha=0.6, label='CDC 95th–98th (obese I)'))
+    handles.append(mpatches.Patch(facecolor='#f46d43', alpha=0.6, label='CDC 98th–99th (obese II)'))
+    handles.append(mpatches.Patch(facecolor='#d73027', alpha=0.6, label='CDC 99th–99.9th (obese III)'))
+    handles.append(mpatches.Patch(facecolor='#a50026', alpha=0.6, label='CDC >99.9th (extreme)'))
     fig.legend(handles=handles, loc='center left', bbox_to_anchor=(0.91, 0.5),
-               fontsize=9, frameon=True, title='Model', title_fontsize=10)
+               fontsize=11, frameon=True, title='Model / CDC bands', title_fontsize=12)
 
     n_label = f'{n_obs_filter}_obs' if n_obs_filter is not None else 'all'
     plt.suptitle(
         f'BMI Trajectories — Participants with {n_obs_filter} Observed Values  '
-        f'(● = observed)',
-        fontsize=12, fontweight='bold', y=1.01,
+        f'(● = observed; background = CDC Extended BMI-for-age growth chart)',
+        fontsize=14, fontweight='bold', y=1.01,
     )
     plt.tight_layout(rect=[0, 0, 0.9, 1.0])
     path = os.path.join(out_dir, f'bmiforecast_trajectories_{n_label}.png')

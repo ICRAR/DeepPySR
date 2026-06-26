@@ -86,13 +86,18 @@ def get_age_filtered_feature_cols(non_bmi_cols: list, target_year: int) -> list:
 
 
 def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
-    """Add birthbmiz, y1bmiz (WHO pygrowup), and y5bmiz (CDC zscore.py) columns.
+    """Add birthbmiz, y1bmiz (WHO LMS), and y5bmiz (CDC extended LMS) columns.
 
-    birth_weight is in grams, heights in cm, y1/y5 weights in kg — consistent
-    with the prep.py convention in Projects/pgs.
+    Uses local data files only — no pygrowup dependency:
+      - birthbmiz / y1bmiz: bmizscore/bmifa_{boys,girls}_0_2_zscores.json (WHO)
+      - y5bmiz: bmizscore/bmi-age-2022.csv (CDC extended BMI-for-age)
+
+    birth_weight is in grams, heights in cm, y1/y5 weights in kg.
     """
-    from bmizscore.zscore import get_bmiz_singlevalue
-    from pygrowup import Calculator
+    import json
+    from scipy.stats import norm as _norm
+
+    _bmizscore_dir = Path(__file__).parent / 'bmizscore'
 
     df = df.copy()
 
@@ -101,29 +106,92 @@ def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
         print("  [early_bmiz] WARNING: no sex column found; skipping")
         return df
 
-    def _sex_str(val):
-        """1→'M', 2→'F', else None."""
-        try:
-            return {1: 'M', 2: 'F'}.get(int(float(val)))
-        except (TypeError, ValueError):
-            return None
-
     def _sex_int(val):
-        """1 or 2 for CDC calculator, else None."""
         try:
             v = int(float(val))
             return v if v in (1, 2) else None
         except (TypeError, ValueError):
             return None
 
-    # WHO growth standard Calculator for birth and age-1
-    _calc_who = Calculator(
-        adjust_height_data=False,
-        adjust_weight_scores=False,
-        include_cdc=False,
-        logger_name='pygrowup',
-        log_level='ERROR',
-    )
+    # ── WHO LMS helpers ───────────────────────────────────────────────────────
+    def _load_who_lms(sex_int):
+        fname = 'bmifa_boys_0_2_zscores.json' if sex_int == 1 else 'bmifa_girls_0_2_zscores.json'
+        rows = json.loads((Path(_bmizscore_dir) / fname).read_text())
+        # Build dict: month (int) → {L, M, S}
+        return {int(r['Month']): {'L': float(r['L']), 'M': float(r['M']), 'S': float(r['S'])}
+                for r in rows}
+
+    _who_lms_cache = {}
+
+    def _who_bmiz(bmi, agemos, sex_int):
+        """Standard WHO LMS z-score; interpolates between integer months."""
+        if sex_int not in _who_lms_cache:
+            _who_lms_cache[sex_int] = _load_who_lms(sex_int)
+        table = _who_lms_cache[sex_int]
+        lo, hi = int(agemos), min(int(agemos) + 1, 24)
+        if lo not in table:
+            return np.nan
+        if lo == hi or hi not in table:
+            L, M, S = table[lo]['L'], table[lo]['M'], table[lo]['S']
+        else:
+            frac = agemos - lo
+            L = table[lo]['L'] + frac * (table[hi]['L'] - table[lo]['L'])
+            M = table[lo]['M'] + frac * (table[hi]['M'] - table[lo]['M'])
+            S = table[lo]['S'] + frac * (table[hi]['S'] - table[lo]['S'])
+        if abs(L) >= 0.01:
+            z = ((bmi / M) ** L - 1) / (L * S)
+        else:
+            z = math.log(bmi / M) / S
+        return float(z)
+
+    # ── CDC extended LMS helpers (bmi-age-2022.csv) ───────────────────────────
+    _cdc_ext = {}
+
+    def _load_cdc_ext(sex_int):
+        if sex_int not in _cdc_ext:
+            path = _bmizscore_dir / 'bmi-age-2022.csv'
+            df_ref = pd.read_csv(path)
+            _cdc_ext[sex_int] = df_ref[df_ref['sex'] == sex_int].sort_values('agemos').reset_index(drop=True)
+        return _cdc_ext[sex_int]
+
+    def _interp_row(ref, agemos):
+        """Linearly interpolate L, M, S, sigma, P95 at the given age in months."""
+        idx = (ref['agemos'] - agemos).abs().idxmin()
+        r = ref.loc[idx]
+        if abs(r['agemos'] - agemos) < 0.01:
+            return r
+        # Find bracketing rows
+        lo_rows = ref[ref['agemos'] <= agemos]
+        hi_rows = ref[ref['agemos'] >= agemos]
+        if lo_rows.empty or hi_rows.empty:
+            return r
+        r_lo = ref.loc[lo_rows.index[-1]]
+        r_hi = ref.loc[hi_rows.index[0]]
+        if r_lo['agemos'] == r_hi['agemos']:
+            return r_lo
+        frac = (agemos - r_lo['agemos']) / (r_hi['agemos'] - r_lo['agemos'])
+        interp = {}
+        for col in ('L', 'M', 'S', 'sigma', 'P95'):
+            interp[col] = r_lo[col] + frac * (r_hi[col] - r_lo[col])
+        return interp
+
+    def _cdc_ext_bmiz(bmi, agemos, sex_int):
+        """CDC extended BMI-for-age z-score from bmi-age-2022.csv."""
+        ref = _load_cdc_ext(sex_int)
+        row = _interp_row(ref, agemos)
+        L, M, S = float(row['L']), float(row['M']), float(row['S'])
+        sigma, p95 = float(row['sigma']), float(row['P95'])
+        # Standard LMS z-score
+        if abs(L) >= 0.01:
+            z_lms = ((bmi / M) ** L - 1) / (L * S)
+        else:
+            z_lms = math.log(bmi / M) / S
+        pct = float(_norm.cdf(z_lms)) * 100.0
+        # Extended z-score for BMI above the 95th percentile
+        if bmi > p95:
+            pct = 90.0 + 10.0 * float(_norm.cdf((bmi - p95) / sigma))
+        pct = min(pct, 99.9999999)
+        return float(_norm.ppf(pct / 100.0))
 
     # ── birthbmiz ─────────────────────────────────────────────────────────────
     if 'birth_weight' in df.columns and 'birth_length' in df.columns:
@@ -132,13 +200,12 @@ def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
             try:
                 bw = float(row['birth_weight'])   # grams
                 bl = float(row['birth_length'])   # cm
-                sx = _sex_str(row[sex_col])
-                if pd.isna(bw) or pd.isna(bl) or sx is None:
+                sx = _sex_int(row[sex_col])
+                if pd.isna(bw) or pd.isna(bl) or sx is None or bl <= 0:
                     birth_bmiz.append(np.nan)
                     continue
-                bmi = bw / 1000.0 / (bl ** 2) * 10000.0
-                z = _calc_who.bmifa(measurement=bmi, age_in_months=0, sex=sx, height=bl)
-                birth_bmiz.append(float(z) if z is not None else np.nan)
+                bmi = (bw / 1000.0) / (bl / 100.0) ** 2
+                birth_bmiz.append(_who_bmiz(bmi, 0, sx))
             except Exception:
                 birth_bmiz.append(np.nan)
         df['birthbmiz'] = birth_bmiz
@@ -154,15 +221,14 @@ def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
             try:
                 w1 = float(row['y1_a1'])   # kg
                 h1 = float(row['y1_a2'])   # cm
-                sx = _sex_str(row[sex_col])
+                sx = _sex_int(row[sex_col])
                 agemos = (float(row[age1_col])
                           if age1_col and pd.notna(row.get(age1_col)) else 12.0)
-                if pd.isna(w1) or pd.isna(h1) or sx is None:
+                if pd.isna(w1) or pd.isna(h1) or sx is None or h1 <= 0:
                     y1_bmiz.append(np.nan)
                     continue
-                bmi = w1 / (h1 ** 2) * 10000.0
-                z = _calc_who.bmifa(measurement=bmi, age_in_months=agemos, sex=sx, height=h1)
-                y1_bmiz.append(float(z) if z is not None else np.nan)
+                bmi = w1 / (h1 / 100.0) ** 2
+                y1_bmiz.append(_who_bmiz(bmi, agemos, sx))
             except Exception:
                 y1_bmiz.append(np.nan)
         df['y1bmiz'] = y1_bmiz
@@ -179,12 +245,11 @@ def _compute_early_bmiz(df: pd.DataFrame) -> pd.DataFrame:
                 h5 = float(row['y5_a2'])    # cm
                 agey = float(row['y5_age']) # years
                 sx = _sex_int(row[sex_col])
-                if pd.isna(w5) or pd.isna(h5) or pd.isna(agey) or sx is None:
+                if pd.isna(w5) or pd.isna(h5) or pd.isna(agey) or sx is None or h5 <= 0:
                     y5_bmiz.append(np.nan)
                     continue
-                z = get_bmiz_singlevalue(agemos=agey * 12, sex_m1f2=sx,
-                                         height_cm=h5, weight_kg=w5)
-                y5_bmiz.append(float(z) if z is not None else np.nan)
+                bmi = w5 / (h5 / 100.0) ** 2
+                y5_bmiz.append(_cdc_ext_bmiz(bmi, agey * 12.0, sx))
             except Exception:
                 y5_bmiz.append(np.nan)
         df['y5bmiz'] = y5_bmiz
