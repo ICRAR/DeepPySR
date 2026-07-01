@@ -30,7 +30,7 @@ def main():
         
     aggregated_df = pd.read_csv(aggregated_file)
     
-    for eq_name in eq_names:
+    for eq_name in [eq_names[3]]:
         print("\n" + "="*70)
         print(f"CONVERGENCE TESTS FOR FEYNMAN EQUATION: {eq_name}")
         print("="*70)

@@ -47,7 +47,7 @@ def _extract_reporter(var_name: str) -> str:
 
 
 def _is_original(var_name: str) -> bool:
-    """True for _0-suffix variables (e.g. G214_B12_0 = original insulin)."""
+    """True for _0-suffix variables (e.g. G214_B12_0 = original diab_raine)."""
     return var_name.endswith("_0")
 
 
@@ -99,7 +99,7 @@ def _shorten_label(label: str, var_name: str) -> str:
     if "LDL cholesterol" in label:
         return "ldl"
     if "Insulin" in label:
-        return "insulin" + ("_orig" if _is_original(var_name) else "")
+        return "diab_raine" + ("_orig" if _is_original(var_name) else "")
     if "C Reactive Protein" in label:
         return "crp" + ("_orig" if _is_original(var_name) else "")
 
@@ -312,6 +312,12 @@ def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
 
 _LONGITUDINAL_AGES_KEEPTO14 = [17, 20, 22, 27, 28]
+_INSULIN_AGES = [14, 17, 20, 22, 27, 28]
+
+_CACHE_PGS    = _BASE / "raine" / "insulin_PGS"
+_CACHE_KEEPTO8 = _BASE / "raine" / "insulin_keepto8"
+_CACHE_PGSTO8  = _BASE / "raine" / "insulin_PGSto8"
+_CACHE_RECENT = _BASE / "raine" / "insulin_recent"
 
 def _build_merged() -> pd.DataFrame:
     """Load, merge, and preprocess the raw data once (no age-specific filtering)."""
@@ -611,11 +617,156 @@ def load_data_longitudinal_keepto14(targets: str | list[str],
     return id_col, X, y
 
 
+def _get_pgs_cols() -> list[str]:
+    return [d.name for d in sorted(_PGS_ROOT.iterdir())
+            if (d / "raine" / "score" / "aggregated_scores.txt").exists()]
+
+
+def _get_insulin_col(merged: pd.DataFrame, age: int) -> str:
+    y_suffix = f"yr{age}"
+    candidates = [c for c in merged.columns if "diab_raine" in c and y_suffix in c]
+    if not candidates:
+        raise ValueError(f"No insulin column found for yr{age}")
+    return candidates[0]
+
+
+def _dedup_by_child_id(df: pd.DataFrame) -> pd.DataFrame:
+    if "child_id" not in df.columns:
+        return df
+    before = len(df)
+    df = (df.assign(_n_valid=df.notna().sum(axis=1))
+          .sort_values("_n_valid", ascending=False)
+          .drop_duplicates(subset="child_id", keep="first")
+          .drop(columns="_n_valid"))
+    dropped = before - len(df)
+    if dropped:
+        print(f"[dedup by child_id] dropped {dropped} duplicate rows")
+    return df
+
+
+def _save_insulin_cache(cache_path: Path, id_col: pd.Series, X: pd.DataFrame, y: pd.Series):
+    cache_df = pd.concat([id_col.reset_index(drop=True),
+                          X.reset_index(drop=True),
+                          y.reset_index(drop=True)], axis=1)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_df.to_csv(cache_path, index=False)
+    print(f"[cache] saved to {cache_path}")
+
+
+def _load_insulin_cache(cache_path: Path):
+    print(f"[cache] loading from {cache_path}")
+    cached = pd.read_csv(cache_path, low_memory=False)
+    id_col = cached["child_id"]
+    y = cached["diab_raine"]
+    X = cached.drop(columns=["child_id", "diab_raine"])
+    return id_col, X, y
+
+
+def load_data_PGS_only(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS-only features to predict insulin at the given age."""
+    cache_path = _CACHE_PGS / f"insulin_{age}.csv"
+    if cache_path.exists():
+        return _load_insulin_cache(cache_path)
+
+    pgs_cols = _get_pgs_cols()
+    merged = _build_merged()
+    y_col = _get_insulin_col(merged, age)
+
+    merged = merged.dropna(subset=[y_col])
+    merged = _dedup_by_child_id(merged)
+
+    id_col = merged["child_id"]
+    y = merged[y_col].rename("diab_raine")
+    X = merged[pgs_cols].copy()
+
+    _save_insulin_cache(cache_path, id_col, X, y)
+    return id_col, X, y
+
+
+def load_data_keepto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load features with timepoints <= 8, no PGS, to predict insulin at the given age."""
+    cache_path = _CACHE_KEEPTO8 / f"insulin_{age}.csv"
+    if cache_path.exists():
+        return _load_insulin_cache(cache_path)
+
+    pgs_cols = _get_pgs_cols()
+    merged = _build_merged()
+    y_col = _get_insulin_col(merged, age)
+
+    high_suffixes = _high_age_suffixes(8)
+    pgs_set = set(pgs_cols)
+    drop_cols = {c for c in merged.columns
+                 if any(suf in c for suf in high_suffixes)
+                 or c in pgs_set or c.startswith("PGS")}
+
+    merged = merged.dropna(subset=[y_col])
+    merged = _dedup_by_child_id(merged)
+
+    id_col = merged["child_id"]
+    y = merged[y_col].rename("diab_raine")
+    X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
+
+    _save_insulin_cache(cache_path, id_col, X, y)
+    return id_col, X, y
+
+
+def load_data_PGSto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS + features with timepoints <= 8 to predict insulin at the given age."""
+    cache_path = _CACHE_PGSTO8 / f"insulin_{age}.csv"
+    if cache_path.exists():
+        return _load_insulin_cache(cache_path)
+
+    merged = _build_merged()
+    y_col = _get_insulin_col(merged, age)
+
+    high_suffixes = _high_age_suffixes(8)
+    drop_cols = {c for c in merged.columns
+                 if any(suf in c for suf in high_suffixes)}
+
+    merged = merged.dropna(subset=[y_col])
+    merged = _dedup_by_child_id(merged)
+
+    id_col = merged["child_id"]
+    y = merged[y_col].rename("diab_raine")
+    X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
+
+    _save_insulin_cache(cache_path, id_col, X, y)
+    return id_col, X, y
+
+
+def load_data_recent(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS + all features collected strictly before target age to predict insulin."""
+    cache_path = _CACHE_RECENT / f"insulin_{age}.csv"
+    if cache_path.exists():
+        return _load_insulin_cache(cache_path)
+
+    merged = _build_merged()
+    y_col = _get_insulin_col(merged, age)
+
+    # Drop all timepoints >= age (keep timepoints < age)
+    high_suffixes = _high_age_suffixes(age - 1)
+    drop_cols = {c for c in merged.columns
+                 if any(suf in c for suf in high_suffixes)}
+
+    merged = merged.dropna(subset=[y_col])
+    merged = _dedup_by_child_id(merged)
+
+    id_col = merged["child_id"]
+    y = merged[y_col].rename("diab_raine")
+    X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
+
+    _save_insulin_cache(cache_path, id_col, X, y)
+    return id_col, X, y
+
+
 if __name__ == '__main__':
     n_feature = 200
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 17, n_features=n_feature)
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 20, n_features=n_feature)
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 22, n_features=n_feature)
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 27, n_features=n_feature)
-    ids, X, y = load_data_keepto14(["insulin", "glucose"], 28, n_features=n_feature)
-    ids, X, y = load_data_longitudinal_keepto14(["insulin", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO14, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["diab_raine", "glucose"], 17, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["diab_raine", "glucose"], 20, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["diab_raine", "glucose"], 22, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["diab_raine", "glucose"], 27, n_features=n_feature)
+    ids, X, y = load_data_keepto14(["diab_raine", "glucose"], 28, n_features=n_feature)
+    ids, X, y = load_data_longitudinal_keepto14(["diab_raine", "glucose"], ages=_LONGITUDINAL_AGES_KEEPTO14, n_features=n_feature)

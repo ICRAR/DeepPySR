@@ -1357,7 +1357,7 @@ def plot_sparse_trajectories(out_dir, n_obs_filter=2, n_sample=12, seed=42, mlp_
         ax.set_ylim(9, 52)
 
         sex_label = 'M' if sex_map[cid] == 1 else 'F'
-        ax.set_title(f'ID {cid} ({sex_label})', fontsize=12)
+        ax.set_title(f'Participant {i + 1} ({sex_label})', fontsize=12)
         ax.set_xlim(-0.5, 27.5)
         ax.set_xticks([0, 5, 8, 14, 20, 27])
         ax.tick_params(labelsize=11)

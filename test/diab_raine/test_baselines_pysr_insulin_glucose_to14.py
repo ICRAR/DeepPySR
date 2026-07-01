@@ -12,7 +12,7 @@ from data_utils import load_data_keepto14 as load_data, load_data_longitudinal_k
 
 import argparse
 
-TARGETS = ['insulin', 'glucose']
+TARGETS = ['diab_raine', 'glucose']
 
 
 def _extract_target(y_df, target):
@@ -41,11 +41,11 @@ def main():
 
     if args.setting == 'longitudinal':
         print("\nLoading longitudinal data...")
-        ids, X, y_df = load_data_longitudinal(["insulin", "glucose"], n_features=args.n_features)
+        ids, X, y_df = load_data_longitudinal(["diab_raine", "glucose"], n_features=args.n_features)
         runs = [(f"longitudinal_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
     else:
         print(f"\nLoading data for age={args.age}...")
-        ids, X, y_df = load_data(["insulin", "glucose"], args.age, n_features=args.n_features)
+        ids, X, y_df = load_data(["diab_raine", "glucose"], args.age, n_features=args.n_features)
         runs = [(f"age_{args.age}_{t}", ids, X, _extract_target(y_df, t)) for t in TARGETS]
 
     for run_name, ids, X, y in runs:

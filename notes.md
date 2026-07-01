@@ -57,10 +57,10 @@ notes: convergence needs to select the best model,
 # bmiforecast
 
 ----------------------------------------
-# insulin
+# diab_raine
 
-1. data up to year 8 -> predict HOMA-IR -> failed (no blood data)
-2. data up to year 14 -> predict HOMA-IR -> not good (first blood data)
-3. data up to year 14 -> predict insulin and glucose separately -> not good
-4. 3 + top 100 features
-4. data up to year 14, forecast insulin and glucose separately -> up to line 291 in insulinforecast_utils.py
+glucose <6.1 normal, 6.1 - 6.9 prediabetes, >7 diabetes
+homa-ir Below 1.0: Optimal diab_raine sensitivity.
+1.0 to 1.9: Normal / borderline.
+2.0 to 2.9: Early diab_raine resistance.
+3.0 and above: Moderate to severe diab_raine resistance

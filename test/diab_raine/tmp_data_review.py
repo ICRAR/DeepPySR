@@ -1,19 +1,19 @@
 """TEMPORARY data review script — not part of the test suite, safe to delete.
 
-Reviews insulin, glucose, and derived HOMA-IR from
-test_data/Health/bmi/G2_data.csv across the ages where both insulin and
+Reviews diab_raine, glucose, and derived HOMA-IR from
+test_data/Health/bmi/G2_data.csv across the ages where both diab_raine and
 glucose were measured (14, 17, 20, 22, 27, 28 - age 8 only has glucose, no
-insulin, so it is excluded to keep insulin/glucose/HOMA-IR comparable).
+diab_raine, so it is excluded to keep diab_raine/glucose/HOMA-IR comparable).
 
-Produces, per variable (insulin, glucose, homa_ir):
+Produces, per variable (diab_raine, glucose, homa_ir):
   - one box-and-whisker plot across ages
   - one histogram figure faceted by age (shared bins per variable, picked
     with the Freedman-Diaconis rule on the pooled data so panels are
     visually comparable)
-plus one insulin-vs-glucose scatter plot faceted by age.
+plus one diab_raine-vs-glucose scatter plot faceted by age.
 
 Run:
-    python test/insulin/tmp_data_review.py
+    python test/diab_raine/tmp_data_review.py
 """
 import os
 
@@ -27,7 +27,7 @@ G2_PATH = os.path.join(_HERE, "..", "..", "test_data", "Health", "bmi", "G2_data
 OUT_DIR = os.path.join(_HERE, "tmp_data_review_output")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# age -> (glucose column, insulin column); column names per G2_data_dictionary.csv
+# age -> (glucose column, diab_raine column); column names per G2_data_dictionary.csv
 VISIT_COLS = {
     14: ("G214_B2", "G214_B12_0"),
     17: ("G217_B2", "G217_B12_0"),
@@ -46,12 +46,12 @@ def load_long_df() -> pd.DataFrame:
     for age, (glu_col, ins_col) in VISIT_COLS.items():
         sub = df[[glu_col, ins_col]].apply(pd.to_numeric, errors="coerce")
         sub = sub.dropna()
-        sub.columns = ["glucose", "insulin"]
+        sub.columns = ["glucose", "diab_raine"]
         sub["age"] = age
         rows.append(sub)
     long_df = pd.concat(rows, ignore_index=True)
-    # HOMA-IR (SI units): glucose mmol/L * insulin mU/L / 22.5
-    long_df["homa_ir"] = long_df["glucose"] * long_df["insulin"] / 22.5
+    # HOMA-IR (SI units): glucose mmol/L * diab_raine mU/L / 22.5
+    long_df["homa_ir"] = long_df["glucose"] * long_df["diab_raine"] / 22.5
     return long_df
 
 
@@ -64,7 +64,7 @@ def fd_bin_edges(
     """Freedman-Diaconis bin edges over the [pct_range] core of the data.
 
     Insulin/HOMA-IR are heavily right-skewed with a few extreme outliers
-    (e.g. insulin up to ~270 mU/L, HOMA-IR up to ~220), so sizing bins off
+    (e.g. diab_raine up to ~270 mU/L, HOMA-IR up to ~220), so sizing bins off
     the raw min/max collapses the bulk of the distribution into one or two
     bars. Instead, the bin range and Freedman-Diaconis width are computed
     on the 0.5th-99.5th percentile core; values outside that range are
@@ -87,7 +87,7 @@ def fd_bin_edges(
 
 
 def print_summary(long_df: pd.DataFrame) -> None:
-    for var in ["insulin", "glucose", "homa_ir"]:
+    for var in ["diab_raine", "glucose", "homa_ir"]:
         print(f"\n--- {var} ---")
         print(long_df.groupby("age")[var].describe()[["count", "mean", "std", "min", "50%", "max"]])
 
@@ -141,7 +141,7 @@ def scatter_insulin_glucose(long_df: pd.DataFrame) -> None:
     axes = np.atleast_1d(axes).flatten()
     for ax, age in zip(axes, AGES):
         sub = long_df[long_df["age"] == age]
-        ax.scatter(sub["insulin"], sub["glucose"], s=12, alpha=0.5, color="darkorange")
+        ax.scatter(sub["diab_raine"], sub["glucose"], s=12, alpha=0.5, color="darkorange")
         ax.set_title(f"age {age} (n={len(sub)})")
         ax.set_xlabel("Insulin (mU/L)")
         ax.set_ylabel("Glucose (mmol/L)")
@@ -157,11 +157,11 @@ def main() -> None:
     long_df = load_long_df()
     print_summary(long_df)
 
-    boxplot(long_df, "insulin", "Insulin (mU/L)")
+    boxplot(long_df, "diab_raine", "Insulin (mU/L)")
     boxplot(long_df, "glucose", "Glucose (mmol/L)")
     boxplot(long_df, "homa_ir", "HOMA-IR")
 
-    histogram_by_age(long_df, "insulin", "Insulin (mU/L)")
+    histogram_by_age(long_df, "diab_raine", "Insulin (mU/L)")
     histogram_by_age(long_df, "glucose", "Glucose (mmol/L)")
     histogram_by_age(long_df, "homa_ir", "HOMA-IR")
 

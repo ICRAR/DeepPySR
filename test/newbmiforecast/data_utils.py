@@ -27,11 +27,11 @@ from bmiforecast_utils import (
     _is_categorical_col,
 )
 
-# Reuse rename/preprocess logic from insulin data_utils (loaded via importlib to avoid name clash)
+# Reuse rename/preprocess logic from diab_raine data_utils (loaded via importlib to avoid name clash)
 import importlib.util as _ilu
 _insulin_spec = _ilu.spec_from_file_location(
     "insulin_data_utils",
-    str(Path(__file__).parents[1] / "insulin" / "data_utils.py"),
+    str(Path(__file__).parents[1] / "diab_raine" / "data_utils.py"),
 )
 _insulin_du = _ilu.module_from_spec(_insulin_spec)
 _insulin_spec.loader.exec_module(_insulin_du)
