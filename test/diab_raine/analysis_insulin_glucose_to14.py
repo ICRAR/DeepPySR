@@ -1137,6 +1137,53 @@ def aggregate_feature_importance():
             print(f"Feature importance plot saved to {plot_path}")
 
 
+# ─── Standalone R² plot ──────────────────────────────────────────────────────
+
+def plot_insulin_r2_vs_age():
+    """Re-plot only the age-specific R² subplot from insulin_insulin_metrics_vs_age.png."""
+    base_dir = RESULTS_DIR
+    csv_path = os.path.join(base_dir, "insulin_insulin_best_models_metrics.csv")
+    if not os.path.exists(csv_path):
+        print(f"CSV not found: {csv_path}. Run plot_results() first.")
+        return
+
+    plot_df = pd.read_csv(csv_path)
+    plot_df = plot_df[plot_df['type'] == 'age-specific'].copy()
+    plot_df['r2'] = plot_df['r2'].clip(lower=0)
+
+    if plot_df.empty:
+        print("No age-specific data found in CSV.")
+        return
+
+    models = sorted(plot_df['display_model'].unique())
+    palette = sns.color_palette("tab10", n_colors=len(models))
+    model_colors = dict(zip(models, palette))
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+    plt.rcParams.update({'font.size': 14})
+
+    sns.lineplot(data=plot_df, x='age', y='r2', hue='display_model',
+                 ax=ax, linestyle='--', linewidth=3.0,
+                 palette=model_colors, marker='o', markersize=8)
+
+    ax.set_title('Age-specific: R² vs Age (Insulin)', fontsize=20, fontweight='bold', pad=15)
+    ax.set_ylabel('R²', fontsize=16)
+    ax.set_xlabel('Age', fontsize=16)
+    ax.tick_params(axis='both', which='major', labelsize=13)
+
+    legend_elements = [Line2D([0], [0], color=model_colors[m], lw=3,
+                               linestyle='--', marker='o', markersize=8, label=m)
+                       for m in models]
+    ax.legend(handles=legend_elements, fontsize=13, frameon=True,
+              title='Model', title_fontsize=14, loc='best')
+
+    plt.tight_layout()
+    plot_path = os.path.join(base_dir, 'insulin_insulin_r2_vs_age.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"R² plot saved to {plot_path}")
+
+
 # ─── Entry point ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
