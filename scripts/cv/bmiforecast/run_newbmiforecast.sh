@@ -4,7 +4,7 @@
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=16
 #SBATCH --nodes=1
-#SBATCH --mem=40G
+#SBATCH --mem=24G
 #SBATCH --output=/scratch/pawsey0411/fchen1/DeepPySR/scripts/newbmiforecast.log
 export PROJECT_ROOT="/scratch/pawsey0411/fchen1/DeepPySR/"
 export DEEPPYSR_PATH="/scratch/pawsey0411/fchen1/deeppysr.jl/python"
