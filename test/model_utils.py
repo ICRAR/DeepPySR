@@ -154,7 +154,7 @@ def get_deeppysr_configs():
     configs = {}
     vps_list = [25, 50, 75]
     vpr_list = [50, 100, 150]
-    aps_list = [10.0, 50.0]
+    aps_list = [10.0, 50.0,30.0]
     # vps_list = [25]
     # vpr_list = [100]
     # aps_list = [50.0,100]
@@ -458,7 +458,7 @@ def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):
     # niterations 100 might be too slow for many runs, use 20 for tests
     return {
         "parallelism": parallelism,
-        "maxsize": 40,
+        "maxsize": 50,
         "binary_operators": ["+", "*", "/", "-", cond_op],
         "extra_sympy_mappings": {
             'cond': sympy_cond,
