@@ -129,7 +129,7 @@ def _select_best_models(df):
             best = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
             best['display_model'] = 'Best DeepPySR'
             selected_data.append(best)
-            interp = deeppysr_df[deeppysr_df['complexity'] <= 35]
+            interp = deeppysr_df[deeppysr_df['complexity'] <= 40]
             if not interp.empty:
                 bi = interp.loc[interp['r2'].idxmax()].copy()
                 bi['display_model'] = 'Interpretable DeepPySR'
@@ -158,7 +158,7 @@ def _select_best_models(df):
                 row['display_model'] = b
                 selected_data.append(row)
 
-    return pd.DataFrame(selected_data), interpretable_formulas
+    return pd.DataFrame(selected_data).reset_index(drop=True), interpretable_formulas
 
 
 def plot_results(df, results_dir, variant_name):
@@ -202,7 +202,7 @@ def plot_results(df, results_dir, variant_name):
     print(f"Plot saved to {plot_path}")
 
     if interpretable_formulas:
-        print(f"\n--- Interpretable DeepPySR Formulas for {variant_name} (Complexity <= 35) ---")
+        print(f"\n--- Interpretable DeepPySR Formulas for {variant_name} (Complexity <= 40) ---")
         interp_df = pd.DataFrame(interpretable_formulas)
         print(interp_df.to_string(index=False))
         interp_df.to_csv(os.path.join(results_dir, 'interpretable_deeppysr_formulas.csv'), index=False)
@@ -428,7 +428,7 @@ def plot_combined(combined_df):
     fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.91, 0.5),
                fontsize=14, frameon=True, title='Feature set', title_fontsize=16, handlelength=4.0)
     plt.suptitle('Insulin Prediction: DeepPySR Performance Across Feature-Set Variants\n'
-                 '(Top: Best DeepPySR — Bottom: Interpretable DeepPySR, complexity <= 35)',
+                 '(Top: Best DeepPySR — Bottom: Interpretable DeepPySR, complexity <= 40)',
                  fontsize=24, fontweight='bold', y=1.0)
     plt.tight_layout(rect=[0, 0, 0.9, 0.95])
     plot_path = os.path.join(current_dir, 'insulin_deeppysr_metrics_vs_age_combined.png')

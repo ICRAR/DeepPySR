@@ -25,10 +25,10 @@ _LOAD_FN = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', type=str, required=True,
+    parser.add_argument('--test', type=str, default='PGSto8',
                         choices=['PGS', 'to8', 'PGSto8'],
                         help='Which feature set to use')
-    parser.add_argument('--age', type=int, default=17,
+    parser.add_argument('--age', type=int, default=22,
                         choices=_INSULIN_AGES)
     parser.add_argument('--vps', type=int, default=25)
     args = parser.parse_args()
@@ -93,7 +93,7 @@ def main():
                 **kwargs,
             )
 
-        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
+        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=True, **cv_kwargs)
 
     print(f"\nAggregating results for {run_name}...")
     aggregate_results(run_out, task='regression')

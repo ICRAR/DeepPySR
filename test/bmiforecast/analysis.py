@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import seaborn as sns
+from scipy import stats as _scipy_stats
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
@@ -1464,11 +1465,22 @@ def _extract_formula_vars(formula_str, available_cols):
     return sorted(t for t in tokens if t not in KNOWN_FUNCS and t in col_set)
 
 
-def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
+def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10, sobol_df=None):
     """For each sampled participant (same selection as plot_sparse_trajectories),
     show the DeepPySR best and interpretable formula, the value of every variable
-    in each formula (with population mean, SD, and this participant's percentile),
-    the predicted BMI, and the true BMI (if observed).
+    in each formula, the predicted BMI, and the true BMI (if observed).
+
+    Per-variable statistics are type-aware:
+      - continuous variables : population mean +/- SD, this participant's percentile,
+        and a two-sided z-test p-value (distance from the population mean in SD units).
+      - binary/categorical variables : population prevalence of the observed level
+        (n / N), and a p-value equal to the empirical frequency of that exact level
+        (small = rare level in the cohort). Percentile is not meaningful for these
+        (it is always 0% or 100%) and is reported as N/A.
+
+    Sobol sensitivity indices (S1, ST) for each variable at each (age, model) are
+    taken from `sobol_df` (as returned by compute_sobol_sensitivity), or loaded from
+    bmiforecast_sobol_sensitivity.csv in out_dir if not provided.
 
     Outputs:
       bmiforecast_formula_demo_{n_obs_filter}_obs.csv   — machine-readable
@@ -1511,9 +1523,11 @@ def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
     rolling_sub = rolling_df[rolling_df['child_id'].isin(sampled_ids)].set_index('child_id')
     all_cols    = list(rolling_sub.columns)
 
-    # Pre-compute population stats (mean, std, sorted values) for every numeric column
-    # using the full rolling_df so percentiles reflect the whole cohort.
-    col_stats = {}   # col -> {'mean': float, 'std': float, 'sorted': np.ndarray}
+    # Pre-compute population stats for every numeric column using the full rolling_df,
+    # classifying each column as 'binary' (only 0/1), 'categorical' (few, integer-valued
+    # levels), or 'continuous'. Percentile/mean/SD only make sense for continuous vars;
+    # binary/categorical vars get a value-level frequency table instead.
+    col_stats = {}   # col -> dict of stats (contents depend on 'type')
     rolling_idx_full = rolling_df.set_index('child_id')
     for col in all_cols:
         if col not in rolling_idx_full.columns:
@@ -1521,25 +1535,84 @@ def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
         vals = rolling_idx_full[col].dropna().values.astype(float)
         if len(vals) == 0:
             continue
-        col_stats[col] = {
-            'mean':   float(np.mean(vals)),
-            'std':    float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0,
-            'sorted': np.sort(vals),
-        }
+        uniq = np.unique(vals)
+        is_integer_valued = np.allclose(uniq, np.round(uniq))
+        if len(uniq) <= 2 and set(uniq.tolist()) <= {0.0, 1.0}:
+            vtype = 'binary'
+        elif len(uniq) <= 10 and is_integer_valued:
+            vtype = 'categorical'
+        else:
+            vtype = 'continuous'
+
+        entry = {'type': vtype, 'n': len(vals)}
+        if vtype == 'continuous':
+            entry['mean']   = float(np.mean(vals))
+            entry['std']    = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+            entry['sorted'] = np.sort(vals)
+        else:
+            level_vals, level_counts = np.unique(vals, return_counts=True)
+            entry['freq'] = {float(lv): int(lc) for lv, lc in zip(level_vals, level_counts)}
+        col_stats[col] = entry
 
     def _percentile(col, value):
-        """Return 0-100 percentile of value within col's population distribution."""
-        if col not in col_stats or np.isnan(value):
+        """Return 0-100 percentile of value within col's population distribution
+        (continuous columns only)."""
+        st = col_stats.get(col, {})
+        if st.get('type') != 'continuous' or np.isnan(value):
             return np.nan
-        arr = col_stats[col]['sorted']
+        arr = st['sorted']
         if len(arr) == 0:
             return np.nan
         return float(np.searchsorted(arr, value, side='right')) / len(arr) * 100.0
+
+    def _variable_summary(col, value):
+        """Return (type, summary_str, pct, p_value) for a variable's observed value.
+
+        continuous  : summary = 'mean +/- sd'; p_value = two-sided z-test p
+                      testing how far `value` sits from the population mean.
+        binary/categorical : summary = 'n_level/N (freq%)' for the observed level;
+                      p_value = empirical frequency of that exact level (rarity).
+        """
+        st = col_stats.get(col)
+        if st is None or np.isnan(value):
+            return ('unknown', 'N/A', np.nan, np.nan)
+
+        if st['type'] == 'continuous':
+            mean, std = st['mean'], st['std']
+            summary = f'{mean:.4f} ± {std:.4f}'
+            pct = _percentile(col, value)
+            if std > 0:
+                z = (value - mean) / std
+                p_value = float(2.0 * _scipy_stats.norm.sf(abs(z)))
+            else:
+                p_value = np.nan
+            return (st['type'], summary, pct, p_value)
+
+        # binary / categorical
+        n_total = st['n']
+        # Match the observed value to the nearest recorded level (guards float noise).
+        level = min(st['freq'].keys(), key=lambda lv: abs(lv - value)) if st['freq'] else value
+        count = st['freq'].get(level, 0)
+        freq  = count / n_total if n_total else np.nan
+        summary = f'level={level:g}  n={count}/{n_total} ({freq*100:.1f}%)'
+        return (st['type'], summary, np.nan, freq)
 
     DEMO_MODELS = [
         ('DeepPySR',                 'deeppysr'),
         ('DeepPySR (Interpretable)', 'deeppysr'),
     ]
+
+    # Sobol sensitivity lookup: (age, model, variable) -> (S1, ST). Sensitivity depends
+    # only on the (age, model) formula, not on the participant, so this is computed once
+    # (via compute_sobol_sensitivity) and shared across all participants/n_obs_filter calls.
+    if sobol_df is None:
+        _sobol_csv = os.path.join(out_dir, 'bmiforecast_sobol_sensitivity.csv')
+        sobol_df = pd.read_csv(_sobol_csv) if os.path.exists(_sobol_csv) else None
+    sobol_lookup = {}
+    if sobol_df is not None and len(sobol_df):
+        for _, r in sobol_df.iterrows():
+            sobol_lookup[(int(r['age']), r['model'], r['variable'])] = (
+                float(r['S1']), float(r['ST']))
 
     # True BMI per (cid, age)
     def true_bmi_at(cid, age):
@@ -1564,9 +1637,9 @@ def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
         f'Formula Demonstration — {n_obs_filter} Observed BMI Participants\n'
         + '=' * 70)
 
-    for cid in sampled_ids:
+    for p_num, cid in enumerate(sampled_ids, start=1):
         text_lines.append(f'\n{"─"*70}')
-        text_lines.append(f'Participant ID: {cid}')
+        text_lines.append(f'Participant {p_num}  (ID: {cid})')
         text_lines.append(f'{"─"*70}')
 
         if cid not in rolling_sub.index:
@@ -1589,18 +1662,14 @@ def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
 
                 var_names = _extract_formula_vars(formula, all_cols)
 
-                # Gather value, mean, std, percentile per variable
-                var_info = {}   # varname -> (value, mean, std, pct)
+                # Gather value, type-aware summary, percentile, p-value, Sobol indices
+                var_info = {}   # varname -> (value, vtype, summary, pct, p_value, S1, ST)
                 for v in var_names:
                     raw = row_data[v] if v in row_data.index else np.nan
                     val = float(raw) if pd.notna(raw) else np.nan
-                    st  = col_stats.get(v, {})
-                    var_info[v] = (
-                        val,
-                        st.get('mean', np.nan),
-                        st.get('std',  np.nan),
-                        _percentile(v, val),
-                    )
+                    vtype, summary, pct, p_value = _variable_summary(v, val)
+                    s1, st_ix = sobol_lookup.get((age, label, v), (np.nan, np.nan))
+                    var_info[v] = (val, vtype, summary, pct, p_value, s1, st_ix)
 
                 try:
                     yp_arr = evaluate_formula(str(formula), X_row, model_type=model_type)
@@ -1611,30 +1680,40 @@ def save_formula_demonstration(out_dir, n_obs_filter=2, n_sample=10):
 
                 text_lines.append(f'    [{label}]')
                 text_lines.append(f'      Formula : {formula}')
-                text_lines.append(f'      {"Variable":<35}  {"Value":>9}  {"Mean":>9}  {"SD":>9}  {"Pctile":>7}')
-                text_lines.append(f'      {"─"*35}  {"─"*9}  {"─"*9}  {"─"*9}  {"─"*7}')
-                for vname, (val, mean, std, pct) in sorted(var_info.items()):
-                    v_str    = f'{val:.4f}'   if not np.isnan(val)  else 'NaN'
-                    mean_str = f'{mean:.4f}'  if not np.isnan(mean) else 'NaN'
-                    std_str  = f'{std:.4f}'   if not np.isnan(std)  else 'NaN'
-                    pct_str  = f'{pct:.1f}%'  if not np.isnan(pct)  else 'NaN'
-                    text_lines.append(f'      {vname:<35}  {v_str:>9}  {mean_str:>9}  {std_str:>9}  {pct_str:>7}')
+                text_lines.append(
+                    f'      {"Variable":<24} {"Type":<11} {"Value":>9}  '
+                    f'{"Summary (mean±SD or level freq)":<38} {"Pctile":>7} '
+                    f'{"p-value":>9} {"Sobol S1":>9} {"Sobol ST":>9}')
+                text_lines.append(f'      {"─"*24} {"─"*11} {"─"*9}  {"─"*38} {"─"*7} {"─"*9} {"─"*9} {"─"*9}')
+                for vname, (val, vtype, summary, pct, p_value, s1, st_ix) in sorted(var_info.items()):
+                    v_str   = f'{val:.4f}'    if not np.isnan(val)     else 'NaN'
+                    pct_str = f'{pct:.1f}%'   if not np.isnan(pct)     else 'N/A'
+                    p_str   = f'{p_value:.4g}' if not np.isnan(p_value) else 'NaN'
+                    s1_str  = f'{s1:.3f}'     if not np.isnan(s1)      else 'N/A'
+                    st_str  = f'{st_ix:.3f}'  if not np.isnan(st_ix)   else 'N/A'
+                    text_lines.append(
+                        f'      {vname:<24} {vtype:<11} {v_str:>9}  {summary:<38} '
+                        f'{pct_str:>7} {p_str:>9} {s1_str:>9} {st_str:>9}')
                 text_lines.append(f'      Predicted BMI : '
                                   + (f'{bmi_pred:.4f}' if not np.isnan(bmi_pred) else 'NaN'))
 
                 # One CSV row per variable (long format)
-                for vname, (val, mean, std, pct) in sorted(var_info.items()):
+                for vname, (val, vtype, summary, pct, p_value, s1, st_ix) in sorted(var_info.items()):
                     csv_rows.append({
-                        'n_obs':      n_obs_filter,
-                        'child_id':   cid,
+                        'n_obs':               n_obs_filter,
+                        'participant_number':  p_num,
+                        'child_id':            cid,
                         'age':        age,
                         'model':      label,
                         'formula':    formula,
                         'variable':   vname,
-                        'value':      round(val,  4) if not np.isnan(val)  else np.nan,
-                        'pop_mean':   round(mean, 4) if not np.isnan(mean) else np.nan,
-                        'pop_sd':     round(std,  4) if not np.isnan(std)  else np.nan,
-                        'percentile': round(pct,  1) if not np.isnan(pct)  else np.nan,
+                        'var_type':   vtype,
+                        'value':      round(val, 4) if not np.isnan(val) else np.nan,
+                        'summary':    summary,
+                        'percentile': round(pct, 1) if not np.isnan(pct) else np.nan,
+                        'p_value':    p_value if not np.isnan(p_value) else np.nan,
+                        'sobol_S1':   s1 if not np.isnan(s1) else np.nan,
+                        'sobol_ST':   st_ix if not np.isnan(st_ix) else np.nan,
                         'bmi_pred':   round(bmi_pred, 4) if not np.isnan(bmi_pred) else np.nan,
                         'bmi_true':   round(true_val, 4) if not np.isnan(true_val) else np.nan,
                     })
@@ -1897,12 +1976,12 @@ if __name__ == '__main__':
     for n in [2, 3, 4, 5]:
         plot_sparse_trajectories(out_dir, n_obs_filter=n, mlp_model=_mlp_model)
 
+    print('=== Computing Sobol sensitivity indices ===')
+    sobol_df = compute_sobol_sensitivity(out_dir)
+
     print('=== Saving formula demonstrations ===')
     for n in [2, 3, 4, 5]:
         print(f'  n_obs={n}')
-        save_formula_demonstration(out_dir, n_obs_filter=n)
-
-    print('=== Computing Sobol sensitivity indices ===')
-    compute_sobol_sensitivity(out_dir)
+        save_formula_demonstration(out_dir, n_obs_filter=n, sobol_df=sobol_df)
 
     print('\nDone.')
