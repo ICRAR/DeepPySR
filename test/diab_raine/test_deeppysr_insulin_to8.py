@@ -48,7 +48,7 @@ def main():
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
 
-    r2w_list = [1, 1.5, 2]
+    r2w_list = [1, 1.5, 2, 4]
     lambda_list = [0.001, 0.005, 0.01]
 
     print(f"\nLoading data for test={args.test}, age={args.age}...")
@@ -93,7 +93,7 @@ def main():
                 **kwargs,
             )
 
-        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=True, **cv_kwargs)
+        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, **cv_kwargs)
 
     print(f"\nAggregating results for {run_name}...")
     aggregate_results(run_out, task='regression')

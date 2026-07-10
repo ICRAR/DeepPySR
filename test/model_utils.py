@@ -154,7 +154,7 @@ def get_deeppysr_configs():
     configs = {}
     vps_list = [25, 50, 75]
     vpr_list = [50, 100, 150]
-    aps_list = [10.0, 50.0,30.0]
+    aps_list = [10.0, 50.0]
     # vps_list = [25]
     # vpr_list = [100]
     # aps_list = [50.0,100]
@@ -466,7 +466,7 @@ def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):
         # "warm_start": True,
         "unary_operators": ["exp", "log", "sin", "sqrt"],
         "parsimony": 0.001,
-        "populations": 100,
+        "populations": 150,
         "population_size": 200,
         "ncycles_per_iteration": 200,
         "verbosity": 0,
