@@ -34,7 +34,7 @@ setup(
     description="A deep symbolic regression package based on PySR",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/DeepPySR",
+    url="https://github.com/ICRAR/DeepPySR",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",

@@ -24,4 +24,4 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/DeepPySR"
+"Homepage" = "https://github.com/ICRAR/DeepPySR"
