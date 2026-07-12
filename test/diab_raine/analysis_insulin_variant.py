@@ -12,7 +12,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import seaborn as sns
+
+SCATTER_AXIS_LIMIT = 100
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(current_dir, ".."))
@@ -298,6 +301,40 @@ def save_predictions_and_scatter(plot_df, load_fn, results_dir):
             ax.set_title(f"{m} (R2={row['r2']:.2f})", fontsize=13, fontweight='bold')
             ax.set_xlabel('True Insulin', fontsize=11)
             ax.set_ylabel('Predicted Insulin', fontsize=11)
+            ax.set_xlim(0, SCATTER_AXIS_LIMIT)
+            ax.set_ylim(0, SCATTER_AXIS_LIMIT)
+
+            # Sane bound so a handful of formula-overflow predictions
+            # (e.g. exp() blowing up to ~1e300) don't collapse the inset
+            # scale; genuine outliers in y_true are still fully shown.
+            # Any prediction beyond the bound is pinned to the edge
+            # (visible as a dot at the border) rather than hidden.
+            sane_pred = y_pred_arr[np.abs(y_pred_arr) < 1e6]
+            pred_cap = sane_pred.max() if sane_pred.size else y_pred_arr.max()
+            raw_lo = min(lo, 0)
+            raw_hi = max(y_true_arr.max(), pred_cap, SCATTER_AXIS_LIMIT)
+            pad = (raw_hi - raw_lo) * 0.08 if raw_hi > raw_lo else 1.0
+            lo_display = raw_lo - pad
+            hi_display = raw_hi + pad
+            y_pred_display = np.clip(y_pred_arr, lo_display, hi_display)
+
+            # Points already visible in the main 0-100 panel are shown
+            # faint/small; points that fall outside it (the reason the
+            # inset exists) are emphasized so they stand out.
+            in_main = (y_true_arr <= SCATTER_AXIS_LIMIT) & (y_pred_display <= SCATTER_AXIS_LIMIT)
+            extreme = ~in_main
+
+            axins = inset_axes(ax, width="42%", height="42%", loc='upper right', borderpad=1.2)
+            axins.plot([lo_display, hi_display], [lo_display, hi_display], 'k--', lw=1)
+            axins.scatter(y_true_arr[in_main], y_pred_display[in_main],
+                          alpha=0.25, color=model_colors[m], s=6, zorder=2)
+            axins.scatter(y_true_arr[extreme], y_pred_display[extreme],
+                          alpha=0.9, color=model_colors[m], s=90, marker='*',
+                          edgecolors='black', linewidths=0.6, zorder=3)
+            axins.set_xlim(lo_display, hi_display)
+            axins.set_ylim(lo_display, hi_display)
+            axins.tick_params(axis='both', which='major', labelsize=7)
+            axins.set_title(f'full range ({extreme.sum()} extreme)', fontsize=8)
 
         for j in range(len(present_models), len(axes)):
             axes[j].set_visible(False)

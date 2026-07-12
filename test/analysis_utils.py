@@ -155,10 +155,17 @@ def evaluate_formula(formula_str, X, model_type='deeppysr'):
             'cond': lambda x, y: sp.Piecewise((y, x > 0), (0, True))
         }
 
-        expr = sp.sympify(str(formula_str), locals=custom_functions)
-
         # Feature names from X
         feature_names = list(X.columns) if hasattr(X, 'columns') else []
+
+        # Some feature names (e.g. "group") collide with SymPy builtin function
+        # names, so sympify would bind them to the builtin instead of treating
+        # them as free variables. Force them to Symbols by giving them priority
+        # in the locals dict used for parsing.
+        local_dict = dict(custom_functions)
+        local_dict.update({name: sp.Symbol(name) for name in feature_names})
+
+        expr = sp.sympify(str(formula_str), locals=local_dict)
 
         # Mapping for indexed variables if they exist in formula
         # We replace x0, x1... and x_0, x_1... with the actual column names
@@ -207,7 +214,7 @@ def evaluate_formula(formula_str, X, model_type='deeppysr'):
         return np.nan_to_num(y_pred, nan=0.0, posinf=1e10, neginf=-1e10)
 
     except Exception as e:
-        # print(f"Error evaluating formula {formula_str}: {e}")
+        print(f"Warning: error evaluating formula {formula_str!r}: {e}")
         return np.zeros(len(X))
 
 def load_fold_metrics(model_dir, task='regression'):
