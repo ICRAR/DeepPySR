@@ -1,5 +1,6 @@
 import re
 import sys
+from itertools import combinations
 import pandas as pd
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
@@ -319,9 +320,97 @@ _CACHE_KEEPTO8 = _BASE / "raine" / "insulin_keepto8"
 _CACHE_PGSTO8  = _BASE / "raine" / "insulin_PGSto8"
 _CACHE_RECENT = _BASE / "raine" / "insulin_recent"
 
+# raw RAINE anthropometric exam codes ("y1_a1", "y1_a2", ...) -> concept name
+_ANTHRO_A_CODE = {
+    1: "weight", 2: "height", 3: "sitting_height", 4: "head_circum",
+    5: "chest_circ", 6: "mid_arm_circum", 7: "triceps_skinfold",
+    8: "subscapular_skinfold", 9: "suprailiac_skinfold",
+    10: "abdominal_skinfold", 12: "waist_girth_avg", 13: "hip_avg",
+}
+
+
+def _normalize_timepoint_name(col: str) -> str | None:
+    """Map a raw RAINE column with an inconsistent timepoint encoding to the
+    canonical 'birth_<concept>' / '<concept>_yr<N>' form used elsewhere in
+    this codebase. Returns None if `col` doesn't match a known scheme."""
+
+    # literal birth_* fields: unify "length" into the "height" concept
+    if col == "birth_length":
+        return "birth_height"
+    if col in ("birth_weight", "birth_head_circum"):
+        return None  # already canonical
+
+    # fam_splitup<N> (no underscore before the digit): N=0 is birth
+    m = re.match(r"^fam_splitup(\d)$", col)
+    if m:
+        n = int(m.group(1))
+        return "birth_fam_splitup" if n == 0 else f"fam_splitup_yr{n}"
+
+    # y<N>_a<M> anthropometric exam codes
+    m = re.match(r"^y(\d+)_a(\d{1,2})$", col)
+    if m:
+        year, code = int(m.group(1)), int(m.group(2))
+        concept = _ANTHRO_A_CODE.get(code)
+        if concept:
+            return f"birth_{concept}" if year == 0 else f"{concept}_yr{year}"
+
+    # generic y<N>_<name> / yr<N>_<name> prefix (underscore between year & name)
+    m = re.match(r"^yr?(\d+)_([a-zA-Z].*)$", col)
+    if m:
+        year, rest = int(m.group(1)), m.group(2)
+        return f"birth_{rest}" if year == 0 else f"{rest}_yr{year}"
+
+    # generic y<N><name> prefix, no underscore (e.g. "y8obese", "yr8sbpmn", "y8bmi_x")
+    m = re.match(r"^yr?(\d+)([a-zA-Z].*)$", col)
+    if m:
+        year, rest = int(m.group(1)), m.group(2)
+        return f"birth_{rest}" if year == 0 else f"{rest}_yr{year}"
+
+    # generic <name>_y<N> / <name>_yr<N> suffix (normalize "_y" to "_yr")
+    m = re.match(r"^(.+)_yr?(\d{1,2})$", col)
+    if m and 0 <= int(m.group(2)) <= 30:
+        base, year = m.group(1), int(m.group(2))
+        return f"birth_{base}" if year == 0 else f"{base}_yr{year}"
+
+    # generic <name>_<N> bare-digit suffix (no "y"/"yr" letter): N=0 is birth,
+    # else measured at year N (e.g. "cohab_0", "weight_12", "hhincome_1")
+    m = re.match(r"^(.+)_(\d{1,2})$", col)
+    if m and 0 <= int(m.group(2)) <= 30:
+        base, year = m.group(1), int(m.group(2))
+        return f"birth_{base}" if year == 0 else f"{base}_yr{year}"
+
+    return None
+
+
+def _normalize_raine_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename raw RAINE columns to a consistent timepoint naming scheme so
+    longitudinal concepts (e.g. weight/height across ages) can be grouped.
+
+    Two distinct raw columns can map to the same canonical name (e.g.
+    "birth_length" and "height_0" both represent birth height). To avoid
+    producing duplicate-labelled columns, only the first column encountered
+    is renamed; later collisions are left under their original raw name."""
+    rename = {}
+    taken = set(df.columns)
+    for col in df.columns:
+        new = _normalize_timepoint_name(col)
+        if not new or new == col:
+            continue
+        if new in taken:
+            print(f"[normalize timepoints] skipping {col!r} -> {new!r} (name already in use)")
+            continue
+        rename[col] = new
+        taken.add(new)
+    if rename:
+        print(f"\n[normalize timepoints] renaming {len(rename)} columns")
+        df = df.rename(columns=rename)
+    return df
+
+
 def _build_merged() -> pd.DataFrame:
     """Load, merge, and preprocess the raw data once (no age-specific filtering)."""
     raine = pd.read_csv(_RAINE_PATH, low_memory=False)
+    raine = _normalize_raine_columns(raine)
 
     g1_rename = _build_rename_map(_BMI_PATH / "G1_data_dictionary.csv", "g1")
     g1 = pd.read_csv(_BMI_PATH / "G1_data.csv", low_memory=False).rename(
@@ -353,6 +442,70 @@ def _build_merged() -> pd.DataFrame:
     merged = merged.dropna(subset=pgs_cols)
     merged = _preprocess(merged)
     return merged
+
+
+_YR_COL_RE = re.compile(r"^(.+)_yr(\d+)$")
+_BIRTH_COL_RE = re.compile(r"^birth_(.+)$")
+
+
+def _longitudinal_groups(X: pd.DataFrame) -> dict[str, list[tuple[int, str, str]]]:
+    """Group numeric columns that track the same concept across timepoints.
+
+    Returns concept -> sorted list of (year, label, column_name), keeping only
+    concepts observed at 2+ distinct timepoints.
+    """
+    groups: dict[str, list[tuple[int, str, str]]] = {}
+    for col in X.columns:
+        if not pd.api.types.is_numeric_dtype(X[col]):
+            continue
+        m = _YR_COL_RE.match(col)
+        if m:
+            base, year = m.group(1), int(m.group(2))
+            concept = re.sub(r"^g[12]_", "", base)
+            label = f"y{year}"
+        else:
+            m2 = _BIRTH_COL_RE.match(col)
+            if not m2:
+                continue
+            concept, year, label = m2.group(1), 0, "birth"
+        groups.setdefault(concept, []).append((year, label, col))
+
+    result = {}
+    for concept, entries in groups.items():
+        dedup: dict[int, tuple[str, str]] = {}
+        for year, label, col in entries:
+            dedup.setdefault(year, (label, col))
+        if len(dedup) >= 2:
+            result[concept] = sorted((y, l, c) for y, (l, c) in dedup.items())
+    return result
+
+
+def _add_longitudinal_features(X: pd.DataFrame) -> pd.DataFrame:
+    """Add first-difference (df1_) and second-derivative (df2_) features
+    between every pair/triple of timepoints for each longitudinal concept."""
+    groups = _longitudinal_groups(X)
+    print(f"\n[feature engineering] found {len(groups)} longitudinal concept groups")
+
+    new_cols: dict[str, pd.Series] = {}
+    for concept, entries in groups.items():
+        print(f"  {concept}: {[label for _, label, _ in entries]}")
+
+        diffs: dict[tuple[str, str], pd.Series] = {}
+        for (yi, li, ci), (yj, lj, cj) in combinations(entries, 2):
+            d = (X[cj] - X[ci]) / (yj - yi)
+            diffs[(li, lj)] = d
+            new_cols[f"df1_{concept}_{li}_{lj}"] = d
+
+        for (yi, li, _), (yj, lj, _), (yk, lk, _) in combinations(entries, 3):
+            d_ij = diffs[(li, lj)]
+            d_jk = diffs[(lj, lk)]
+            d2 = (d_jk - d_ij) / ((yk - yi) / 2)
+            new_cols[f"df2_{concept}_{li}{lj}_{lj}{lk}"] = d2
+
+    if new_cols:
+        X = pd.concat([X, pd.DataFrame(new_cols, index=X.index)], axis=1)
+    print(f"[feature engineering] added {len(new_cols)} new features, total columns: {X.shape[1]}")
+    return X
 
 
 def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
@@ -662,9 +815,9 @@ def _load_insulin_cache(cache_path: Path):
     return id_col, X, y
 
 
-def load_data_PGS_only(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_PGS_only(age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load PGS-only features to predict insulin at the given age."""
-    cache_path = _CACHE_PGS / f"insulin_{age}.csv"
+    cache_path = _CACHE_PGS / f"insulin_{age}{'_df' if feateng else ''}.csv"
     if cache_path.exists():
         return _load_insulin_cache(cache_path)
 
@@ -678,14 +831,16 @@ def load_data_PGS_only(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged[pgs_cols].copy()
+    if feateng:
+        X = _add_longitudinal_features(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_keepto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_keepto8(age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load features with timepoints <= 8, no PGS, to predict insulin at the given age."""
-    cache_path = _CACHE_KEEPTO8 / f"insulin_{age}.csv"
+    cache_path = _CACHE_KEEPTO8 / f"insulin_{age}{'_df' if feateng else ''}.csv"
     if cache_path.exists():
         return _load_insulin_cache(cache_path)
 
@@ -705,15 +860,17 @@ def load_data_keepto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    if feateng:
+        X = _add_longitudinal_features(X)
     X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_PGSto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_PGSto8(age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load PGS + features with timepoints <= 8 to predict insulin at the given age."""
-    cache_path = _CACHE_PGSTO8 / f"insulin_{age}.csv"
+    cache_path = _CACHE_PGSTO8 / f"insulin_{age}{'_df' if feateng else ''}.csv"
     if cache_path.exists():
         return _load_insulin_cache(cache_path)
 
@@ -730,15 +887,17 @@ def load_data_PGSto8(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    if feateng:
+        X = _add_longitudinal_features(X)
     X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_recent(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_recent(age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load PGS + all features collected strictly before target age to predict insulin."""
-    cache_path = _CACHE_RECENT / f"insulin_{age}.csv"
+    cache_path = _CACHE_RECENT / f"insulin_{age}{'_df' if feateng else ''}.csv"
     if cache_path.exists():
         return _load_insulin_cache(cache_path)
 
@@ -756,6 +915,8 @@ def load_data_recent(age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    if feateng:
+        X = _add_longitudinal_features(X)
     X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)

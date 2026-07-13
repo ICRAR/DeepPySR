@@ -17,9 +17,12 @@ def main():
     parser.add_argument('--age', type=int, default=17,
                         choices=_INSULIN_AGES)
     parser.add_argument('--vps', type=int, default=25)
+    parser.add_argument('--feateng', action='store_true', default=False,
+                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
-    out_root = os.path.join(current_dir, "results_insulin_recent")
+    results_dir = "results_insulin/results_insulin_df_recent" if args.feateng else "results_insulin/results_insulin_recent"
+    out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
     deeppysr_configs = get_deeppysr_configs()
@@ -36,8 +39,8 @@ def main():
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
 
-    print(f"\nLoading recent data for age={args.age}...")
-    ids, X, y = load_data_recent(args.age)
+    print(f"\nLoading recent data for age={args.age}, feateng={args.feateng}...")
+    ids, X, y = load_data_recent(args.age, feateng=args.feateng)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"

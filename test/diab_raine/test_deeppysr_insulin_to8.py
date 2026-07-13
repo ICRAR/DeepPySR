@@ -31,9 +31,13 @@ def main():
     parser.add_argument('--age', type=int, default=22,
                         choices=_INSULIN_AGES)
     parser.add_argument('--vps', type=int, default=25)
+    parser.add_argument('--feateng', action='store_true', default=False,
+                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
+    if args.feateng:
+        results_dir = f"results_insulin_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -51,8 +55,8 @@ def main():
     r2w_list = [1, 1.5, 2, 4]
     lambda_list = [0.001, 0.005, 0.01]
 
-    print(f"\nLoading data for test={args.test}, age={args.age}...")
-    ids, X, y = load_fn(args.age)
+    print(f"\nLoading data for test={args.test}, age={args.age}, feateng={args.feateng}...")
+    ids, X, y = load_fn(args.age, feateng=args.feateng)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"

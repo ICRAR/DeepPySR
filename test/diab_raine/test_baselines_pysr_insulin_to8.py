@@ -28,14 +28,18 @@ _N_TOP = 50
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', type=str, default='PGS',
+    parser.add_argument('--test', type=str, default='to8',
                         choices=['PGS', 'to8', 'PGSto8'],
                         help='Which feature set to use')
-    parser.add_argument('--age', type=int, default=28,
+    parser.add_argument('--age', type=int, default=22,
                         choices=_INSULIN_AGES)
+    parser.add_argument('--feateng', action='store_true', default=True,
+                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
+    if args.feateng:
+        results_dir = f"results_insulin_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -46,8 +50,8 @@ def main():
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
 
-    print(f"\nLoading data for test={args.test}, age={args.age}...")
-    ids, X, y = load_fn(args.age)
+    print(f"\nLoading data for test={args.test}, age={args.age}, feateng={args.feateng}...")
+    ids, X, y = load_fn(args.age, feateng=args.feateng)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"
