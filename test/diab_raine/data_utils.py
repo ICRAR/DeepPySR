@@ -565,13 +565,15 @@ def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
 
 
 def _high_age_suffixes(cutoff: int) -> set:
-    """Return yr/y suffix strings for timepoints with age > cutoff."""
+    """Return yr/y suffix strings for timepoints with age > cutoff.
+
+    Covers every possible year (not just the known G-code timepoints), since
+    normalized RAINE columns (e.g. "_yr12", "_yr24") can carry ages that
+    don't appear in _TIMEPOINT_YEAR."""
     suffixes = set()
-    for yr in _TIMEPOINT_YEAR.values():
-        m = re.match(r"yr(\d+)$", yr)
-        if m and int(m.group(1)) > cutoff:
-            suffixes.add(yr)
-            suffixes.add(f"y{m.group(1)}")
+    for yr in range(cutoff + 1, 41):
+        suffixes.add(f"yr{yr}")
+        suffixes.add(f"y{yr}")
     return suffixes
 
 
@@ -860,9 +862,9 @@ def load_data_keepto8(age: int, feateng: bool = False) -> tuple[pd.Series, pd.Da
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
     if feateng:
         X = _add_longitudinal_features(X)
-    X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y
@@ -887,9 +889,9 @@ def load_data_PGSto8(age: int, feateng: bool = False) -> tuple[pd.Series, pd.Dat
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
     if feateng:
         X = _add_longitudinal_features(X)
-    X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y
@@ -915,9 +917,9 @@ def load_data_recent(age: int, feateng: bool = False) -> tuple[pd.Series, pd.Dat
     id_col = merged["child_id"]
     y = merged[y_col].rename("diab_raine")
     X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
     if feateng:
         X = _add_longitudinal_features(X)
-    X = _clean_and_impute(X)
 
     _save_insulin_cache(cache_path, id_col, X, y)
     return id_col, X, y

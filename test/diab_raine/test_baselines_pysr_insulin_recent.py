@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--age', type=int, default=28,
                         choices=_INSULIN_AGES)
-    parser.add_argument('--feateng', action='store_true', default=False,
+    parser.add_argument('--feateng', action='store_true', default=True,
                         help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 

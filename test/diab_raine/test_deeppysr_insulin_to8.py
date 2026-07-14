@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--age', type=int, default=22,
                         choices=_INSULIN_AGES)
     parser.add_argument('--vps', type=int, default=25)
-    parser.add_argument('--feateng', action='store_true', default=False,
+    parser.add_argument('--feateng', action='store_true', default=True,
                         help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 

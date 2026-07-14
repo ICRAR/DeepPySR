@@ -28,10 +28,10 @@ _N_TOP = 50
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test', type=str, default='to8',
+    parser.add_argument('--test', type=str, default='PGSto8',
                         choices=['PGS', 'to8', 'PGSto8'],
                         help='Which feature set to use')
-    parser.add_argument('--age', type=int, default=22,
+    parser.add_argument('--age', type=int, default=28,
                         choices=_INSULIN_AGES)
     parser.add_argument('--feateng', action='store_true', default=True,
                         help='Add first-difference/second-derivative longitudinal features')
