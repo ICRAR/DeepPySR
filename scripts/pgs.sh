@@ -65,7 +65,7 @@ PGS003149
 for PGS_ID in "${PGS_LIST[@]}"; do
 nextflow run pgscatalog/pgsc_calc \
   -profile singularity \
-  --input /scratch/pawsey0411/fchen1/pgs/samplesheet.csv \
+  --input /scratch/pawsey0411/fchen1/DeepPySR/scripts/samplesheet.csv \
   --target_build GRCh38 \
   --pgs_id ${PGS_ID} \
   --outdir /scratch/pawsey0411/fchen1/pgs/pgs_score/${PGS_ID}/
