@@ -2,7 +2,7 @@
 #SBATCH --account=pawsey0411
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=20G
+#SBATCH --mem=80G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=pgsc_calc
 #SBATCH --output=/scratch/pawsey0411/fchen1/pgs/nextflowpgs.log
