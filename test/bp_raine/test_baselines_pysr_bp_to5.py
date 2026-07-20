@@ -19,9 +19,9 @@ from data_utils import (
 import argparse
 
 _LOAD_FN = {
-    'PGS':    (load_data_PGS_only,  'results_bp_PGS'),
-    'to5':    (load_data_keepto5,   'results_bp_to5'),
-    'PGSto5': (load_data_PGSto5,    'results_bp_PGSto5'),
+    'PGS':    (load_data_PGS_only,  'results_bp/results_bp_PGS'),
+    'to5':    (load_data_keepto5,   'results_bp/results_bp_to5'),
+    'PGSto5': (load_data_PGSto5,    'results_bp/results_bp_PGSto5'),
 }
 
 _N_TOP = 100
@@ -46,7 +46,7 @@ def main():
     if args.test == 'PGS':
         args.feateng = False
     if args.feateng:
-        results_dir = f"results_bp_df_{args.test}"
+        results_dir = f"results_bp/results_bp_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 

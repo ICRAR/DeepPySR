@@ -20,9 +20,9 @@ import argparse
 _N_TOP = 100
 
 _LOAD_FN = {
-    'PGS':    (load_data_PGS_only,  'results_lipids_PGS'),
-    'to8':    (load_data_keepto8,   'results_lipids_to8'),
-    'PGSto8': (load_data_PGSto8,    'results_lipids_PGSto8'),
+    'PGS':    (load_data_PGS_only,  'results_lipids/results_lipids_PGS'),
+    'to8':    (load_data_keepto8,   'results_lipids/results_lipids_to8'),
+    'PGSto8': (load_data_PGSto8,    'results_lipids/results_lipids_PGSto8'),
 }
 
 
@@ -46,7 +46,7 @@ def main():
     if args.test == 'PGS':
         args.feateng = False
     if args.feateng:
-        results_dir = f"results_lipids_df_{args.test}"
+        results_dir = f"results_lipids/results_lipids_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
