@@ -20,7 +20,14 @@ dependencies = [
     "pandas",
     "pycirclize",
     "torch",
-    "pykan"
+    "pykan",
+    "scikit-learn",
+    "tqdm",
+    "scipy",
+    "imblearn",
+    "PyYAML",
+    "xgboost",
+    "statsmodels"
 ]
 
 [project.urls]
