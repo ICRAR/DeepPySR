@@ -12,7 +12,7 @@ from data_utils import load_data_recent, _INSULIN_AGES
 
 import argparse
 
-_N_TOP = 50
+_N_TOP = 100
 
 
 def main():
@@ -78,23 +78,29 @@ def main():
 
             run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs, **fs_kwargs)
 
-    # PySR models
+    # PySR models — two runs per config: all features and top-100
     print("\nEvaluating PySR Models...")
     for cfg_name, cfg_overrides in pysr_configs.items():
         aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
         full_name = f"pysr_{param_suffix}_aps{aps}_grid"
-        pysr_out = os.path.join(run_out, "pysr", full_name)
-        if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
-            print(f"  Skipping {full_name} (results exist)")
-            continue
-        print(f"  {full_name}...")
 
-        def pysr_factory(co=cfg_overrides):
-            kwargs = pysr_base_kwargs.copy()
-            kwargs.update(co)
-            return PySRRegressor(**kwargs)
+        for subfolder, fs_kwargs in [
+            ("all_features", {}),
+            (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
+        ]:
+            pysr_out = os.path.join(run_out, "pysr", full_name) if subfolder == "all_features" \
+                else os.path.join(run_out, "pysr", full_name, subfolder)
+            if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
+                print(f"  Skipping {full_name}/{subfolder} (results exist)")
+                continue
+            print(f"  {full_name}/{subfolder}...")
 
-        run_cv(pysr_factory, X, y, outdir=pysr_out, scaler=False, **cv_kwargs)
+            def pysr_factory(co=cfg_overrides):
+                kwargs = pysr_base_kwargs.copy()
+                kwargs.update(co)
+                return PySRRegressor(**kwargs)
+
+            run_cv(pysr_factory, X, y, outdir=pysr_out, scaler=False, **cv_kwargs, **fs_kwargs)
 
     print(f"\nAggregating results for {run_name}...")
     aggregate_results(run_out, task='regression')

@@ -19,6 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, '..')))
 import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import r2_score
+from scipy.stats import pearsonr
 from pysr import PySRRegressor
 from deeppysr import DeepPySR
 from model_utils import (
@@ -59,129 +60,92 @@ def _pysr_kwargs(base_kwargs, overrides=None):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def evaluate_all_deeppysr_formulas(run_out_dir, X, y):
+def _pearson_from_predictions(pred_path, pred_col='y_pred'):
+    """Pearson r computed fresh from a predictions.csv (genuine out-of-fold
+    predictions from run_cv) -- overall_metrics.csv doesn't carry pearson_r
+    (eval_utils.calculate_metrics never computed it), so it's derived here
+    instead of retraining."""
+    if not os.path.exists(pred_path):
+        return np.nan
+    try:
+        df = pd.read_csv(pred_path)
+        y_true = df['y_true'].values.astype(float)
+        y_pred = df[pred_col].values.astype(float)
+        mask = np.isfinite(y_true) & np.isfinite(y_pred)
+        if mask.sum() < 2 or np.std(y_true[mask]) == 0 or np.std(y_pred[mask]) == 0:
+            return np.nan
+        return float(pearsonr(y_true[mask], y_pred[mask])[0])
+    except Exception:
+        return np.nan
+
+
+def _read_overall_metrics(path, pred_path=None, pred_col='y_pred'):
+    """Read r2/mae/rmse from an overall_metrics.csv, plus pearson_r derived
+    from the sibling predictions.csv if given.
+
+    These are genuine out-of-fold CV metrics already computed by run_cv (each
+    fold's model/formula is only ever applied to the rows it did NOT train on),
+    so no re-evaluation against the full dataset is needed or safe.
+    """
+    if not os.path.exists(path):
+        return None
+    try:
+        row = pd.read_csv(path).iloc[0]
+        metrics = {'r2': float(row['r2']), 'mae': float(row['mae']), 'rmse': float(row['rmse'])}
+        metrics['pearson_r'] = _pearson_from_predictions(pred_path, pred_col=pred_col) \
+            if pred_path is not None else np.nan
+        return metrics
+    except Exception:
+        return None
+
+
+def collect_cv_grid_metrics(run_out_dir, family_dirname):
+    """Genuine out-of-fold CV metrics for each grid config of a formula family.
+
+    Returns:
+        dict: {config_name: {'r2':.., 'mae':.., 'rmse':.., 'pearson_r':..}}
+    """
     results = {}
-    deeppysr_dir = os.path.join(run_out_dir, 'deeppysr')
-    if not os.path.exists(deeppysr_dir):
+    family_dir = os.path.join(run_out_dir, family_dirname)
+    if not os.path.exists(family_dir):
         return results
-
-    pattern = os.path.join(deeppysr_dir, '**', 'relationships_fold*.csv')
-    files = glob.glob(pattern, recursive=True)
-    if not files:
-        files = glob.glob(os.path.join(deeppysr_dir, '**', 'relationships.csv'), recursive=True)
-
-    for f in files:
-        try:
-            df = pd.read_csv(f)
-            if 'formula' not in df.columns:
-                continue
-            for _, row in df.iterrows():
-                formula = str(row['formula'])
-                if formula in results:
-                    continue
-                try:
-                    y_pred = evaluate_formula(formula, X, model_type='deeppysr')
-                    mask = ~np.isnan(y_pred)
-                    if mask.sum() < 2:
-                        continue
-                    r2_val = r2_score(np.asarray(y)[mask], y_pred[mask])
-                    results[formula] = (r2_val, y_pred)
-                except Exception:
-                    continue
-        except Exception:
-            continue
+    for cfg in sorted(os.listdir(family_dir)):
+        cfg_path = os.path.join(family_dir, cfg)
+        metrics = _read_overall_metrics(os.path.join(cfg_path, 'overall_metrics.csv'),
+                                        pred_path=os.path.join(cfg_path, 'predictions.csv'))
+        if metrics is not None:
+            results[cfg] = metrics
     return results
 
 
-def evaluate_all_pysr_formulas(run_out_dir, X, y):
-    results = {}
-    pysr_dir = os.path.join(run_out_dir, 'pysr')
-    if not os.path.exists(pysr_dir):
-        return results
+def collect_cv_baseline_metrics(run_out_dir):
+    """Genuine out-of-fold CV metrics for each baseline model.
 
-    for f in glob.glob(os.path.join(pysr_dir, '**', 'formulas_fold*.csv'), recursive=True):
-        try:
-            df = pd.read_csv(f)
-            if 'formula' not in df.columns:
-                continue
-            for _, row in df.iterrows():
-                formula = str(row['formula'])
-                if formula in results:
-                    continue
-                try:
-                    y_pred = evaluate_formula(formula, X, model_type='pysr')
-                    mask = ~np.isnan(y_pred)
-                    if mask.sum() < 2:
-                        continue
-                    r2_val = r2_score(np.asarray(y)[mask], y_pred[mask])
-                    results[formula] = (r2_val, y_pred)
-                except Exception:
-                    continue
-        except Exception:
-            continue
-    return results
-
-
-def evaluate_all_kan_formulas(run_out_dir, X, y):
-    results = {}
-    kan_dir = os.path.join(run_out_dir, 'baselines', 'KAN')
-    if not os.path.exists(kan_dir):
-        return results
-
-    pattern = os.path.join(kan_dir, '**', 'formulas_fold*.csv')
-    files = glob.glob(pattern, recursive=True)
-    if not files:
-        files = glob.glob(os.path.join(kan_dir, '**', 'formulas.csv'), recursive=True)
-
-    for f in files:
-        try:
-            df = pd.read_csv(f)
-            if 'formula' not in df.columns:
-                continue
-            for _, row in df.iterrows():
-                formula = str(row['formula'])
-                if formula in results:
-                    continue
-                try:
-                    y_pred = evaluate_formula(formula, X, model_type='kan')
-                    mask = ~np.isnan(y_pred)
-                    if mask.sum() < 2:
-                        continue
-                    r2_val = r2_score(np.asarray(y)[mask], y_pred[mask])
-                    results[formula] = (r2_val, y_pred)
-                except Exception:
-                    continue
-        except Exception:
-            continue
-    return results
-
-
-def evaluate_all_baseline_models(run_out_dir, X, y, feature_cols):
+    Returns:
+        dict: {model_name: {'r2':.., 'mae':.., 'rmse':.., 'pearson_r':..}}
+    """
     results = {}
     baselines_dir = os.path.join(run_out_dir, 'baselines')
     if not os.path.exists(baselines_dir):
         return results
-
     for name in sorted(os.listdir(baselines_dir)):
-        if name.startswith('_') or not os.path.isdir(os.path.join(baselines_dir, name)):
+        model_dir = os.path.join(baselines_dir, name)
+        if name.startswith('_') or not os.path.isdir(model_dir):
             continue
-        pred_file = os.path.join(baselines_dir, name, 'predictions.csv')
-        if not os.path.exists(pred_file):
-            continue
-        try:
-            df_pred = pd.read_csv(pred_file)
-            if 'y_true' not in df_pred.columns or 'y_pred' not in df_pred.columns:
-                continue
-            y_true_cv = df_pred['y_true'].values
-            y_pred_cv = df_pred['y_pred'].values
-            mask = ~np.isnan(y_pred_cv) & ~np.isnan(y_true_cv)
-            if mask.sum() < 2:
-                continue
-            r2_val = r2_score(y_true_cv[mask], y_pred_cv[mask])
-            results[name] = (r2_val, y_pred_cv)
-        except Exception:
-            continue
+        metrics = _read_overall_metrics(os.path.join(model_dir, 'overall_metrics.csv'),
+                                        pred_path=os.path.join(model_dir, 'predictions.csv'))
+        if metrics is not None:
+            results[name] = metrics
     return results
+
+
+def collect_cv_kan_symbolic_metrics(run_out_dir):
+    """Genuine out-of-fold CV metrics for KAN's extracted symbolic formula."""
+    kan_dir = os.path.join(run_out_dir, 'baselines', 'KAN')
+    metrics = _read_overall_metrics(
+        os.path.join(kan_dir, 'overall_metrics_sym.csv'),
+        pred_path=os.path.join(kan_dir, 'predictions.csv'), pred_col='y_pred_kansym')
+    return {'KAN_symbolic': metrics} if metrics is not None else {}
 
 
 def evaluate_full_baseline_models(full_models_dir, get_x_eval, y_eval):
@@ -306,63 +270,46 @@ def evaluate_full_formula_models(full_models_dir, get_x_eval, y_eval):
     return results
 
 
-def select_best_cv_model_and_save_metrics(run_out, all_results_dict, y_eval=None):
-    from sklearn.metrics import mean_absolute_error, mean_squared_error
+def select_best_cv_model_and_save_metrics(run_out):
+    """Pick the best grid config per family from genuine out-of-fold CV metrics
+    and save cv_metrics_summary.csv.
 
-    def _extra_metrics(y_true, y_pred):
-        mask = ~np.isnan(y_pred) & ~np.isnan(np.asarray(y_true, dtype=float))
-        yt, yp = np.asarray(y_true)[mask], np.asarray(y_pred)[mask]
-        if len(yt) < 2:
-            return np.nan, np.nan
-        return mean_absolute_error(yt, yp), np.sqrt(mean_squared_error(yt, yp))
-
-    results_by_family = {}
-
-    for family, label in [('deeppysr', 'DeepPySR'), ('pysr', 'PySR'), ('kan', 'KAN')]:
-        best_r2 = -float('inf')
-        best_name = best_preds = best_formula = None
-        for formula, (r2_val, preds) in all_results_dict.get(family, {}).items():
-            print(f"    {label} formula r2={r2_val:.4f}: {formula[:60]}...")
-            if r2_val > best_r2:
-                best_r2 = r2_val
-                best_name = label
-                best_preds = preds
-                best_formula = formula
-        if best_name:
-            print(f"  [{label} best CV] r2={best_r2:.4f}")
-            results_by_family[family] = {best_name: (best_formula, best_preds, best_r2)}
-
-    results_by_family['baseline'] = {}
-    for model_name, (r2_val, preds) in all_results_dict.get('baseline', {}).items():
-        print(f"    Baseline {model_name} CV r2={r2_val:.4f}")
-        results_by_family['baseline'][model_name] = (model_name, preds, r2_val)
-
+    Every number here comes from run_cv's own overall_metrics.csv, where each
+    fold's model/formula was fit on ~80% of the data and evaluated only on the
+    20% it did not see. No formula is ever re-applied to rows it was trained on.
+    """
     rows = []
-    for family, models_dict in results_by_family.items():
-        for model_name, (formula_or_label, preds, r2_val) in models_dict.items():
-            row = {'family': family, 'model': model_name, 'cv_r2': r2_val}
-            if family == 'baseline':
-                pred_file = os.path.join(run_out, 'baselines', model_name, 'predictions.csv')
-                try:
-                    df_pred = pd.read_csv(pred_file)
-                    mae, rmse = _extra_metrics(df_pred['y_true'].values, df_pred['y_pred'].values)
-                    row['cv_mae'] = mae
-                    row['cv_rmse'] = rmse
-                except Exception:
-                    row['cv_mae'] = np.nan
-                    row['cv_rmse'] = np.nan
-            elif y_eval is not None and preds is not None:
-                mae, rmse = _extra_metrics(y_eval, preds)
-                row['cv_mae'] = mae
-                row['cv_rmse'] = rmse
-            rows.append(row)
+
+    for family, label in [('deeppysr', 'DeepPySR'), ('pysr', 'PySR')]:
+        grid_metrics = collect_cv_grid_metrics(run_out, family)
+        for cfg, m in grid_metrics.items():
+            print(f"    {label} [{cfg}] cv_r2={m['r2']:.4f}")
+        if grid_metrics:
+            best_cfg = max(grid_metrics, key=lambda k: grid_metrics[k]['r2'])
+            m = grid_metrics[best_cfg]
+            print(f"  [{label} best CV config: {best_cfg}] r2={m['r2']:.4f}")
+            rows.append({'family': family, 'model': label,
+                         'cv_r2': m['r2'], 'cv_mae': m['mae'], 'cv_rmse': m['rmse'],
+                         'cv_pearson_r': m['pearson_r']})
+
+    for name, m in collect_cv_kan_symbolic_metrics(run_out).items():
+        print(f"    KAN symbolic cv_r2={m['r2']:.4f}")
+        rows.append({'family': 'kan', 'model': name,
+                     'cv_r2': m['r2'], 'cv_mae': m['mae'], 'cv_rmse': m['rmse'],
+                     'cv_pearson_r': m['pearson_r']})
+
+    for name, m in collect_cv_baseline_metrics(run_out).items():
+        print(f"    Baseline {name} CV r2={m['r2']:.4f}")
+        rows.append({'family': 'baseline', 'model': name,
+                     'cv_r2': m['r2'], 'cv_mae': m['mae'], 'cv_rmse': m['rmse'],
+                     'cv_pearson_r': m['pearson_r']})
 
     if rows:
         metrics_csv = os.path.join(run_out, 'cv_metrics_summary.csv')
         pd.DataFrame(rows).to_csv(metrics_csv, index=False)
         print(f"  Saved CV metrics to {metrics_csv}\n")
 
-    return results_by_family
+    return rows
 
 
 def select_best_full_model(all_results_dict):
@@ -666,30 +613,9 @@ def run_rolling_step(merged_df, non_bmi_cols, target_year, rolling_csv):
 
     print(f'  Evaluating CV results on {known_mask.sum()} known samples...\n')
 
-    print('  Evaluating DeepPySR CV formulas...')
-    cv_deeppysr = evaluate_all_deeppysr_formulas(run_out, _get_x_eval('deeppysr'), y_eval)
-
-    print('  Evaluating PySR CV formulas...')
-    cv_pysr = evaluate_all_pysr_formulas(run_out, _get_x_eval('pysr'), y_eval)
-
-    print('  Evaluating KAN CV formulas...')
-    cv_kan = evaluate_all_kan_formulas(run_out, _get_x_eval('kan'), y_eval)
-
-    print('  Reading Baseline CV predictions...')
-    cv_baseline = evaluate_all_baseline_models(run_out, _get_x_eval('deeppysr'), y_eval, feature_cols)
-
-    cv_results = {
-        'deeppysr': cv_deeppysr,
-        'pysr': cv_pysr,
-        'kan': cv_kan,
-        'baseline': cv_baseline,
-    }
-
-    if any(cv_results.values()):
-        print('\n  --- CV metrics ---')
-        select_best_cv_model_and_save_metrics(run_out, cv_results, y_eval=y_eval)
-    else:
-        print('  No CV results found.')
+    # ── CV evaluation: read genuine out-of-fold metrics already computed by run_cv ──
+    print('\n  --- CV metrics (out-of-fold, no leakage) ---')
+    select_best_cv_model_and_save_metrics(run_out)
 
     pysr_base_kwargs = _rolling_step_kwargs.get('pysr_base_kwargs', {})
     deeppysr_configs = _rolling_step_kwargs.get('deeppysr_configs', {})
