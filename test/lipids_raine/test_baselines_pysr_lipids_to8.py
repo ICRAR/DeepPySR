@@ -111,8 +111,7 @@ def main():
             ("all_features", {}),
             (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
         ]:
-            pysr_out = os.path.join(run_out, "pysr", full_name) if subfolder == "all_features" \
-                else os.path.join(run_out, "pysr", full_name, subfolder)
+            pysr_out = os.path.join(run_out, "pysr", full_name, subfolder)
             if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
                 print(f"  Skipping {full_name}/{subfolder} (results exist)")
                 continue
