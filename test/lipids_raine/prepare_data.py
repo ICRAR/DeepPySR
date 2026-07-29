@@ -1,11 +1,9 @@
 """Pre-build and cache X/y data for every (target, age, test-type) combo used
-by the lipids_raine test scripts, for both feateng=False and feateng=True.
+by the lipids_raine test scripts.
 
-Caching is keyed on (test-type, target, age) only (see data_utils.py) --
-feateng is applied on top of the cached raw data, so this mainly warms the
-on-disk cache once per combo and then sanity-checks the feateng path.
-Combos that are already cached on disk are skipped automatically inside
-each load_fn.
+Caching is keyed on (test-type, target, age) (see data_utils.py). Combos
+that are already cached on disk are skipped automatically inside each
+load_fn.
 """
 import sys
 import traceback
@@ -15,6 +13,7 @@ from data_utils import (
     load_data_keepto8,
     load_data_PGSto8,
     load_data_recent,
+    load_data_nblood,
     _LIPIDS_AGES,
     _LIPID_TARGETS,
 )
@@ -24,6 +23,7 @@ _LOAD_FN = {
     'to8':    load_data_keepto8,
     'PGSto8': load_data_PGSto8,
     'recent': load_data_recent,
+    'nblood': load_data_nblood,
 }
 
 
@@ -39,21 +39,20 @@ def main():
 
     for i, (test_name, target, age) in enumerate(combos, 1):
         load_fn = _LOAD_FN[test_name]
-        for feateng in (False, True):
-            label = f"[{i}/{total}] test={test_name} target={target} age={age} feateng={feateng}"
-            try:
-                ids, X, y = load_fn(target, age, feateng=feateng)
-                print(f"{label} -> OK n={len(X)} features={X.shape[1]}")
-            except Exception as e:
-                print(f"{label} -> FAILED: {e}")
-                traceback.print_exc()
-                failures.append((test_name, target, age, feateng, str(e)))
+        label = f"[{i}/{total}] test={test_name} target={target} age={age}"
+        try:
+            ids, X, y = load_fn(target, age)
+            print(f"{label} -> OK n={len(X)} features={X.shape[1]}")
+        except Exception as e:
+            print(f"{label} -> FAILED: {e}")
+            traceback.print_exc()
+            failures.append((test_name, target, age, str(e)))
 
-    print(f"\nDone. {total * 2 - len(failures)}/{total * 2} combos succeeded.")
+    print(f"\nDone. {total - len(failures)}/{total} combos succeeded.")
     if failures:
         print(f"\n{len(failures)} failures:")
-        for test_name, target, age, feateng, err in failures:
-            print(f"  test={test_name} target={target} age={age} feateng={feateng}: {err}")
+        for test_name, target, age, err in failures:
+            print(f"  test={test_name} target={target} age={age}: {err}")
         sys.exit(1)
 
 

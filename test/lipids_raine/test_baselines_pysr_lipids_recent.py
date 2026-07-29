@@ -8,26 +8,30 @@ from pysr import PySRRegressor
 from model_utils import get_pysr_configs, get_baseline_models, get_pysr_base_kwargs, KANWrapper
 from sklearn.base import clone
 from eval_utils import run_cv, aggregate_results
-from data_utils import load_data_recent, _LIPIDS_AGES, _LIPID_TARGETS
+from data_utils import load_data_recent, load_data_nblood, _LIPIDS_AGES, _LIPID_TARGETS
 
 import argparse
 
 _N_TOP = 100
 
+_LOAD_FN = {
+    'recent': (load_data_recent, 'results_lipids/results_lipids_recent'),
+    'nblood': (load_data_nblood, 'results_lipids/results_lipids_nblood'),
+}
+
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--test', type=str, default='recent',
+                        choices=['recent', 'nblood'],
+                        help='Which feature set to use')
     parser.add_argument('--target', type=str, default='cholesterol',
                         choices=_LIPID_TARGETS)
     parser.add_argument('--age', type=int, default=28,
                         choices=_LIPIDS_AGES)
-    parser.add_argument('--feateng', dest='feateng', action='store_true', default=True,
-                        help='Add first-difference/second-derivative longitudinal features')
-    parser.add_argument('--no_feateng', dest='feateng', action='store_false',
-                        help='Disable longitudinal feature engineering')
     args = parser.parse_args()
 
-    results_dir = "results_lipids/results_lipids_df_recent" if args.feateng else "results_lipids/results_lipids_recent"
+    load_fn, results_dir = _LOAD_FN[args.test]
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -38,8 +42,8 @@ def main():
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
 
-    print(f"\nLoading recent data for target={args.target}, age={args.age}, feateng={args.feateng}...")
-    ids, X, y = load_data_recent(args.target, args.age, feateng=args.feateng)
+    print(f"\nLoading {args.test} data for target={args.target}, age={args.age}...")
+    ids, X, y = load_fn(args.target, args.age)
     y = y.rename(args.target)
 
     run_name = f"age_{args.age}_{args.target}"

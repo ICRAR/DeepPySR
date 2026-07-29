@@ -1,7 +1,11 @@
 #!/bin/bash
 # Generates SLURM job scripts under scripts/cv/lipids_raine/ and scripts/cv/bp_raine/,
-# mirroring the layout of scripts/cv/diab_raine/ but extended over multiple targets
-# and with/without longitudinal feature engineering (--no_feateng).
+# mirroring the layout of scripts/cv/diab_raine/ but extended over multiple targets.
+#
+# lipids_raine has no feateng split (retired) and adds a 5th input_type,
+# nblood (like recent, but excludes all blood-lipid history from the
+# features). bp_raine is unchanged: still with/without longitudinal feature
+# engineering (--no_feateng), still only to5/PGSto5/recent.
 
 set -e
 
@@ -44,15 +48,64 @@ create_script() {
     chmod +x "${outdir}/run_${job_name}.sh"
 }
 
-# Args: dataset short to8_variant pgsto8_variant targets_var ages_var
-generate_dataset() {
-    local dataset=$1 short=$2 to8_variant=$3 pgsto8_variant=$4
+# lipids_raine: no feateng split; to8/PGSto8 via test_*_lipids_to8.py,
+# recent/nblood via test_*_lipids_recent.py (--test recent|nblood).
+generate_lipids() {
+    local -n targets=$1
+    local -n ages=$2
+
+    local baselines_to8_script="test/lipids_raine/test_baselines_pysr_lipids_to8.py"
+    local baselines_recent_script="test/lipids_raine/test_baselines_pysr_lipids_recent.py"
+    local deeppysr_to8_script="test/lipids_raine/test_deeppysr_lipids_to8.py"
+    local deeppysr_recent_script="test/lipids_raine/test_deeppysr_lipids_recent.py"
+
+    for target in "${targets[@]}"; do
+        for age in "${ages[@]}"; do
+            # --- Baselines + PySR ---
+            create_script "lipids_raine" "lipids_baselines_pgs_age${age}_${target}" \
+                "${baselines_to8_script} --test PGS --target ${target} --age ${age}"
+
+            for variant in to8 PGSto8; do
+                local variant_lc="${variant,,}"
+                create_script "lipids_raine" "lipids_baselines_${variant_lc}_age${age}_${target}" \
+                    "${baselines_to8_script} --test ${variant} --target ${target} --age ${age}"
+            done
+
+            for variant in recent nblood; do
+                create_script "lipids_raine" "lipids_baselines_${variant}_age${age}_${target}" \
+                    "${baselines_recent_script} --test ${variant} --target ${target} --age ${age}"
+            done
+
+            # --- DeepPySR ---
+            for vps in 25 50 75; do
+                create_script "lipids_raine" "lipids_deeppysr_pgs_age${age}_${target}_vps${vps}" \
+                    "${deeppysr_to8_script} --test PGS --target ${target} --age ${age} --vps ${vps}"
+
+                for variant in to8 PGSto8; do
+                    local variant_lc="${variant,,}"
+                    create_script "lipids_raine" "lipids_deeppysr_${variant_lc}_age${age}_${target}_vps${vps}" \
+                        "${deeppysr_to8_script} --test ${variant} --target ${target} --age ${age} --vps ${vps}"
+                done
+
+                for variant in recent nblood; do
+                    create_script "lipids_raine" "lipids_deeppysr_${variant}_age${age}_${target}_vps${vps}" \
+                        "${deeppysr_recent_script} --test ${variant} --target ${target} --age ${age} --vps ${vps}"
+                done
+            done
+        done
+    done
+}
+
+# bp_raine: unchanged -- to5/PGSto5/recent, still with/without feateng.
+# Args: dataset short to5_variant pgsto5_variant targets_var ages_var
+generate_bp() {
+    local dataset=$1 short=$2 to5_variant=$3 pgsto5_variant=$4
     local -n targets=$5
     local -n ages=$6
 
-    local baselines_to8_script="test/${dataset}/test_baselines_pysr_${short}_${to8_variant}.py"
+    local baselines_to5_script="test/${dataset}/test_baselines_pysr_${short}_${to5_variant}.py"
     local baselines_recent_script="test/${dataset}/test_baselines_pysr_${short}_recent.py"
-    local deeppysr_to8_script="test/${dataset}/test_deeppysr_${short}_${to8_variant}.py"
+    local deeppysr_to5_script="test/${dataset}/test_deeppysr_${short}_${to5_variant}.py"
     local deeppysr_recent_script="test/${dataset}/test_deeppysr_${short}_recent.py"
 
     for target in "${targets[@]}"; do
@@ -61,14 +114,14 @@ generate_dataset() {
 
             # PGS: feateng is forced off internally by the test script, no with/without split
             create_script "$dataset" "${dataset}_baselines_pgs_age${age}_${target}" \
-                "${baselines_to8_script} --test PGS --target ${target} --age ${age}"
+                "${baselines_to5_script} --test PGS --target ${target} --age ${age}"
 
-            for variant in "$to8_variant" "$pgsto8_variant"; do
+            for variant in "$to5_variant" "$pgsto5_variant"; do
                 local variant_lc="${variant,,}"
                 create_script "$dataset" "${dataset}_baselines_${variant_lc}_age${age}_${target}" \
-                    "${baselines_to8_script} --test ${variant} --target ${target} --age ${age}"
+                    "${baselines_to5_script} --test ${variant} --target ${target} --age ${age}"
                 create_script "$dataset" "${dataset}_baselines_${variant_lc}_age${age}_${target}_nofeateng" \
-                    "${baselines_to8_script} --test ${variant} --target ${target} --age ${age} --no_feateng"
+                    "${baselines_to5_script} --test ${variant} --target ${target} --age ${age} --no_feateng"
             done
 
             create_script "$dataset" "${dataset}_baselines_recent_age${age}_${target}" \
@@ -79,14 +132,14 @@ generate_dataset() {
             # --- DeepPySR ---
             for vps in 25 50 75; do
                 create_script "$dataset" "${dataset}_deeppysr_pgs_age${age}_${target}_vps${vps}" \
-                    "${deeppysr_to8_script} --test PGS --target ${target} --age ${age} --vps ${vps}"
+                    "${deeppysr_to5_script} --test PGS --target ${target} --age ${age} --vps ${vps}"
 
-                for variant in "$to8_variant" "$pgsto8_variant"; do
+                for variant in "$to5_variant" "$pgsto5_variant"; do
                     local variant_lc="${variant,,}"
                     create_script "$dataset" "${dataset}_deeppysr_${variant_lc}_age${age}_${target}_vps${vps}" \
-                        "${deeppysr_to8_script} --test ${variant} --target ${target} --age ${age} --vps ${vps}"
+                        "${deeppysr_to5_script} --test ${variant} --target ${target} --age ${age} --vps ${vps}"
                     create_script "$dataset" "${dataset}_deeppysr_${variant_lc}_age${age}_${target}_vps${vps}_nofeateng" \
-                        "${deeppysr_to8_script} --test ${variant} --target ${target} --age ${age} --vps ${vps} --no_feateng"
+                        "${deeppysr_to5_script} --test ${variant} --target ${target} --age ${age} --vps ${vps} --no_feateng"
                 done
 
                 create_script "$dataset" "${dataset}_deeppysr_recent_age${age}_${target}_vps${vps}" \
@@ -99,11 +152,11 @@ generate_dataset() {
 }
 
 lipids_targets=(cholesterol triglyceride hdl ldl)
-lipids_ages=(14 17 20 22 27 28)
-generate_dataset "lipids_raine" "lipids" "to8" "PGSto8" lipids_targets lipids_ages
+lipids_ages=(14 17 20 22 28)
+generate_lipids lipids_targets lipids_ages
 
 bp_targets=(sys_bp dia_bp)
 bp_ages=(10 14 17 20 22)
-generate_dataset "bp_raine" "bp" "to5" "PGSto5" bp_targets bp_ages
+generate_bp "bp_raine" "bp" "to5" "PGSto5" bp_targets bp_ages
 
 echo "Done."

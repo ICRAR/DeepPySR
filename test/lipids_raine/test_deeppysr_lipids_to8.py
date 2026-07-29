@@ -36,17 +36,9 @@ def main():
     parser.add_argument('--age', type=int, default=22,
                         choices=_LIPIDS_AGES)
     parser.add_argument('--vps', type=int, default=25)
-    parser.add_argument('--feateng', dest='feateng', action='store_true', default=True,
-                        help='Add first-difference/second-derivative longitudinal features')
-    parser.add_argument('--no_feateng', dest='feateng', action='store_false',
-                        help='Disable longitudinal feature engineering')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
-    if args.test == 'PGS':
-        args.feateng = False
-    if args.feateng:
-        results_dir = f"results_lipids/results_lipids_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -64,8 +56,8 @@ def main():
     r2w_list = [1, 1.5, 2, 4]
     lambda_list = [0.001, 0.005, 0.01]
 
-    print(f"\nLoading data for test={args.test}, target={args.target}, age={args.age}, feateng={args.feateng}...")
-    ids, X, y = load_fn(args.target, args.age, feateng=args.feateng)
+    print(f"\nLoading data for test={args.test}, target={args.target}, age={args.age}...")
+    ids, X, y = load_fn(args.target, args.age)
     y = y.rename(args.target)
 
     run_name = f"age_{args.age}_{args.target}"

@@ -1,7 +1,6 @@
 import re
 import sys
 from functools import lru_cache
-from itertools import combinations
 import pandas as pd
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
@@ -28,15 +27,32 @@ _TIMEPOINT_YEAR = {
     "G220": "yr20", "G222": "yr22", "G227": "yr27", "G228": "yr28",
 }
 
-# lipid targets available at these ages (G2xx_B3-B6)
-_LIPIDS_AGES = [14, 17, 20, 22, 27, 28]
+# lipid targets available at these ages (G2xx_B3-B6). Age 27 is no longer a
+# standalone target age -- its values are merged into age 28 (see
+# _lipid_target_series) to fix a severe class imbalance in participant
+# counts between the two adjacent waves; _get_target_col is still used
+# internally by that merge to read the raw yr27/yr28 columns.
+_LIPIDS_AGES = [14, 17, 20, 22, 28]
 _LIPID_TARGETS = ["cholesterol", "triglyceride", "hdl", "ldl"]
+_LIPID_TARGET_KEYWORDS = ("cholesterol", "triglyceride", "hdl", "ldl")
 _FEATURE_CUTOFF = 8
+
+# Known data-entry errors for child_id 10840 at yr27: cholesterol=76.0 mmol/L
+# (~15x any other value in the cohort; next-highest is 8.1) and
+# triglyceride=78.0 mmol/L (also the max in the cohort by a huge margin),
+# while their yr28 values (5.2 and 1.4 respectively) are unremarkable --
+# almost certainly transcription errors (e.g. a misplaced decimal), not real
+# measurements. Nulled out in _build_merged so they can neither contaminate
+# the age-27/28 target merge in _lipid_target_series nor leak in as raw
+# yr27 feature values in any input_type that keeps that timepoint.
+_BAD_LIPID_YR27_CHILD_ID = 10840
+_BAD_LIPID_YR27_TARGETS = ("cholesterol", "triglyceride")
 
 _CACHE_PGS     = _BASE / "raine" / "lipids_PGS"
 _CACHE_KEEPTO8 = _BASE / "raine" / "lipids_keepto8"
 _CACHE_PGSTO8  = _BASE / "raine" / "lipids_PGSto8"
 _CACHE_RECENT  = _BASE / "raine" / "lipids_recent"
+_CACHE_NBLOOD  = _BASE / "raine" / "lipids_nblood"
 
 
 def _extract_timepoint(var_name: str) -> str:
@@ -462,71 +478,107 @@ def _build_merged() -> pd.DataFrame:
     pgs_cols = _get_pgs_cols()
     merged = merged.dropna(subset=pgs_cols)
     merged = _preprocess(merged)
+
+    merged = _null_bad_lipid_yr27_values(merged)
+    merged = _consolidate_sex_columns(merged)
+    merged = _consolidate_bmi_yr8(merged)
+    merged = _add_missing_bmi(merged)
     return merged
 
 
-_YR_COL_RE = re.compile(r"^(.+)_yr(\d+)$")
-_BIRTH_COL_RE = re.compile(r"^birth_(.+)$")
+def _null_bad_lipid_yr27_values(merged: pd.DataFrame) -> pd.DataFrame:
+    """Null out the known-bad yr27 cholesterol/triglyceride values for
+    _BAD_LIPID_YR27_CHILD_ID (see constant docstring). Done once here, on the
+    raw columns, so the fix applies uniformly whether that timepoint is read
+    as a target (via _lipid_target_series) or leaks in as a raw feature in
+    any input_type that keeps yr27 columns (e.g. 'recent' at age 28)."""
+    bad = merged["child_id"] == _BAD_LIPID_YR27_CHILD_ID
+    for target in _BAD_LIPID_YR27_TARGETS:
+        col27 = _get_target_col(merged, target, 27)
+        n_bad = int((bad & merged[col27].notna()).sum())
+        if n_bad:
+            print(f"[data cleaning] nulling {n_bad} known-bad {col27} value(s) "
+                  f"for child_id {_BAD_LIPID_YR27_CHILD_ID}")
+            merged.loc[bad, col27] = float("nan")
+    return merged
 
 
-def _longitudinal_groups(X: pd.DataFrame) -> dict[str, list[tuple[int, str, str]]]:
-    """Group numeric columns that track the same concept across timepoints.
+_SEX_COL_RE = re.compile(r"^(g[12]_)?sex(01|_x)?$", re.IGNORECASE)
 
-    Returns concept -> sorted list of (year, label, column_name), keeping only
-    concepts observed at 2+ distinct timepoints.
-    """
-    groups: dict[str, list[tuple[int, str, str]]] = {}
-    for col in X.columns:
-        if not pd.api.types.is_numeric_dtype(X[col]):
+
+def _consolidate_sex_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse every sex-encoding column (raw + dictionary-derived, whatever
+    coding they use) into a single canonical 'sex' feature so downstream
+    duplicate/correlation-based dropping doesn't have to be relied on."""
+    candidates = [c for c in df.columns if _SEX_COL_RE.match(c)]
+    if len(candidates) <= 1:
+        return df
+
+    canonical = "g2_sex" if "g2_sex" in candidates else sorted(candidates)[0]
+    combined = df[canonical].copy()
+    for c in candidates:
+        if c == canonical:
             continue
-        m = _YR_COL_RE.match(col)
-        if m:
-            base, year = m.group(1), int(m.group(2))
-            concept = re.sub(r"^g[12]_", "", base)
-            label = f"y{year}"
-        else:
-            m2 = _BIRTH_COL_RE.match(col)
-            if not m2:
-                continue
-            concept, year, label = m2.group(1), 0, "birth"
-        groups.setdefault(concept, []).append((year, label, col))
+        other = df[c]
+        both = pd.concat([combined.rename("canon"), other.rename("other")], axis=1).dropna()
+        if len(both) and (both["canon"] == both["other"]).mean() < 0.5:
+            # differently-coded (e.g. 1/2 vs 0/1): remap to canonical's scale
+            mapping = both.groupby("other")["canon"].agg(lambda s: s.mode().iloc[0])
+            other = other.map(mapping)
+        combined = combined.fillna(other)
 
-    result = {}
-    for concept, entries in groups.items():
-        dedup: dict[int, tuple[str, str]] = {}
-        for year, label, col in entries:
-            dedup.setdefault(year, (label, col))
-        if len(dedup) >= 2:
-            result[concept] = sorted((y, l, c) for y, (l, c) in dedup.items())
-    return result
+    print(f"\n[sex columns] consolidated {candidates} -> '{canonical}' "
+          f"({int(combined.notna().sum())} non-null)")
+    df = df.drop(columns=[c for c in candidates if c != canonical])
+    df[canonical] = combined
+    return df
 
 
-def _add_longitudinal_features(X: pd.DataFrame) -> pd.DataFrame:
-    """Add first-difference (df1_) and second-derivative (df2_) features
-    between every pair/triple of timepoints for each longitudinal concept."""
-    groups = _longitudinal_groups(X)
-    print(f"\n[feature engineering] found {len(groups)} longitudinal concept groups")
+def _consolidate_bmi_yr8(df: pd.DataFrame) -> pd.DataFrame:
+    """Merge the two precomputed yr8 BMI columns (bmi_x_yr8, bmi_y_yr8 --
+    two independent sources in the raw RAINE data) into a single
+    consistently-named 'bmi_yr8', row-wise mean where both are present."""
+    x_col, y_col = "bmi_x_yr8", "bmi_y_yr8"
+    has_x, has_y = x_col in df.columns, y_col in df.columns
+    if not (has_x or has_y):
+        return df
 
-    new_cols: dict[str, pd.Series] = {}
-    for concept, entries in groups.items():
-        print(f"  {concept}: {[label for _, label, _ in entries]}")
+    if has_x and has_y:
+        bmi_yr8 = pd.concat([df[x_col], df[y_col]], axis=1).mean(axis=1, skipna=True)
+        drop_cols = [x_col, y_col]
+    else:
+        bmi_yr8 = df[x_col] if has_x else df[y_col]
+        drop_cols = [x_col if has_x else y_col]
 
-        diffs: dict[tuple[str, str], pd.Series] = {}
-        for (yi, li, ci), (yj, lj, cj) in combinations(entries, 2):
-            d = (X[cj] - X[ci]) / (yj - yi)
-            diffs[(li, lj)] = d
-            new_cols[f"df1_{concept}_{li}_{lj}"] = d
+    print(f"\n[bmi] consolidated {drop_cols} -> 'bmi_yr8'")
+    df = df.drop(columns=drop_cols)
+    df["bmi_yr8"] = bmi_yr8
+    return df
 
-        for (yi, li, _), (yj, lj, _), (yk, lk, _) in combinations(entries, 3):
-            d_ij = diffs[(li, lj)]
-            d_jk = diffs[(lj, lk)]
-            d2 = (d_jk - d_ij) / ((yk - yi) / 2)
-            new_cols[f"df2_{concept}_{li}{lj}_{lj}{lk}"] = d2
 
-    if new_cols:
-        X = pd.concat([X, pd.DataFrame(new_cols, index=X.index)], axis=1)
-    print(f"[feature engineering] added {len(new_cols)} new features, total columns: {X.shape[1]}")
-    return X
+# (weight_column, weight->kg scale), (height_column, height->m scale) for
+# every BMI checkpoint missing from the raw data (birth, yr1). Later
+# checkpoints (yr5/8/10/14/17/20/22/27) are already precomputed upstream;
+# yr28 can't be added since no height measurement exists at that timepoint.
+_MISSING_BMI_SOURCES = {
+    "birth_bmi": (("birth_weight", 1 / 1000), ("birth_height", 1 / 100)),
+    "bmi_yr1":   (("weight_yr1", 1), ("height_yr1", 1 / 100)),
+}
+
+
+def _add_missing_bmi(df: pd.DataFrame) -> pd.DataFrame:
+    """Add BMI columns not present in the raw data (birth, yr1) from their
+    underlying weight/height measurements, named consistently with the
+    existing 'birth_<concept>' / '<concept>_yr<N>' convention."""
+    for bmi_col, ((w_col, w_scale), (h_col, h_scale)) in _MISSING_BMI_SOURCES.items():
+        if bmi_col in df.columns or w_col not in df.columns or h_col not in df.columns:
+            continue
+        weight_kg = df[w_col] * w_scale
+        height_m = df[h_col] * h_scale
+        df[bmi_col] = weight_kg / (height_m ** 2)
+        print(f"\n[bmi] computed '{bmi_col}' from {w_col}/{h_col} "
+              f"({int(df[bmi_col].notna().sum())} non-null)")
+    return df
 
 
 def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
@@ -606,6 +658,25 @@ def _get_target_col(merged: pd.DataFrame, target: str, age: int) -> str:
     return candidates[0]
 
 
+def _lipid_target_series(merged: pd.DataFrame, target: str, age: int) -> pd.Series:
+    """y values for `target` at `age`, aligned to merged's index.
+
+    age=28 is the merged year-27/28 wave: the row-wise mean of the raw
+    yr27/yr28 columns where both are present, or whichever one is present
+    when only one is (pandas .mean(skipna=True) already does exactly this --
+    NaN only when both are missing). age 27 is no longer a standalone target
+    age (see _LIPIDS_AGES), so this is the only place its raw column is
+    still read. Known-bad yr27 values are already nulled out in _build_merged
+    (see _null_bad_lipid_yr27_values), so they can't pull this merge off
+    toward their bogus values."""
+    if age != 28:
+        return merged[_get_target_col(merged, target, age)]
+
+    col27 = _get_target_col(merged, target, 27)
+    col28 = _get_target_col(merged, target, 28)
+    return pd.concat([merged[col27], merged[col28]], axis=1).mean(axis=1, skipna=True)
+
+
 def _dedup_by_child_id(df: pd.DataFrame) -> pd.DataFrame:
     if "child_id" not in df.columns:
         return df
@@ -620,14 +691,13 @@ def _dedup_by_child_id(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _cache_path(cache_dir: Path, target: str, age: int, feateng: bool) -> Path:
-    suffix = "_feateng" if feateng else ""
-    return cache_dir / f"{target}_{age}{suffix}.csv"
+def _cache_path(cache_dir: Path, target: str, age: int) -> Path:
+    return cache_dir / f"{target}_{age}.csv"
 
 
-def _save_cache(cache_dir: Path, target: str, age: int, feateng: bool,
+def _save_cache(cache_dir: Path, target: str, age: int,
                  id_col: pd.Series, X: pd.DataFrame, y: pd.Series) -> Path:
-    cache_path = _cache_path(cache_dir, target, age, feateng)
+    cache_path = _cache_path(cache_dir, target, age)
     y = y.rename(target)
     cache_df = pd.concat([id_col.reset_index(drop=True),
                           X.reset_index(drop=True),
@@ -647,113 +717,138 @@ def _load_cache(cache_path: Path, target: str):
     return id_col, X, y
 
 
-def load_data_PGS_only(target: str, age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
-    """Load PGS-only features to predict `target` lipid at the given age.
+def _blood_lipid_cols(columns) -> set:
+    """Every column tracking one of the 4 blood-lipid concepts at any
+    timepoint (used by load_data_nblood to exclude lipid history as a
+    feature, not just the current target)."""
+    return {c for c in columns if any(kw in c for kw in _LIPID_TARGET_KEYWORDS)}
 
-    feateng is irrelevant here (PGS columns carry no per-timepoint suffix,
-    so longitudinal feature engineering is always a no-op), so the cache is
-    always saved/loaded as "{target}_{age}.csv" regardless of the flag."""
-    cache_path = _cache_path(_CACHE_PGS, target, age, False)
+
+def load_data_PGS_only(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS-only features to predict `target` lipid at the given age."""
+    cache_path = _cache_path(_CACHE_PGS, target, age)
     if cache_path.exists():
         return _load_cache(cache_path, target)
 
     pgs_cols = _get_pgs_cols()
     merged = _build_merged()
-    y_col = _get_target_col(merged, target, age)
+    y_all = _lipid_target_series(merged, target, age)
 
-    merged = merged.dropna(subset=[y_col])
+    merged = merged.loc[y_all.notna()]
     merged = _dedup_by_child_id(merged)
 
     id_col = merged["child_id"]
-    y = merged[y_col].rename(target)
+    y = y_all.loc[merged.index].rename(target)
     X = merged[pgs_cols].copy()
 
-    _save_cache(_CACHE_PGS, target, age, False, id_col, X, y)
+    _save_cache(_CACHE_PGS, target, age, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_keepto8(target: str, age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_keepto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load features with timepoints <= 8, no PGS, to predict `target` lipid at the given age."""
-    cache_path = _cache_path(_CACHE_KEEPTO8, target, age, feateng)
+    cache_path = _cache_path(_CACHE_KEEPTO8, target, age)
     if cache_path.exists():
         return _load_cache(cache_path, target)
 
     pgs_cols = _get_pgs_cols()
     merged = _build_merged()
-    y_col = _get_target_col(merged, target, age)
+    y_all = _lipid_target_series(merged, target, age)
 
     high_suffixes = _high_age_suffixes(_FEATURE_CUTOFF)
     pgs_set = set(pgs_cols)
     drop_cols = {c for c in merged.columns
                  if any(suf in c for suf in high_suffixes)
-                 or c in pgs_set or c.startswith("PGS")}
+                 or c in pgs_set or c.startswith("PGS") or c.startswith("SUM_PGS")}
 
-    merged = merged.dropna(subset=[y_col])
+    merged = merged.loc[y_all.notna()]
     merged = _dedup_by_child_id(merged)
 
     id_col = merged["child_id"]
-    y = merged[y_col].rename(target)
+    y = y_all.loc[merged.index].rename(target)
     X = merged.drop(columns=["child_id"] + list(drop_cols))
     X = _clean_and_impute(X)
-    if feateng:
-        X = _add_longitudinal_features(X)
 
-    _save_cache(_CACHE_KEEPTO8, target, age, feateng, id_col, X, y)
+    _save_cache(_CACHE_KEEPTO8, target, age, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_PGSto8(target: str, age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_PGSto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load PGS + features with timepoints <= 8 to predict `target` lipid at the given age."""
-    cache_path = _cache_path(_CACHE_PGSTO8, target, age, feateng)
+    cache_path = _cache_path(_CACHE_PGSTO8, target, age)
     if cache_path.exists():
         return _load_cache(cache_path, target)
 
     merged = _build_merged()
-    y_col = _get_target_col(merged, target, age)
+    y_all = _lipid_target_series(merged, target, age)
 
     high_suffixes = _high_age_suffixes(_FEATURE_CUTOFF)
     drop_cols = {c for c in merged.columns
-                 if any(suf in c for suf in high_suffixes)}
+                 if any(suf in c for suf in high_suffixes) or c.startswith("SUM_PGS")}
 
-    merged = merged.dropna(subset=[y_col])
+    merged = merged.loc[y_all.notna()]
     merged = _dedup_by_child_id(merged)
 
     id_col = merged["child_id"]
-    y = merged[y_col].rename(target)
+    y = y_all.loc[merged.index].rename(target)
     X = merged.drop(columns=["child_id"] + list(drop_cols))
     X = _clean_and_impute(X)
-    if feateng:
-        X = _add_longitudinal_features(X)
 
-    _save_cache(_CACHE_PGSTO8, target, age, feateng, id_col, X, y)
+    _save_cache(_CACHE_PGSTO8, target, age, id_col, X, y)
     return id_col, X, y
 
 
-def load_data_recent(target: str, age: int, feateng: bool = False) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_recent(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Load PGS + all features collected strictly before target age to predict `target` lipid."""
-    cache_path = _cache_path(_CACHE_RECENT, target, age, feateng)
+    cache_path = _cache_path(_CACHE_RECENT, target, age)
     if cache_path.exists():
         return _load_cache(cache_path, target)
 
     merged = _build_merged()
-    y_col = _get_target_col(merged, target, age)
+    y_all = _lipid_target_series(merged, target, age)
 
     # Drop all timepoints >= age (keep timepoints < age)
     high_suffixes = _high_age_suffixes(age - 1)
     drop_cols = {c for c in merged.columns
-                 if any(suf in c for suf in high_suffixes)}
+                 if any(suf in c for suf in high_suffixes) or c.startswith("SUM_PGS")}
 
-    merged = merged.dropna(subset=[y_col])
+    merged = merged.loc[y_all.notna()]
     merged = _dedup_by_child_id(merged)
 
     id_col = merged["child_id"]
-    y = merged[y_col].rename(target)
+    y = y_all.loc[merged.index].rename(target)
     X = merged.drop(columns=["child_id"] + list(drop_cols))
     X = _clean_and_impute(X)
-    if feateng:
-        X = _add_longitudinal_features(X)
 
-    _save_cache(_CACHE_RECENT, target, age, feateng, id_col, X, y)
+    _save_cache(_CACHE_RECENT, target, age, id_col, X, y)
+    return id_col, X, y
+
+
+def load_data_nblood(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Like load_data_recent, but also excludes every blood-lipid column
+    (cholesterol/triglyceride/hdl/ldl at any timepoint) from the features,
+    not just the current target -- so no lipid history can leak in."""
+    cache_path = _cache_path(_CACHE_NBLOOD, target, age)
+    if cache_path.exists():
+        return _load_cache(cache_path, target)
+
+    merged = _build_merged()
+    y_all = _lipid_target_series(merged, target, age)
+
+    high_suffixes = _high_age_suffixes(age - 1)
+    drop_cols = {c for c in merged.columns
+                 if any(suf in c for suf in high_suffixes) or c.startswith("SUM_PGS")}
+    drop_cols |= _blood_lipid_cols(merged.columns)
+
+    merged = merged.loc[y_all.notna()]
+    merged = _dedup_by_child_id(merged)
+
+    id_col = merged["child_id"]
+    y = y_all.loc[merged.index].rename(target)
+    X = merged.drop(columns=["child_id"] + list(drop_cols))
+    X = _clean_and_impute(X)
+
+    _save_cache(_CACHE_NBLOOD, target, age, id_col, X, y)
     return id_col, X, y
 
 
@@ -764,3 +859,4 @@ if __name__ == '__main__':
             ids, X, y = load_data_keepto8(target, age)
             ids, X, y = load_data_PGSto8(target, age)
             ids, X, y = load_data_recent(target, age)
+            ids, X, y = load_data_nblood(target, age)
