@@ -28,10 +28,10 @@ _TIMEPOINT_YEAR = {
 }
 
 # lipid targets available at these ages (G2xx_B3-B6). Age 27 is no longer a
-# standalone target age -- its values are merged into age 28 (see
-# _lipid_target_series) to fix a severe class imbalance in participant
-# counts between the two adjacent waves; _get_target_col is still used
-# internally by that merge to read the raw yr27/yr28 columns.
+# standalone target age -- its values are merged into age 28 by
+# _consolidate_yr27_into_yr28 (called from _build_merged, fixing a severe class
+# imbalance in participant counts between the two adjacent waves) along with
+# every other yr27 variable, not just the 4 lipid targets.
 _LIPIDS_AGES = [14, 17, 20, 22, 28]
 _LIPID_TARGETS = ["cholesterol", "triglyceride", "hdl", "ldl"]
 _LIPID_TARGET_KEYWORDS = ("cholesterol", "triglyceride", "hdl", "ldl")
@@ -42,8 +42,8 @@ _FEATURE_CUTOFF = 8
 # triglyceride=78.0 mmol/L (also the max in the cohort by a huge margin),
 # while their yr28 values (5.2 and 1.4 respectively) are unremarkable --
 # almost certainly transcription errors (e.g. a misplaced decimal), not real
-# measurements. Nulled out in _build_merged so they can neither contaminate
-# the age-27/28 target merge in _lipid_target_series nor leak in as raw
+# measurements. Nulled out in _build_merged, before _consolidate_yr27_into_yr28
+# runs, so they can neither contaminate the age-27/28 merge nor leak in as raw
 # yr27 feature values in any input_type that keeps that timepoint.
 _BAD_LIPID_YR27_CHILD_ID = 10840
 _BAD_LIPID_YR27_TARGETS = ("cholesterol", "triglyceride")
@@ -480,9 +480,37 @@ def _build_merged() -> pd.DataFrame:
     merged = _preprocess(merged)
 
     merged = _null_bad_lipid_yr27_values(merged)
+    merged = _consolidate_yr27_into_yr28(merged)
     merged = _consolidate_sex_columns(merged)
     merged = _consolidate_bmi_yr8(merged)
     merged = _add_missing_bmi(merged)
+    return merged
+
+
+def _consolidate_yr27_into_yr28(merged: pd.DataFrame) -> pd.DataFrame:
+    """Fold every yr27 column into its yr28 sibling: row-wise mean where both exist,
+    whichever one exists when only one does. Ages 27 and 28 are the same RAINE
+    follow-up wave, just split across participants by scheduling (see _LIPIDS_AGES),
+    so this generalizes what used to be a lipid-target-only special case (previously
+    done ad hoc in _lipid_target_series) to every variable collected at that wave --
+    afterwards no 'yr27' column remains anywhere in the dataset, only 'yr28'.
+
+    Must run after _null_bad_lipid_yr27_values so the known-bad yr27 values are
+    nulled before they can pollute an averaged yr28 value."""
+    yr27_cols = [c for c in merged.columns if "yr27" in c]
+    n_merged = n_renamed = 0
+    for col27 in yr27_cols:
+        col28 = col27.replace("yr27", "yr28")
+        if col28 in merged.columns:
+            merged[col28] = pd.concat([merged[col27], merged[col28]], axis=1).mean(axis=1, skipna=True)
+            merged = merged.drop(columns=[col27])
+            n_merged += 1
+        else:
+            merged = merged.rename(columns={col27: col28})
+            n_renamed += 1
+    print(f"\n[yr27/yr28 consolidation] merged {n_merged} column pair(s) into their "
+          f"yr28 sibling, renamed {n_renamed} yr27-only column(s) to yr28 "
+          f"({len(yr27_cols)} yr27 columns processed, 0 remain)")
     return merged
 
 
@@ -650,6 +678,18 @@ def _high_age_suffixes(cutoff: int) -> set:
     return suffixes
 
 
+def _recent_feature_cutoff(age: int) -> int:
+    """Highest wave (inclusive) still usable as a 'recent'/'nblood' feature for the
+    given target age. Age 28 is the merged yr27/yr28 wave: yr27 is effectively the
+    same wave as the target, not a genuine prior observation, so it must be excluded
+    too -- the cutoff drops to 26 instead of the usual age - 1.
+
+    _consolidate_yr27_into_yr28 already folds every yr27 column into yr28 at the
+    source (_build_merged), so no 'yr27'-named column should exist by the time this
+    runs -- this special case is a defensive backstop, not the primary mechanism."""
+    return 26 if age == 28 else age - 1
+
+
 def _get_target_col(merged: pd.DataFrame, target: str, age: int) -> str:
     y_suffix = f"yr{age}"
     candidates = [c for c in merged.columns if target in c and y_suffix in c]
@@ -661,20 +701,13 @@ def _get_target_col(merged: pd.DataFrame, target: str, age: int) -> str:
 def _lipid_target_series(merged: pd.DataFrame, target: str, age: int) -> pd.Series:
     """y values for `target` at `age`, aligned to merged's index.
 
-    age=28 is the merged year-27/28 wave: the row-wise mean of the raw
-    yr27/yr28 columns where both are present, or whichever one is present
-    when only one is (pandas .mean(skipna=True) already does exactly this --
-    NaN only when both are missing). age 27 is no longer a standalone target
-    age (see _LIPIDS_AGES), so this is the only place its raw column is
-    still read. Known-bad yr27 values are already nulled out in _build_merged
-    (see _null_bad_lipid_yr27_values), so they can't pull this merge off
-    toward their bogus values."""
-    if age != 28:
-        return merged[_get_target_col(merged, target, age)]
-
-    col27 = _get_target_col(merged, target, 27)
-    col28 = _get_target_col(merged, target, 28)
-    return pd.concat([merged[col27], merged[col28]], axis=1).mean(axis=1, skipna=True)
+    age=28 already reflects the merged yr27/yr28 wave -- _build_merged folds every
+    yr27 column (including the 4 lipid targets) into its yr28 sibling via
+    _consolidate_yr27_into_yr28 (row-wise mean where both waves are present,
+    whichever one exists when only one is), with known-bad yr27 values already
+    nulled out beforehand (see _null_bad_lipid_yr27_values). So this is now a
+    plain lookup for every age, including 28."""
+    return merged[_get_target_col(merged, target, age)]
 
 
 def _dedup_by_child_id(df: pd.DataFrame) -> pd.DataFrame:
@@ -807,8 +840,8 @@ def load_data_recent(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd
     merged = _build_merged()
     y_all = _lipid_target_series(merged, target, age)
 
-    # Drop all timepoints >= age (keep timepoints < age)
-    high_suffixes = _high_age_suffixes(age - 1)
+    # Drop all timepoints >= the cutoff (keep timepoints strictly before it)
+    high_suffixes = _high_age_suffixes(_recent_feature_cutoff(age))
     drop_cols = {c for c in merged.columns
                  if any(suf in c for suf in high_suffixes) or c.startswith("SUM_PGS")}
 
@@ -835,7 +868,7 @@ def load_data_nblood(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd
     merged = _build_merged()
     y_all = _lipid_target_series(merged, target, age)
 
-    high_suffixes = _high_age_suffixes(age - 1)
+    high_suffixes = _high_age_suffixes(_recent_feature_cutoff(age))
     drop_cols = {c for c in merged.columns
                  if any(suf in c for suf in high_suffixes) or c.startswith("SUM_PGS")}
     drop_cols |= _blood_lipid_cols(merged.columns)

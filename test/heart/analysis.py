@@ -206,7 +206,7 @@ def save_results(df):
         best_deeppysr['display_model'] = 'Best DeepPySR'
         selected_data.append(best_deeppysr)
 
-        interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 35]
+        interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 30]
         if not interp_deeppysr_df.empty:
             interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['f1'].idxmax()].copy()
             interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
@@ -248,7 +248,7 @@ def save_results(df):
     print(f"Best models plot data saved to {plot_csv_path}")
 
     # Print interpretable DeepPySR formulas
-    print("\n--- Interpretable DeepPySR Formulas (Complexity < 35) ---")
+    print("\n--- Interpretable DeepPySR Formulas (Complexity < 30) ---")
     interp_df = pd.DataFrame(interpretable_formulas)
     print(interp_df.to_string(index=False))
     interp_csv_path = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
