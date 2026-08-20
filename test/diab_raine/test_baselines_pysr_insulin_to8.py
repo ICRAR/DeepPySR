@@ -18,9 +18,9 @@ from data_utils import (
 import argparse
 
 _LOAD_FN = {
-    'PGS':    (load_data_PGS_only,  'results_insulin_PGS'),
-    'to8':    (load_data_keepto8,   'results_insulin_to8'),
-    'PGSto8': (load_data_PGSto8,    'results_insulin_PGSto8'),
+    'PGS':    (load_data_PGS_only,  'results_insulin/results_insulin_PGS'),
+    'to8':    (load_data_keepto8,   'results_insulin/results_insulin_to8'),
+    'PGSto8': (load_data_PGSto8,    'results_insulin/results_insulin_PGSto8'),
 }
 
 _N_TOP = 100
@@ -33,13 +33,9 @@ def main():
                         help='Which feature set to use')
     parser.add_argument('--age', type=int, default=28,
                         choices=_INSULIN_AGES)
-    parser.add_argument('--feateng', action='store_true', default=True,
-                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
-    if args.feateng:
-        results_dir = f"results_insulin_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -50,8 +46,8 @@ def main():
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
 
-    print(f"\nLoading data for test={args.test}, age={args.age}, feateng={args.feateng}...")
-    ids, X, y = load_fn(args.age, feateng=args.feateng)
+    print(f"\nLoading data for test={args.test}, age={args.age}...")
+    ids, X, y = load_fn(args.age)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"
@@ -104,8 +100,7 @@ def main():
             ("all_features", {}),
             (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
         ]:
-            pysr_out = os.path.join(run_out, "pysr", full_name) if subfolder == "all_features" \
-                else os.path.join(run_out, "pysr", full_name, subfolder)
+            pysr_out = os.path.join(run_out, "pysr", full_name, subfolder)
             if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
                 print(f"  Skipping {full_name}/{subfolder} (results exist)")
                 continue

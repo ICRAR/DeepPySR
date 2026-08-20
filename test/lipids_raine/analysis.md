@@ -51,12 +51,16 @@ Scoped to `PGS`, `PGSto8`, `to8`, `nblood` — `recent` excluded (focus on earli
 - [Models vs age — recent](results_lipids/lipids_models_vs_age_recent.png)
 - [Models vs age — nblood](results_lipids/lipids_models_vs_age_nblood.png)
 
-By feature-set (ftsl), best row confined to that variant instead of collapsed across both:
+[//]: # (By feature-set &#40;ftsl&#41;, best row confined to that variant instead of collapsed across both:)
 
-- [Best model vs age — all_feature](results_lipids/lipids_models_vs_age_all_feature.png)
-- [Best input type vs age — all_feature](results_lipids/lipids_input_types_vs_age_all_feature.png)
-- [Best model vs age — top100](results_lipids/lipids_models_vs_age_top100.png)
-- [Best input type vs age — top100](results_lipids/lipids_input_types_vs_age_top100.png)
+[//]: # ()
+[//]: # (- [Best model vs age — all_feature]&#40;results_lipids/lipids_models_vs_age_all_feature.png&#41;)
+
+[//]: # (- [Best input type vs age — all_feature]&#40;results_lipids/lipids_input_types_vs_age_all_feature.png&#41;)
+
+[//]: # (- [Best model vs age — top100]&#40;results_lipids/lipids_models_vs_age_top100.png&#41;)
+
+[//]: # (- [Best input type vs age — top100]&#40;results_lipids/lipids_input_types_vs_age_top100.png&#41;)
 
 ## Per input-type plots
 

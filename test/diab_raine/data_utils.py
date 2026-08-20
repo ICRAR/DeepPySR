@@ -1,5 +1,6 @@
 import re
 import sys
+from functools import lru_cache
 from itertools import combinations
 import pandas as pd
 from pathlib import Path
@@ -313,7 +314,11 @@ def _preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
 
 _LONGITUDINAL_AGES_KEEPTO14 = [17, 20, 22, 27, 28]
-_INSULIN_AGES = [14, 17, 20, 22, 27, 28]
+# 27 dropped: it's the same RAINE follow-up wave as 28, just split across
+# participants by scheduling -- see _consolidate_yr27_into_yr28, which folds
+# every yr27 column into yr28 at the source, matching lipids_raine's
+# _LIPIDS_AGES.
+_INSULIN_AGES = [14, 17, 20, 22, 28]
 
 _CACHE_PGS    = _BASE / "raine" / "insulin_PGS"
 _CACHE_KEEPTO8 = _BASE / "raine" / "insulin_keepto8"
@@ -407,8 +412,11 @@ def _normalize_raine_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@lru_cache(maxsize=1)
 def _build_merged() -> pd.DataFrame:
-    """Load, merge, and preprocess the raw data once (no age-specific filtering)."""
+    """Load, merge, and preprocess the raw data once (no age-specific filtering).
+
+    Memoized per-process, matching lipids_raine/data_utils.py's _build_merged."""
     raine = pd.read_csv(_RAINE_PATH, low_memory=False)
     raine = _normalize_raine_columns(raine)
 
@@ -441,6 +449,32 @@ def _build_merged() -> pd.DataFrame:
                 if (d / "raine" / "score" / "aggregated_scores.txt").exists()]
     merged = merged.dropna(subset=pgs_cols)
     merged = _preprocess(merged)
+    merged = _consolidate_yr27_into_yr28(merged)
+    return merged
+
+
+def _consolidate_yr27_into_yr28(merged: pd.DataFrame) -> pd.DataFrame:
+    """Fold every yr27 column into its yr28 sibling: row-wise mean where both exist,
+    whichever one exists when only one does. Ages 27 and 28 are the same RAINE
+    follow-up wave, just split across participants by scheduling (see
+    _INSULIN_AGES) -- afterwards no 'yr27' column remains anywhere in the
+    dataset, only 'yr28'. Ported from lipids_raine/data_utils.py's
+    _consolidate_yr27_into_yr28 (identical mechanism, generic over every
+    column, not just the diab_raine target)."""
+    yr27_cols = [c for c in merged.columns if "yr27" in c]
+    n_merged = n_renamed = 0
+    for col27 in yr27_cols:
+        col28 = col27.replace("yr27", "yr28")
+        if col28 in merged.columns:
+            merged[col28] = pd.concat([merged[col27], merged[col28]], axis=1).mean(axis=1, skipna=True)
+            merged = merged.drop(columns=[col27])
+            n_merged += 1
+        else:
+            merged = merged.rename(columns={col27: col28})
+            n_renamed += 1
+    print(f"\n[yr27/yr28 consolidation] merged {n_merged} column pair(s) into their "
+          f"yr28 sibling, renamed {n_renamed} yr27-only column(s) to yr28 "
+          f"({len(yr27_cols)} yr27 columns processed, 0 remain)")
     return merged
 
 
@@ -575,6 +609,21 @@ def _high_age_suffixes(cutoff: int) -> set:
         suffixes.add(f"yr{yr}")
         suffixes.add(f"y{yr}")
     return suffixes
+
+
+def _recent_feature_cutoff(age: int) -> int:
+    """Highest wave (inclusive) still usable as a 'recent' feature for the
+    given target age. Age 28 is the merged yr27/yr28 wave: yr27 is
+    effectively the same wave as the target, not a genuine prior
+    observation, so it must be excluded too -- the cutoff drops to 26
+    instead of the usual age - 1.
+
+    _consolidate_yr27_into_yr28 already folds every yr27 column into yr28 at
+    the source (_build_merged), so no 'yr27'-named column should exist by
+    the time this runs -- this special case is a defensive backstop, not the
+    primary mechanism. Ported from lipids_raine/data_utils.py's
+    _recent_feature_cutoff."""
+    return 26 if age == 28 else age - 1
 
 
 def _select_features(X: pd.DataFrame, y: pd.DataFrame, n_features: int) -> pd.DataFrame:
@@ -906,8 +955,9 @@ def load_data_recent(age: int, feateng: bool = False) -> tuple[pd.Series, pd.Dat
     merged = _build_merged()
     y_col = _get_insulin_col(merged, age)
 
-    # Drop all timepoints >= age (keep timepoints < age)
-    high_suffixes = _high_age_suffixes(age - 1)
+    # Drop all timepoints >= age (keep timepoints < age; see
+    # _recent_feature_cutoff for the age=28 special case)
+    high_suffixes = _high_age_suffixes(_recent_feature_cutoff(age))
     drop_cols = {c for c in merged.columns
                  if any(suf in c for suf in high_suffixes)}
 

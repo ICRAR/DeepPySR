@@ -1,6 +1,15 @@
 import os
 import sys
 import inspect
+
+# Must load before torch: importing juliacall (pulled in by deeppysr/pysr)
+# after torch has already been imported can segfault the process (see
+# https://github.com/pytorch/pytorch/issues/78829). Every caller that used
+# to import `deeppysr`/`pysr` directly before `model_utils` avoided this by
+# luck of import order; this module now guarantees the safe order itself.
+from deeppysr import DeepPySR
+from pysr import PySRRegressor
+
 import numpy as np
 import torch
 import sympy
@@ -403,9 +412,6 @@ class AIFeynmanWrapper(BaseEstimator, RegressorMixin):
             f"max_complexity={self.max_complexity}, "
             f"transformations={self.transformations})"
         )
-
-from deeppysr import DeepPySR
-from pysr import PySRRegressor
 
 # --- Model Factories ---
 def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_state=42):

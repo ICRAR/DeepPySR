@@ -22,6 +22,6 @@
 /*paper/
 /Manifest.toml
 /Project.toml
-/test/diab_raine/bk/
-
+/test/diab_raine/
+!/test/lipids_raine/**/*.png
 /mynote.md

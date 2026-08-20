@@ -19,9 +19,9 @@ import argparse
 _N_TOP = 100
 
 _LOAD_FN = {
-    'PGS':    (load_data_PGS_only,  'results_insulin_PGS'),
-    'to8':    (load_data_keepto8,   'results_insulin_to8'),
-    'PGSto8': (load_data_PGSto8,    'results_insulin_PGSto8'),
+    'PGS':    (load_data_PGS_only,  'results_insulin/results_insulin_PGS'),
+    'to8':    (load_data_keepto8,   'results_insulin/results_insulin_to8'),
+    'PGSto8': (load_data_PGSto8,    'results_insulin/results_insulin_PGSto8'),
 }
 
 
@@ -33,13 +33,9 @@ def main():
     parser.add_argument('--age', type=int, default=22,
                         choices=_INSULIN_AGES)
     parser.add_argument('--vps', type=int, default=25)
-    parser.add_argument('--feateng', action='store_true', default=True,
-                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
-    if args.feateng:
-        results_dir = f"results_insulin_df_{args.test}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -57,8 +53,8 @@ def main():
     r2w_list = [1, 1.5, 2, 4]
     lambda_list = [0.001, 0.005, 0.01]
 
-    print(f"\nLoading data for test={args.test}, age={args.age}, feateng={args.feateng}...")
-    ids, X, y = load_fn(args.age, feateng=args.feateng)
+    print(f"\nLoading data for test={args.test}, age={args.age}...")
+    ids, X, y = load_fn(args.age)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"
@@ -88,8 +84,7 @@ def main():
             ("all_features", {}),
             (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
         ]:
-            deeppysr_out = os.path.join(run_out, "deeppysr", full_name) if subfolder == "all_features" \
-                else os.path.join(run_out, "deeppysr", full_name, subfolder)
+            deeppysr_out = os.path.join(run_out, "deeppysr", full_name, subfolder)
             if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
                 print(f"  Skipping {full_name}/{subfolder} (results exist)")
                 continue

@@ -19,11 +19,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--age', type=int, default=28,
                         choices=_INSULIN_AGES)
-    parser.add_argument('--feateng', action='store_true', default=True,
-                        help='Add first-difference/second-derivative longitudinal features')
     args = parser.parse_args()
 
-    results_dir = "results_insulin/results_insulin_df_recent" if args.feateng else "results_insulin/results_insulin_recent"
+    results_dir = "results_insulin/results_insulin_recent"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -34,8 +32,8 @@ def main():
     sz  = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f"nit{nit}_pop{pop}_sz{sz}"
 
-    print(f"\nLoading recent data for age={args.age}, feateng={args.feateng}...")
-    ids, X, y = load_data_recent(args.age, feateng=args.feateng)
+    print(f"\nLoading recent data for age={args.age}...")
+    ids, X, y = load_data_recent(args.age)
     y = y.rename("diab_raine")
 
     run_name = f"age_{args.age}_diab_raine"
@@ -88,8 +86,7 @@ def main():
             ("all_features", {}),
             (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
         ]:
-            pysr_out = os.path.join(run_out, "pysr", full_name) if subfolder == "all_features" \
-                else os.path.join(run_out, "pysr", full_name, subfolder)
+            pysr_out = os.path.join(run_out, "pysr", full_name, subfolder)
             if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
                 print(f"  Skipping {full_name}/{subfolder} (results exist)")
                 continue
