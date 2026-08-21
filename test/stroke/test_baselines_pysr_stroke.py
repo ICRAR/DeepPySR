@@ -45,13 +45,15 @@ def main():
     sz = pysr_base_kwargs.get('population_size', 200)
     param_suffix = f'nit{nit}_pop{pop}_sz{sz}'
 
+    # No oversampling for stroke: baselines, PySR and DeepPySR all train on
+    # the raw class distribution (matches the diabetes pipeline).
     cv_kwargs = {
         'task': task,
         'n_splits': 5,
         'random_state': 42,
         'stratify_by': y,
         'feature_selection': False,
-        'use_smote': True
+        'use_smote': False,
     }
 
     print('Evaluating Baseline Models...')

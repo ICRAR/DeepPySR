@@ -57,7 +57,7 @@ def main():
         'random_state': 42,
         'stratify_by': y,
         'feature_selection': False,
-        'use_smote': True
+        'use_smote': False
     }
 
     print('Evaluating DeepPySR...')
