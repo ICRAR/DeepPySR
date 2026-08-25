@@ -1,9 +1,9 @@
-"""Regression analysis for insulin-prediction feature-set variants (PGS,
-to8, PGSto8, recent) under results_insulin/.
+"""Regression + clinical-bin classification analysis for BMI-prediction
+feature-set variants (PGS, to8, PGSto8, recent) under results_bmi/.
 
-Single target (diab_raine = fasting insulin, mU/L), all_features only --
-top50/top100 feature-selected results are not processed at all (unlike
-lipids_raine/bp_raine, which also aggregate a top100 variant).
+Single target (bmi_raine = child BMI, kg/m2), all_features only -- no
+feature-selection/top100 variant exists for this dataset (see
+test_baselines_pysr_bmi_*.py/test_deeppysr_bmi_*.py, which never produce one).
 
 Unlike analysis_lipids.py/analysis_bp.py, DeepPySR/PySR r2/rmse/mae/pearson_r
 are NOT computed by re-evaluating a formula in-sample on the full dataset --
@@ -13,38 +13,50 @@ directly comparable to how baseline models are scored from their own
 predictions.csv. "Interpretable DeepPySR" is its own leak-free CV pass with
 each fold's candidate pool restricted to complexity < INTERP_MAX_COMPLEXITY
 *before* ranking by held-out fit (not a post-hoc filter of the unconstrained
-result).
+result). This whole leak-free-CV architecture is ported from
+diab_raine/analysis_insulin.py.
 
-Produces, per variant, under results_insulin/results_insulin_<variant>/:
-  insulin_aggregated_results.csv   -- every (age, model) row found on disk.
-  insulin_best_models_metrics.csv  -- one row per (age, display_model): the
-                                       CV-pooled winner within that model
-                                       family (Best DeepPySR, Interpretable
-                                       DeepPySR, PySR, KAN, and each
-                                       baseline).
-  insulin_metrics_vs_age.png       -- r2/rmse/mae/pearson_r vs age, lines=
-                                       display_model.
+Unlike insulin (pure regression, no established clinical categories), BMI
+has well-known adult clinical categories, so this analysis ALSO scores every
+row by **F1 (macro)** on 3 clinical bins (see BMI_BIN_EDGES) and selects each
+age's "best" model by max F1 rather than max r2 -- mirroring bp_raine's/
+lipids_raine's pattern (adapted into this file's single-target row/column
+structure).
+
+Produces, per variant, under results_bmi/results_bmi_<variant>/:
+  bmi_aggregated_results.csv   -- every (age, model) row found on disk.
+  bmi_best_models_metrics.csv  -- one row per (age, display_model): the
+                                   CV-pooled winner (max F1) within that
+                                   model family (Best DeepPySR, Interpretable
+                                   DeepPySR, PySR, KAN, and each baseline).
+  bmi_metrics_vs_age.png       -- r2/pearson_r/f1_macro vs age, lines=
+                                   display_model.
   interpretable_deeppysr_formulas.csv
   formula_predictions/age_<age>.csv + age_<age>_scatter.png
   feature_importance_aggregated.csv + feature_importance_by_model.png
-  age_<age>_diab_raine/insulin_sensitivity.csv + .png
+  age_<age>_bmi_raine/bmi_sensitivity.csv + .png
                                     -- feature-importance heatmap combining
                                        ElasticNet/ExtraTrees/RandomForest/
                                        XGBoost's own feature_importance.csv
                                        with a subprocess-isolated MLP SHAP
                                        refit (see
-                                       _insulin_mlp_shap_importance_subprocess
+                                       _bmi_mlp_shap_importance_subprocess
                                        for why it's a subprocess).
-  age_<age>_diab_raine/insulin_deeppysr_sensitivity.csv + .png
+  age_<age>_bmi_raine/bmi_deeppysr_sensitivity.csv + .png
                                     -- Best vs Interpretable DeepPySR
                                        permutation sensitivity
                                        (common.formula_sensitivity), reusing
-                                       the exact formula string/r2/pearson_r
-                                       already selected into
-                                       insulin_best_models_metrics.csv.
-Combined (across all 4 variants), under results_insulin/:
-  insulin_deeppysr_combined_metrics.csv
-  insulin_deeppysr_metrics_vs_age_combined.png
+                                       the exact formula string/r2/pearson_r/
+                                       f1_macro already selected into
+                                       bmi_best_models_metrics.csv.
+Combined (across all 4 variants), under results_bmi/:
+  bmi_deeppysr_combined_metrics.csv
+  bmi_deeppysr_metrics_vs_age_combined.png
+  bmi_deeppysr_sensitivity_overview.csv + .png
+                                    -- which variables drive DeepPySR's
+                                       interpretable formulas, and does that
+                                       change by data source (see
+                                       aggregate_permutation_sensitivity).
 """
 import json
 import os
@@ -59,6 +71,7 @@ from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import seaborn as sns
+from sklearn.metrics import f1_score
 
 SCATTER_AXIS_LIMIT = 50
 
@@ -66,11 +79,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
-RESULTS_BASE_DIR = os.path.join(current_dir, "results_insulin")
+RESULTS_BASE_DIR = os.path.join(current_dir, "results_bmi")
 
 from data_utils import (
     load_data_PGS_only, load_data_keepto8, load_data_PGSto8, load_data_recent,
-    _INSULIN_AGES,
+    _BMI_AGES, TARGET,
 )
 from analysis_v1_utils import calculate_metrics, get_best_formula_from_raw, get_oof_predictions
 
@@ -79,15 +92,55 @@ from common import formula_sensitivity
 
 INTERP_MAX_COMPLEXITY = 30
 
-AGES = _INSULIN_AGES
-TARGET = 'diab_raine'
+AGES = _BMI_AGES
 
 VARIANTS = {
-    'PGS':    (load_data_PGS_only,  'results_insulin_PGS'),
-    'to8':    (load_data_keepto8,   'results_insulin_to8'),
-    'PGSto8': (load_data_PGSto8,    'results_insulin_PGSto8'),
-    'recent': (load_data_recent,    'results_insulin_recent'),
+    'PGS':    (load_data_PGS_only,  'results_bmi_PGS'),
+    'to8':    (load_data_keepto8,   'results_bmi_to8'),
+    'PGSto8': (load_data_PGSto8,    'results_bmi_PGSto8'),
+    'recent': (load_data_recent,    'results_bmi_recent'),
 }
+
+# ── Clinical binning for classification-style metrics ────────────────────────
+# Standard adult WHO/CDC BMI categories (kg/m2): Underweight <18.5,
+# Normal 18.5-24.9, Overweight 25-29.9, Obese >=30. No pediatric
+# age/sex-specific percentile norms are applied even at the younger ages in
+# this cohort -- same simplification analysis_bp.py/analysis_lipids.py make
+# for their own adolescent ages -- and it matters more here than for those:
+# checking real population counts at each target age confirmed the
+# "Underweight" tier is dominated by developmentally-normal children at
+# young ages (752/1284 = 58.6% "underweight" at age 10, 298/1277 = 23.3% at
+# age 14) simply because normal childhood BMI sits well below the adult
+# 18.5 cutoff -- not because these children are clinically underweight. By
+# age 22/28 this tier shrinks to ~2% as the cohort approaches adulthood.
+# Underweight and Normal are therefore collapsed into a single "Normal or
+# below" tier (mirroring how lipids_raine/bp_raine each collapse their own
+# least clinically distinct tier down to 3), leaving Overweight/Obese --
+# the two categories that stay clinically meaningful across the whole age
+# range -- as their own tiers. This F1_macro is a rough clinical-relevance
+# signal for model comparison, not a diagnostic label.
+BMI_BIN_EDGES = (25.0, 30.0)
+BMI_CLASS_LABELS = ['Normal or below', 'Overweight', 'Obese']
+
+
+def _bin_bmi(values):
+    """Values (kg/m2) -> class index 0/1/2 per BMI_BIN_EDGES."""
+    return np.digitize(np.asarray(values, dtype=float), list(BMI_BIN_EDGES))
+
+
+def _bmi_f1_macro(y_true, y_pred):
+    """Macro-F1 of the 3-class clinical bins, applying the same cutoffs to
+    both y_true and y_pred (so a regression model is scored on whether its
+    continuous prediction lands in the right clinical category, not on a
+    separately-fit classifier)."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    valid = ~(np.isnan(y_true) | np.isnan(y_pred))
+    if not valid.any():
+        return np.nan
+    y_true_bin = _bin_bmi(y_true[valid])
+    y_pred_bin = _bin_bmi(y_pred[valid])
+    return float(f1_score(y_true_bin, y_pred_bin, average='macro', labels=[0, 1, 2], zero_division=0))
 
 
 def _load_age(load_fn, age):
@@ -109,7 +162,8 @@ def _process_baselines(age_path, age, all_data):
         df_pred = pd.read_csv(pred_file)
         tag = f"{model_name}_all_features"
         r2, rmse, mae, pearson_r = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-        all_data.append([age, tag, r2, rmse, mae, pearson_r, np.nan, "", "", "", np.nan])
+        f1_macro = _bmi_f1_macro(df_pred['y_true'], df_pred['y_pred'])
+        all_data.append([age, tag, r2, rmse, mae, pearson_r, f1_macro, np.nan, "", "", "", np.nan])
 
 
 def _process_sr_dir(age_path, age, subdir, model_type, load_fn, all_data):
@@ -117,9 +171,10 @@ def _process_sr_dir(age_path, age, subdir, model_type, load_fn, all_data):
     'fullsr_nit500_..._grid'); the actual relationships_fold*.csv /
     formulas_fold*.csv / predictions.csv files sit one level deeper, under
     that config's own all_features/ subfolder -- same convention
-    test_*_insulin_*.py's baselines already nest under (see
-    _process_baselines), now that top100 has been removed and all_features
-    is the only feature-set variant produced."""
+    test_*_bmi_*.py's baselines already nest under (see
+    _process_baselines), matching diab_raine/analysis_insulin.py's identical
+    fix (a real bug there before it: SR configs weren't being found at all
+    because this descent into all_features/ was missing)."""
     sr_dir = os.path.join(age_path, subdir)
     if not os.path.exists(sr_dir):
         return
@@ -130,12 +185,15 @@ def _process_sr_dir(age_path, age, subdir, model_type, load_fn, all_data):
         _, X_age, y_age = _load_age(load_fn, age)
         formula, complexity, metrics = get_best_formula_from_raw(v_path, X_age, y_age, model_type=model_type)
         r2, rmse, mae, pearson_r = metrics
+        y_pred = get_oof_predictions(v_path, X_age, y_age, model_type=model_type)
+        f1_macro = _bmi_f1_macro(y_age, y_pred) if y_pred is not None else np.nan
         if not formula:
             pred_file = os.path.join(v_path, "predictions.csv")
             if os.path.exists(pred_file):
                 df_pred = pd.read_csv(pred_file)
                 r2, rmse, mae, pearson_r = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-        all_data.append([age, variant, r2, rmse, mae, pearson_r, complexity, formula, v_path, model_type, np.nan])
+                f1_macro = _bmi_f1_macro(df_pred['y_true'], df_pred['y_pred'])
+        all_data.append([age, variant, r2, rmse, mae, pearson_r, f1_macro, complexity, formula, v_path, model_type, np.nan])
 
         # Separate complexity-constrained candidate for "Interpretable
         # DeepPySR": selection must be constrained to complexity < 30 per
@@ -146,28 +204,34 @@ def _process_sr_dir(age_path, age, subdir, model_type, load_fn, all_data):
                 v_path, X_age, y_age, model_type=model_type, max_complexity=INTERP_MAX_COMPLEXITY)
             if formula_i:
                 r2_i, rmse_i, mae_i, pearson_r_i = metrics_i
+                y_pred_i = get_oof_predictions(v_path, X_age, y_age, model_type=model_type,
+                                                max_complexity=INTERP_MAX_COMPLEXITY)
+                f1_i = _bmi_f1_macro(y_age, y_pred_i) if y_pred_i is not None else np.nan
                 all_data.append([age, f"{variant}__interp{INTERP_MAX_COMPLEXITY}", r2_i, rmse_i, mae_i, pearson_r_i,
-                                 complexity_i, formula_i, v_path, model_type, INTERP_MAX_COMPLEXITY])
+                                 f1_i, complexity_i, formula_i, v_path, model_type, INTERP_MAX_COMPLEXITY])
 
 
 def process_results(load_fn, results_dir):
     all_data = []
     for age in AGES:
-        age_path = os.path.join(results_dir, f"age_{age}_diab_raine")
+        age_path = os.path.join(results_dir, f"age_{age}_{TARGET}")
         if not os.path.exists(age_path):
             continue
         _process_baselines(age_path, age, all_data)
         _process_sr_dir(age_path, age, "deeppysr", "deeppysr", load_fn, all_data)
         _process_sr_dir(age_path, age, "pysr", "pysr", load_fn, all_data)
 
-    df = pd.DataFrame(all_data, columns=['age', 'model', 'r2', 'rmse', 'mae', 'pearson_r', 'complexity', 'formula',
-                                          'source_path', 'formula_model_type', 'max_complexity'])
+    df = pd.DataFrame(all_data, columns=['age', 'model', 'r2', 'rmse', 'mae', 'pearson_r', 'f1_macro', 'complexity',
+                                          'formula', 'source_path', 'formula_model_type', 'max_complexity'])
     df['r2'] = df['r2'].clip(lower=0)
     return df
 
 
 def _select_best_models(df):
-    """Return plot_df and interpretable_formulas, age-specific only."""
+    """Return plot_df and interpretable_formulas, age-specific only. Each
+    age's winner within a model family is the max-F1_macro (clinical-bin
+    classification) row, not max-r2 -- mirroring bp_raine's/lipids_raine's
+    selection rule."""
     df = df.copy()
     df['r2'] = df['r2'].clip(lower=0)
     ages = sorted(df['age'].unique())
@@ -182,44 +246,38 @@ def _select_best_models(df):
         # definition (interpretable is a complexity-restricted special
         # case), so its candidate pool includes both the unconstrained rows
         # AND the complexity-constrained rows -- not just the unconstrained
-        # ones. Picking only from unconstrained rows could otherwise lose to
-        # the interpretable pick, since both selections rank candidates by
-        # in-fold training fitness (a noisy proxy for held-out
-        # generalization), not by held-out performance itself.
+        # ones.
         deeppysr_df = age_df[is_deeppysr]
         if not deeppysr_df.empty:
-            best = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
+            best = deeppysr_df.loc[deeppysr_df['f1_macro'].idxmax()].copy()
             best['display_model'] = 'Best DeepPySR'
             selected_data.append(best)
-            # Complexity-constrained candidates were computed separately
-            # (own CV pass per fold, see _process_sr_dir) rather than by
-            # filtering deeppysr_df post-hoc.
             interp = age_df[is_deeppysr & (age_df['max_complexity'] == INTERP_MAX_COMPLEXITY)]
             if not interp.empty:
-                bi = interp.loc[interp['r2'].idxmax()].copy()
+                bi = interp.loc[interp['f1_macro'].idxmax()].copy()
                 bi['display_model'] = 'Interpretable DeepPySR'
                 selected_data.append(bi)
                 interpretable_formulas.append({'age': age, 'model': bi['model'],
                                                'formula': bi['formula'], 'r2': bi['r2'],
-                                               'complexity': bi['complexity']})
+                                               'f1_macro': bi['f1_macro'], 'complexity': bi['complexity']})
 
         pysr_df = age_df[age_df['model'].str.contains('pysr', na=False)]
         if not pysr_df.empty:
-            best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
+            best_pysr = pysr_df.loc[pysr_df['f1_macro'].idxmax()].copy()
             best_pysr['display_model'] = 'PySR'
             selected_data.append(best_pysr)
 
         for m in ['KAN']:
             m_df = age_df[age_df['model'].str.startswith(f"{m}_")]
             if not m_df.empty:
-                row = m_df.loc[m_df['r2'].idxmax()].copy()
+                row = m_df.loc[m_df['f1_macro'].idxmax()].copy()
                 row['display_model'] = m
                 selected_data.append(row)
 
         for b in ['ElasticNet', 'ExtraTrees', 'MLP', 'RandomForest', 'XGBoost']:
             b_df = age_df[age_df['model'].str.startswith(f"{b}_")]
             if not b_df.empty:
-                row = b_df.loc[b_df['r2'].idxmax()].copy()
+                row = b_df.loc[b_df['f1_macro'].idxmax()].copy()
                 row['display_model'] = b
                 selected_data.append(row)
 
@@ -232,18 +290,18 @@ def plot_results(df, results_dir, variant_name):
         print(f"No data to plot for variant={variant_name}.")
         return plot_df
 
-    plot_csv_path = os.path.join(results_dir, 'insulin_best_models_metrics.csv')
+    plot_csv_path = os.path.join(results_dir, 'bmi_best_models_metrics.csv')
     plot_df.to_csv(plot_csv_path, index=False)
     print(f"Best models saved to {plot_csv_path}")
 
-    metrics = ['r2', 'rmse', 'mae', 'pearson_r']
-    fig, axes = plt.subplots(1, 4, figsize=(28, 7))
+    metrics = ['r2', 'pearson_r', 'f1_macro']
+    fig, axes = plt.subplots(1, 3, figsize=(21, 7))
     plt.rcParams.update({'font.size': 14})
     models = sorted(plot_df['display_model'].unique())
     palette = sns.color_palette("tab10", n_colors=len(models))
     model_colors = dict(zip(models, palette))
 
-    metric_labels = {'r2': 'R2', 'rmse': 'RMSE', 'mae': 'MAE', 'pearson_r': 'Pearson r'}
+    metric_labels = {'r2': 'R2', 'pearson_r': 'Pearson r', 'f1_macro': 'F1 (macro, clinical bins)'}
     for col, metric in enumerate(metrics):
         ax = axes[col]
         label = metric_labels.get(metric, metric.upper())
@@ -260,10 +318,10 @@ def plot_results(df, results_dir, variant_name):
     legend_elements = [Line2D([0], [0], color=model_colors[m], lw=3, label=m) for m in models]
     fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.91, 0.5),
                fontsize=14, frameon=True, title='Models', title_fontsize=16, handlelength=4.0)
-    plt.suptitle(f'Insulin Prediction Performance ({variant_name}): Best Models Comparison',
+    plt.suptitle(f'BMI Prediction Performance ({variant_name}): Best Models Comparison',
                  fontsize=24, fontweight='bold', y=1.02)
     plt.tight_layout(rect=[0, 0, 0.9, 0.96])
-    plot_path = os.path.join(results_dir, 'insulin_metrics_vs_age.png')
+    plot_path = os.path.join(results_dir, 'bmi_metrics_vs_age.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"Plot saved to {plot_path}")
@@ -299,7 +357,7 @@ def _get_model_predictions(row, age_path, X_full, y_full):
     """Return (y_true, y_pred) arrays for one selected model row.
 
     Formula-based models (DeepPySR, PySR) use the same pooled leak-free
-    out-of-fold predictions the reported R2 was computed from
+    out-of-fold predictions the reported R2/F1 was computed from
     (get_oof_predictions on row['source_path']) -- NOT a re-evaluation of a
     single formula on the full in-sample dataset. Everything else falls
     back to the CV predictions.csv saved during training.
@@ -336,7 +394,7 @@ def save_predictions_and_scatter(plot_df, load_fn, results_dir):
 
     for age in sorted(plot_df['age'].unique()):
         age_df = plot_df[plot_df['age'] == age]
-        age_path = os.path.join(results_dir, f"age_{age}_diab_raine")
+        age_path = os.path.join(results_dir, f"age_{age}_{TARGET}")
         ids, X_full, y_full = _load_age(load_fn, age)
 
         pred_table = pd.concat([
@@ -369,9 +427,9 @@ def save_predictions_and_scatter(plot_df, load_fn, results_dir):
             hi = max(y_true_arr.max(), y_pred_arr.max())
             ax.plot([lo, hi], [lo, hi], 'k--', lw=1)
             ax.scatter(y_true_arr, y_pred_arr, alpha=0.5, color=model_colors[m], s=20)
-            ax.set_title(f"{m} (R2={row['r2']:.2f}, r={row['pearson_r']:.2f})", fontsize=13, fontweight='bold')
-            ax.set_xlabel('True Insulin', fontsize=11)
-            ax.set_ylabel('Predicted Insulin', fontsize=11)
+            ax.set_title(f"{m} (R2={row['r2']:.2f}, F1={row['f1_macro']:.2f})", fontsize=13, fontweight='bold')
+            ax.set_xlabel('True BMI', fontsize=11)
+            ax.set_ylabel('Predicted BMI', fontsize=11)
             ax.set_xlim(0, SCATTER_AXIS_LIMIT)
             ax.set_ylim(0, SCATTER_AXIS_LIMIT)
 
@@ -389,7 +447,7 @@ def save_predictions_and_scatter(plot_df, load_fn, results_dir):
             hi_display = raw_hi + pad
             y_pred_display = np.clip(y_pred_arr, lo_display, hi_display)
 
-            # Points already visible in the main 0-100 panel are shown
+            # Points already visible in the main 0-50 panel are shown
             # faint/small; points that fall outside it (the reason the
             # inset exists) are emphasized so they stand out.
             in_main = (y_true_arr <= SCATTER_AXIS_LIMIT) & (y_pred_display <= SCATTER_AXIS_LIMIT)
@@ -425,7 +483,7 @@ def save_predictions_and_scatter(plot_df, load_fn, results_dir):
 def aggregate_feature_importance(results_dir):
     importance_data = []
     for age in AGES:
-        baselines_dir = os.path.join(results_dir, f"age_{age}_diab_raine", "baselines")
+        baselines_dir = os.path.join(results_dir, f"age_{age}_{TARGET}", "baselines")
         if not os.path.exists(baselines_dir):
             continue
         for m in os.listdir(baselines_dir):
@@ -478,14 +536,14 @@ HEATMAP_MODEL_ORDER = ['RandomForest', 'ExtraTrees', 'XGBoost', 'ElasticNet', 'M
 _SENS_INK = "#0b0b0b"
 _SENS_BLUE_STEPS = ["#eef4fc", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5",
                     "#256abf", "#184f95", "#104281", "#0d366b"]
-_SENS_CMAP = LinearSegmentedColormap.from_list("insulin_seq_blue", _SENS_BLUE_STEPS, N=256)
+_SENS_CMAP = LinearSegmentedColormap.from_list("bmi_seq_blue", _SENS_BLUE_STEPS, N=256)
 
 DEEPPYSR_VARIANT_COLORS = {'Best DeepPySR': '#3987e5', 'Interpretable DeepPySR': '#e58939'}
 
 
-def _insulin_mlp_shap_importance(X, y, task='regression', use_smote=False, epochs=80, batch_size=64,
-                                  max_train_rows=None, n_background=50, n_explain=200,
-                                  random_state=42):
+def _bmi_mlp_shap_importance(X, y, task='regression', use_smote=False, epochs=80, batch_size=64,
+                              max_train_rows=None, n_background=50, n_explain=200,
+                              random_state=42):
     """Same as deeppysr_paper/codes/common.py::mlp_shap_importance, except the
     SHAP Permutation explainer is given an explicit max_evals sized to the
     feature count (common.py's version leaves it at SHAP's internal default
@@ -546,8 +604,8 @@ def _insulin_mlp_shap_importance(X, y, task='regression', use_smote=False, epoch
     return dict(zip(feature_names, pct))
 
 
-def _insulin_mlp_shap_importance_subprocess(variant_name, age, random_state=42, n_explain=60, timeout=1800):
-    """Runs _insulin_mlp_shap_importance in a fresh subprocess
+def _bmi_mlp_shap_importance_subprocess(variant_name, age, random_state=42, n_explain=60, timeout=1800):
+    """Runs _bmi_mlp_shap_importance in a fresh subprocess
     (_mlp_shap_worker.py) instead of in-process. Importing model_utils
     (which pulls in torch AND, via its own module-level
     `from pysr import PySRRegressor`, juliacall) reliably segfaults once
@@ -578,7 +636,7 @@ def _insulin_mlp_shap_importance_subprocess(variant_name, age, random_state=42, 
             os.remove(out_path)
 
 
-def _insulin_conventional_importance(age_path, model_name):
+def _bmi_conventional_importance(age_path, model_name):
     """{feature: pct} read from that model's own all_features
     feature_importance.csv, or {} if absent."""
     imp_file = os.path.join(age_path, "baselines", model_name, "all_features", "feature_importance.csv")
@@ -641,14 +699,14 @@ def _plot_deeppysr_sensitivity(age_df, X_full, out_dir, age, variant_name, n_rep
     """Combined Best-vs-Interpretable DeepPySR permutation sensitivity plot
     for one (variant, age) combo: grouped horizontal bars over the union of
     every variable either formula references, annotated with each formula's
-    own complexity and r2/pearson_r -- reusing the exact leak-free
-    (CV-pooled OOF) values already selected into insulin_best_models_metrics.csv,
+    own complexity and r2/pearson_r/f1_macro -- reusing the exact leak-free
+    (CV-pooled OOF) values already selected into bmi_best_models_metrics.csv,
     not a fresh re-evaluation.
 
-    Saves under out_dir (the same age_<age>_diab_raine directory as
-    insulin_sensitivity.csv/.png):
-      insulin_deeppysr_sensitivity.csv
-      insulin_deeppysr_sensitivity.png
+    Saves under out_dir (the same age_<age>_bmi_raine directory as
+    bmi_sensitivity.csv/.png):
+      bmi_deeppysr_sensitivity.csv
+      bmi_deeppysr_sensitivity.png
     """
     variants = []
     for label in ['Best DeepPySR', 'Interpretable DeepPySR']:
@@ -670,7 +728,7 @@ def _plot_deeppysr_sensitivity(age_df, X_full, out_dir, age, variant_name, n_rep
             continue
         variants.append({
             'label': label, 'formula': formula, 'complexity': row['complexity'],
-            'r2': row['r2'], 'pearson_r': row['pearson_r'], 'sens': sens,
+            'r2': row['r2'], 'pearson_r': row['pearson_r'], 'f1_macro': row['f1_macro'], 'sens': sens,
         })
 
     if not variants:
@@ -693,11 +751,12 @@ def _plot_deeppysr_sensitivity(age_df, X_full, out_dir, age, variant_name, n_rep
     ax.set_yticks(y_pos)
     ax.set_yticklabels(order, fontsize=11)
     ax.set_xlabel('Sensitivity (%)', fontsize=12)
-    ax.set_title(f'diab_raine ({variant_name}, age {age}): DeepPySR sensitivity — Best vs Interpretable',
+    ax.set_title(f'BMI ({variant_name}, age {age}): DeepPySR sensitivity — Best vs Interpretable',
                  fontsize=13, fontweight='bold')
 
     legend_labels = [
-        f"{v['label']} (complexity={v['complexity']:.0f}, R2={v['r2']:.2f}, r={v['pearson_r']:.2f})"
+        f"{v['label']} (complexity={v['complexity']:.0f}, R2={v['r2']:.2f}, "
+        f"r={v['pearson_r']:.2f}, F1={v['f1_macro']:.2f})"
         for v in variants
     ]
     handles = [plt.Rectangle((0, 0), 1, 1, color=DEEPPYSR_VARIANT_COLORS.get(v['label'], 'gray'))
@@ -705,22 +764,22 @@ def _plot_deeppysr_sensitivity(age_df, X_full, out_dir, age, variant_name, n_rep
     ax.legend(handles, legend_labels, loc='lower right', fontsize=10, frameon=True)
 
     plt.tight_layout()
-    png_path = os.path.join(out_dir, 'insulin_deeppysr_sensitivity.png')
+    png_path = os.path.join(out_dir, 'bmi_deeppysr_sensitivity.png')
     plt.savefig(png_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
 
     csv_rows = [
         {'variant': variant_name, 'age': age, 'formula_type': v['label'],
          'variable': var, 'sensitivity_pct': pct, 'complexity': v['complexity'],
-         'r2': v['r2'], 'pearson_r': v['pearson_r']}
+         'r2': v['r2'], 'pearson_r': v['pearson_r'], 'f1_macro': v['f1_macro']}
         for v in variants for var, pct in v['sens'].items()
     ]
-    pd.DataFrame(csv_rows).to_csv(os.path.join(out_dir, 'insulin_deeppysr_sensitivity.csv'), index=False)
+    pd.DataFrame(csv_rows).to_csv(os.path.join(out_dir, 'bmi_deeppysr_sensitivity.csv'), index=False)
 
     return png_path
 
 
-def compute_insulin_sensitivity(plot_df, load_fn, results_dir, variant_name, n_repeats=15, random_state=42, top_n=10):
+def compute_bmi_sensitivity(plot_df, load_fn, results_dir, variant_name, n_repeats=15, random_state=42, top_n=10):
     """Per-age feature-importance comparison: ElasticNet/ExtraTrees/
     RandomForest/XGBoost's own feature_importance.csv, plus a subprocess-
     isolated MLP SHAP refit. Also calls _plot_deeppysr_sensitivity for every
@@ -732,13 +791,13 @@ def compute_insulin_sensitivity(plot_df, load_fn, results_dir, variant_name, n_r
 
     for age in sorted(plot_df['age'].unique()):
         age_df = plot_df[plot_df['age'] == age]
-        age_path = os.path.join(results_dir, f"age_{age}_diab_raine")
+        age_path = os.path.join(results_dir, f"age_{age}_{TARGET}")
         if not os.path.exists(age_path):
             continue
 
         importances = {}
         for model_name in FEATURE_IMPORTANCE_MODELS:
-            imp = _insulin_conventional_importance(age_path, model_name)
+            imp = _bmi_conventional_importance(age_path, model_name)
             if imp:
                 importances[model_name] = imp
 
@@ -746,8 +805,8 @@ def compute_insulin_sensitivity(plot_df, load_fn, results_dir, variant_name, n_r
         _, X_full, y_full = _load_age(load_fn, age)
 
         try:
-            mlp_imp = _insulin_mlp_shap_importance_subprocess(variant_name, age,
-                                                               random_state=random_state, n_explain=60)
+            mlp_imp = _bmi_mlp_shap_importance_subprocess(variant_name, age,
+                                                           random_state=random_state, n_explain=60)
             if mlp_imp:
                 importances['MLP (SHAP)'] = mlp_imp
         except Exception as e:
@@ -768,11 +827,11 @@ def compute_insulin_sensitivity(plot_df, load_fn, results_dir, variant_name, n_r
         long_df = long_df[long_df['pct'] > 0].copy()
         long_df.insert(0, 'variant', variant_name)
         long_df.insert(0, 'age', age)
-        csv_path = os.path.join(age_path, "insulin_sensitivity.csv")
+        csv_path = os.path.join(age_path, "bmi_sensitivity.csv")
         long_df.to_csv(csv_path, index=False)
 
-        title = f'diab_raine ({variant_name}, age {age}): feature importance across models'
-        png_path = os.path.join(age_path, "insulin_sensitivity.png")
+        title = f'BMI ({variant_name}, age {age}): feature importance across models'
+        png_path = os.path.join(age_path, "bmi_sensitivity.png")
         _plot_sensitivity_heatmap(table, png_path, title, top_n=top_n)
 
         print(f"  Sensitivity saved to {age_path}")
@@ -782,7 +841,7 @@ def run_variant(name):
     load_fn, results_subdir = VARIANTS[name]
     results_dir = os.path.join(RESULTS_BASE_DIR, results_subdir)
 
-    out_csv = os.path.join(results_dir, "insulin_aggregated_results.csv")
+    out_csv = os.path.join(results_dir, "bmi_aggregated_results.csv")
     if os.path.exists(out_csv):
         df = pd.read_csv(out_csv)
         print(f"Results loaded from {out_csv}")
@@ -796,12 +855,12 @@ def run_variant(name):
     aggregate_feature_importance(results_dir)
 
     print(f"\n--- Computing formula/feature sensitivity for {name} ---")
-    compute_insulin_sensitivity(plot_df, load_fn, results_dir, name)
+    compute_bmi_sensitivity(plot_df, load_fn, results_dir, name)
 
 
 def aggregate_permutation_sensitivity(top_n=15, min_pct=1.0):
     """Combine every per-age DeepPySR permutation-sensitivity CSV
-    (insulin_deeppysr_sensitivity.csv, written by _plot_deeppysr_sensitivity)
+    (bmi_deeppysr_sensitivity.csv, written by _plot_deeppysr_sensitivity)
     across all 4 variants into one overview: which variables drive
     DeepPySR's formulas, and does that change depending on which data
     source (variant) the model was given? Only the 'Interpretable DeepPySR'
@@ -819,18 +878,18 @@ def aggregate_permutation_sensitivity(top_n=15, min_pct=1.0):
     summed across every variant.
 
     Saves, under RESULTS_BASE_DIR:
-      insulin_deeppysr_sensitivity_overview.csv  -- every kept age's rows,
-                                                     concatenated (unaveraged)
-      insulin_deeppysr_sensitivity_overview.png  -- heatmap, top_n variables
-                                                     x variant, % of that
-                                                     variant's ages where the
-                                                     variable is a driver
+      bmi_deeppysr_sensitivity_overview.csv  -- every kept age's rows,
+                                                 concatenated (unaveraged)
+      bmi_deeppysr_sensitivity_overview.png  -- heatmap, top_n variables
+                                                 x variant, % of that
+                                                 variant's ages where the
+                                                 variable is a driver
     """
     rows = []
     for variant_name, (_, results_subdir) in VARIANTS.items():
         results_dir = os.path.join(RESULTS_BASE_DIR, results_subdir)
         for age in AGES:
-            f = os.path.join(results_dir, f"age_{age}_diab_raine", "insulin_deeppysr_sensitivity.csv")
+            f = os.path.join(results_dir, f"age_{age}_{TARGET}", "bmi_deeppysr_sensitivity.csv")
             if not os.path.exists(f):
                 continue
             df = pd.read_csv(f)
@@ -842,7 +901,7 @@ def aggregate_permutation_sensitivity(top_n=15, min_pct=1.0):
         return pd.DataFrame()
 
     long_df = pd.concat(rows, ignore_index=True)
-    csv_path = os.path.join(RESULTS_BASE_DIR, "insulin_deeppysr_sensitivity_overview.csv")
+    csv_path = os.path.join(RESULTS_BASE_DIR, "bmi_deeppysr_sensitivity_overview.csv")
     long_df.to_csv(csv_path, index=False)
     print(f"DeepPySR sensitivity overview saved to {csv_path}")
 
@@ -857,10 +916,10 @@ def aggregate_permutation_sensitivity(top_n=15, min_pct=1.0):
     top_vars = counts.sum(axis=1).sort_values(ascending=False).head(top_n).index
     plot_table = pct_table.loc[top_vars]
 
-    png_path = os.path.join(RESULTS_BASE_DIR, "insulin_deeppysr_sensitivity_overview.png")
+    png_path = os.path.join(RESULTS_BASE_DIR, "bmi_deeppysr_sensitivity_overview.png")
     _plot_sensitivity_heatmap(
         plot_table, png_path,
-        title="Insulin: how often each variable drives DeepPySR's interpretable formula, by data source"
+        title="BMI: how often each variable drives DeepPySR's interpretable formula, by data source"
               f" (n ages: {', '.join(f'{v}={n}' for v, n in ages_per_variant.items())})",
         top_n=top_n, cbar_label="% of that variant's ages where this variable is a driver")
     print(f"DeepPySR sensitivity overview plot saved to {png_path}")
@@ -875,7 +934,7 @@ COMBINED_DISPLAY_MODELS = ['Best DeepPySR', 'Interpretable DeepPySR']
 def load_combined():
     rows = []
     for variant_name, (_, results_subdir) in VARIANTS.items():
-        csv_path = os.path.join(RESULTS_BASE_DIR, results_subdir, 'insulin_best_models_metrics.csv')
+        csv_path = os.path.join(RESULTS_BASE_DIR, results_subdir, 'bmi_best_models_metrics.csv')
         if not os.path.exists(csv_path):
             print(f"Missing {csv_path}, run analysis for variant {variant_name} first.")
             continue
@@ -890,13 +949,13 @@ def load_combined():
 
 
 def plot_combined(combined_df):
-    metrics = ['r2', 'rmse', 'mae', 'pearson_r']
-    metric_labels = {'r2': 'R2', 'rmse': 'RMSE', 'mae': 'MAE', 'pearson_r': 'Pearson r'}
+    metrics = ['r2', 'pearson_r', 'f1_macro']
+    metric_labels = {'r2': 'R2', 'pearson_r': 'Pearson r', 'f1_macro': 'F1 (macro, clinical bins)'}
     tests = sorted(combined_df['test'].unique())
     palette = sns.color_palette("tab10", n_colors=len(tests))
     test_colors = dict(zip(tests, palette))
 
-    fig, axes = plt.subplots(2, 4, figsize=(28, 14))
+    fig, axes = plt.subplots(2, 3, figsize=(21, 14))
     plt.rcParams.update({'font.size': 14})
 
     for row_i, display_model in enumerate(COMBINED_DISPLAY_MODELS):
@@ -916,11 +975,11 @@ def plot_combined(combined_df):
     legend_elements = [Line2D([0], [0], color=test_colors[t], lw=3, marker='o', label=t) for t in tests]
     fig.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(0.91, 0.5),
                fontsize=14, frameon=True, title='Feature set', title_fontsize=16, handlelength=4.0)
-    plt.suptitle('Insulin Prediction: DeepPySR Performance Across Feature-Set Variants\n'
+    plt.suptitle('BMI Prediction: DeepPySR Performance Across Feature-Set Variants\n'
                  f'(Top: Best DeepPySR — Bottom: Interpretable DeepPySR, complexity < {INTERP_MAX_COMPLEXITY})',
                  fontsize=24, fontweight='bold', y=1.0)
     plt.tight_layout(rect=[0, 0, 0.9, 0.95])
-    plot_path = os.path.join(RESULTS_BASE_DIR, 'insulin_deeppysr_metrics_vs_age_combined.png')
+    plot_path = os.path.join(RESULTS_BASE_DIR, 'bmi_deeppysr_metrics_vs_age_combined.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"Combined plot saved to {plot_path}")
@@ -932,7 +991,7 @@ def run_combined():
         print("No data available for combined analysis.")
         return
 
-    out_csv = os.path.join(RESULTS_BASE_DIR, 'insulin_deeppysr_combined_metrics.csv')
+    out_csv = os.path.join(RESULTS_BASE_DIR, 'bmi_deeppysr_combined_metrics.csv')
     combined_df.to_csv(out_csv, index=False)
     print(f"Combined metrics saved to {out_csv}")
 
