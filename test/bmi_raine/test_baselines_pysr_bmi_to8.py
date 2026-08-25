@@ -32,6 +32,8 @@ def main():
                         help='Which feature set to use')
     parser.add_argument('--age', type=int, default=28,
                         choices=_BMI_AGES)
+    parser.add_argument('--save_hof', action='store_true',
+                        help='Persist PySR hall-of-fame/checkpoint files (large; off by default).')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
@@ -39,7 +41,7 @@ def main():
     os.makedirs(out_root, exist_ok=True)
 
     pysr_configs = get_pysr_configs()
-    pysr_base_kwargs = get_pysr_base_kwargs()
+    pysr_base_kwargs = get_pysr_base_kwargs(save_hof=args.save_hof)
     nit = pysr_base_kwargs.get('niterations', 100)
     pop = pysr_base_kwargs.get('populations', 30)
     sz  = pysr_base_kwargs.get('population_size', 200)

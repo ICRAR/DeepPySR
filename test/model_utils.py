@@ -440,7 +440,7 @@ def get_baseline_models(task='regression', input_dim=None, output_dim=1, random_
             'KAN': KANWrapper(input_dim=input_dim, output_dim=output_dim, hidden_dim=10, steps=200, update_grid=False, task='regression')
         }
 
-def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):
+def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False, save_hof=False):
     if os_cpu_count is None:
         try:
             os_cpu_count = os.cpu_count() or 2
@@ -481,4 +481,12 @@ def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False):
         "procs": default_procs,
         "niterations": 500,#100,
         # "timeout_in_seconds": 3000, # 10 minute timeout per fit to prevent hanging
+        # PySR's own hall-of-fame/checkpoint output (output_directory/checkpoint.pkl)
+        # is redundant with what run_cv already extracts into formulas_fold*.csv /
+        # relationships_fold*.csv -- and checkpoint.pkl alone has been measured at
+        # 40+GB across just 3 datasets' worth of PySR baseline runs. temp_equation_file
+        # routes PySR's internal equation file through a system tempdir that's
+        # deleted after fit (see pysr.sr.PySRRegressor._checkpoint / delete_tempfiles),
+        # so nothing persists on disk unless save_hof=True is explicitly requested.
+        "temp_equation_file": not save_hof,
     }

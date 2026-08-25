@@ -144,7 +144,10 @@ def run_cv(model_factory, X, y, ids=None, groups=None, stratify_by=None, task='r
             X_train, y_train = sm.fit_resample(X_train, y_train)
         
         model = model_factory()
-        if hasattr(model, 'output_directory') and outdir:
+        # temp_equation_file=True (see get_pysr_base_kwargs's save_hof flag) requires
+        # PySR's own output_directory to stay None -- it manages its own tempdir
+        # internally and asserts this at fit time, so skip the override in that case.
+        if hasattr(model, 'output_directory') and outdir and not getattr(model, 'temp_equation_file', False):
             model.output_directory = os.path.join(outdir, 'pysr_outputs', 'y')
         model.fit(X_train, y_train)
         
@@ -289,7 +292,10 @@ def run_nocv(model_factory, X, y, ids=None, task='regression', outdir=None, scal
         X_train, y_values = sm.fit_resample(X_train, y_values)
 
     model = model_factory()
-    if hasattr(model, 'output_directory') and outdir:
+    # temp_equation_file=True (see get_pysr_base_kwargs's save_hof flag) requires
+    # PySR's own output_directory to stay None -- it manages its own tempdir
+    # internally and asserts this at fit time, so skip the override in that case.
+    if hasattr(model, 'output_directory') and outdir and not getattr(model, 'temp_equation_file', False):
         model.output_directory = os.path.join(outdir, 'pysr_outputs', 'y')
     model.fit(X_train, y_values)
     

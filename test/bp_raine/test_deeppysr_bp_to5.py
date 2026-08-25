@@ -34,6 +34,8 @@ def main():
     parser.add_argument('--age', type=int, default=20,
                         choices=_BP_AGES)
     parser.add_argument('--vps', type=int, default=25)
+    parser.add_argument('--save_hof', action='store_true',
+                        help='Persist PySR hall-of-fame/checkpoint files (large; off by default).')
     args = parser.parse_args()
 
     load_fn, results_dir = _LOAD_FN[args.test]
@@ -45,7 +47,7 @@ def main():
         deeppysr_configs = {k: v for k, v in deeppysr_configs.items()
                             if f"vps{args.vps}_" in k}
 
-    pysr_base_kwargs = get_pysr_base_kwargs()
+    pysr_base_kwargs = get_pysr_base_kwargs(save_hof=args.save_hof)
     nit = pysr_base_kwargs.get('niterations', 100)
     pop = pysr_base_kwargs.get('populations', 30)
     sz  = pysr_base_kwargs.get('population_size', 200)
