@@ -743,6 +743,47 @@ def _cache_path(cache_dir: Path, target: str, age: int) -> Path:
     return cache_dir / f"{target}_{age}.csv"
 
 
+@lru_cache(maxsize=1)
+def _get_sex_lookup() -> dict:
+    """child_id -> g2_sex (0=male, 1=female per RAINE's G2_data_dictionary
+    SEXa coding), built directly from _build_merged()'s output.
+
+    Deliberately built from _build_merged() alone, never from a loader's own
+    (X, y) -- _build_merged() does the merge/preprocess/consolidation but NOT
+    _clean_and_impute()'s IterativeImputer call, so this lookup stays cheap
+    regardless of how many times sex-filtering is requested. Sex-filtering
+    must be a post-hoc row selection on an already-built, already-cached
+    (ids, X, y) triple (see _filter_by_sex) -- it must never cause a second,
+    per-sex imputation pass."""
+    merged = _build_merged()
+    lookup = merged[["child_id", "g2_sex"]].dropna(subset=["g2_sex"])
+    lookup = lookup.drop_duplicates(subset="child_id", keep="first")
+    return dict(zip(lookup["child_id"], lookup["g2_sex"]))
+
+
+def _filter_by_sex(id_col: pd.Series, X: pd.DataFrame, y: pd.Series, sex: int | None):
+    """Post-hoc row filter applied to an already-built (ids, X, y) triple --
+    whether that triple just came from disk cache (the common case) or a
+    fresh build, this never re-enters _build_merged()/_clean_and_impute(), so
+    it costs nothing beyond a dict lookup and a boolean mask.
+
+    sex=None (the default) returns id_col/X/y completely unchanged, by
+    identity -- this is what keeps the unfiltered path byte-identical to
+    before sex support existed (same cache files, same function behavior).
+    When sex is 0/1, rows are restricted to that sex and g2_sex (now
+    constant) is dropped from X if present."""
+    if sex is None:
+        return id_col, X, y
+    lookup = _get_sex_lookup()
+    mask = id_col.map(lookup).eq(sex).fillna(False)
+    id_f = id_col.loc[mask].reset_index(drop=True)
+    X_f = X.loc[mask].reset_index(drop=True)
+    if "g2_sex" in X_f.columns:
+        X_f = X_f.drop(columns=["g2_sex"])
+    y_f = y.loc[mask].reset_index(drop=True)
+    return id_f, X_f, y_f
+
+
 def _save_cache(cache_dir: Path, target: str, age: int,
                  id_col: pd.Series, X: pd.DataFrame, y: pd.Series) -> Path:
     cache_path = _cache_path(cache_dir, target, age)
@@ -772,11 +813,17 @@ def _blood_lipid_cols(columns) -> set:
     return {c for c in columns if any(kw in c for kw in _LIPID_TARGET_KEYWORDS)}
 
 
-def load_data_PGS_only(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
-    """Load PGS-only features to predict `target` lipid at the given age."""
+def load_data_PGS_only(target: str, age: int, sex: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS-only features to predict `target` lipid at the given age.
+
+    sex, if given (0=male, 1=female), restricts to that sex only -- applied
+    as a cheap post-hoc row filter (_filter_by_sex) on top of the ordinary,
+    unfiltered (ids, X, y), never as a change to what gets built/cached
+    above: the cache path/contents here are 100% identical to a sex-naive
+    caller, whether sex is None or not."""
     cache_path = _cache_path(_CACHE_PGS, target, age)
     if cache_path.exists():
-        return _load_cache(cache_path, target)
+        return _filter_by_sex(*_load_cache(cache_path, target), sex)
 
     pgs_cols = _get_pgs_cols()
     merged = _build_merged()
@@ -790,14 +837,18 @@ def load_data_PGS_only(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, 
     X = merged[pgs_cols].copy()
 
     _save_cache(_CACHE_PGS, target, age, id_col, X, y)
-    return id_col, X, y
+    return _filter_by_sex(id_col, X, y, sex)
 
 
-def load_data_keepto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
-    """Load features with timepoints <= 8, no PGS, to predict `target` lipid at the given age."""
+def load_data_keepto8(target: str, age: int, sex: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load features with timepoints <= 8, no PGS, to predict `target` lipid at the given age.
+
+    sex, if given (0=male, 1=female), restricts to that sex only -- see
+    load_data_PGS_only's docstring: a post-hoc filter, not a change to what
+    gets built/cached."""
     cache_path = _cache_path(_CACHE_KEEPTO8, target, age)
     if cache_path.exists():
-        return _load_cache(cache_path, target)
+        return _filter_by_sex(*_load_cache(cache_path, target), sex)
 
     pgs_cols = _get_pgs_cols()
     merged = _build_merged()
@@ -818,14 +869,18 @@ def load_data_keepto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, p
     X = _clean_and_impute(X)
 
     _save_cache(_CACHE_KEEPTO8, target, age, id_col, X, y)
-    return id_col, X, y
+    return _filter_by_sex(id_col, X, y, sex)
 
 
-def load_data_PGSto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
-    """Load PGS + features with timepoints <= 8 to predict `target` lipid at the given age."""
+def load_data_PGSto8(target: str, age: int, sex: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS + features with timepoints <= 8 to predict `target` lipid at the given age.
+
+    sex, if given (0=male, 1=female), restricts to that sex only -- see
+    load_data_PGS_only's docstring: a post-hoc filter, not a change to what
+    gets built/cached."""
     cache_path = _cache_path(_CACHE_PGSTO8, target, age)
     if cache_path.exists():
-        return _load_cache(cache_path, target)
+        return _filter_by_sex(*_load_cache(cache_path, target), sex)
 
     merged = _build_merged()
     y_all = _lipid_target_series(merged, target, age)
@@ -843,14 +898,18 @@ def load_data_PGSto8(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd
     X = _clean_and_impute(X)
 
     _save_cache(_CACHE_PGSTO8, target, age, id_col, X, y)
-    return id_col, X, y
+    return _filter_by_sex(id_col, X, y, sex)
 
 
-def load_data_recent(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
-    """Load PGS + all features collected strictly before target age to predict `target` lipid."""
+def load_data_recent(target: str, age: int, sex: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+    """Load PGS + all features collected strictly before target age to predict `target` lipid.
+
+    sex, if given (0=male, 1=female), restricts to that sex only -- see
+    load_data_PGS_only's docstring: a post-hoc filter, not a change to what
+    gets built/cached."""
     cache_path = _cache_path(_CACHE_RECENT, target, age)
     if cache_path.exists():
-        return _load_cache(cache_path, target)
+        return _filter_by_sex(*_load_cache(cache_path, target), sex)
 
     merged = _build_merged()
     y_all = _lipid_target_series(merged, target, age)
@@ -869,16 +928,20 @@ def load_data_recent(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd
     X = _clean_and_impute(X)
 
     _save_cache(_CACHE_RECENT, target, age, id_col, X, y)
-    return id_col, X, y
+    return _filter_by_sex(id_col, X, y, sex)
 
 
-def load_data_nblood(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
+def load_data_nblood(target: str, age: int, sex: int | None = None) -> tuple[pd.Series, pd.DataFrame, pd.Series]:
     """Like load_data_recent, but also excludes every blood-lipid column
     (cholesterol/triglyceride/hdl/ldl at any timepoint) from the features,
-    not just the current target -- so no lipid history can leak in."""
+    not just the current target -- so no lipid history can leak in.
+
+    sex, if given (0=male, 1=female), restricts to that sex only -- see
+    load_data_PGS_only's docstring: a post-hoc filter, not a change to what
+    gets built/cached."""
     cache_path = _cache_path(_CACHE_NBLOOD, target, age)
     if cache_path.exists():
-        return _load_cache(cache_path, target)
+        return _filter_by_sex(*_load_cache(cache_path, target), sex)
 
     merged = _build_merged()
     y_all = _lipid_target_series(merged, target, age)
@@ -897,7 +960,7 @@ def load_data_nblood(target: str, age: int) -> tuple[pd.Series, pd.DataFrame, pd
     X = _clean_and_impute(X)
 
     _save_cache(_CACHE_NBLOOD, target, age, id_col, X, y)
-    return id_col, X, y
+    return _filter_by_sex(id_col, X, y, sex)
 
 
 if __name__ == '__main__':

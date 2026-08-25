@@ -1,6 +1,18 @@
 """Aggregate regression results for the lipids RAINE tests (cholesterol,
 triglyceride, hdl, ldl) across all input-type variants under results_lipids/.
 
+INPUT_TYPES has 15 entries: the 5 base variants (PGS, PGSto8, to8, recent,
+nblood) plus, for each, a male-only ('_male') and female-only ('_female')
+variant trained on the same features but restricted to one sex (RAINE's
+G2_data_dictionary SEXa coding: 0=male, 1=female -- see data_utils.py's
+`sex` loader parameter, which still takes the raw 0/1 value; only the
+results-folder/input_type naming uses the human-readable male/female tag).
+Sex-specific results live under results_lipids_<base>_<male|female>/,
+produced by the same training scripts via a --sex {0,1} flag; every
+function in this file is generic over INPUT_TYPES and treats a
+sex-specific entry exactly like any other input_type once
+INPUT_TYPE_LOADERS/_deeppysr_uses_scaler know how to resolve it.
+
 Unlike analysis_insulin_variant.py, the r2/rmse/mae/pearson_r columns are NOT
 leak-free CV -- they're read straight off each leaf's predictions.csv
 (y_true/y_pred columns), matching how the baseline models are already
@@ -88,19 +100,44 @@ AGES = [14, 17, 20, 22, 27, 28]
 FS_SUBFOLDERS = ["all_features"]
 FTSL_LABELS = {"all_features": "all_feature"}
 
-INPUT_TYPES = ["PGS", "PGSto8", "to8", "recent", "nblood"]
+# 5 base input types, each immediately followed by its two sex-stratified
+# variants (_male/_female, i.e. sex=0/1 per RAINE's G2_data_dictionary SEXa
+# coding -- see data_utils.py's sex parameter). Sex-specific runs are otherwise treated
+# exactly like any other input_type throughout this file: _variant_dir(),
+# _deeppysr_uses_scaler(), the sensitivity/plotting functions etc. are all
+# generic over INPUT_TYPES and need no per-entry special-casing beyond what's
+# below -- results live under results_lipids_<base>_<male|female>/, matching
+# _variant_dir's existing f"results_lipids_{input_type}" pattern unchanged.
+INPUT_TYPES = [
+    "PGS", "PGS_male", "PGS_female",
+    "PGSto8", "PGSto8_male", "PGSto8_female",
+    "to8", "to8_male", "to8_female",
+    "recent", "recent_male", "recent_female",
+    "nblood", "nblood_male", "nblood_female",
+]
 BASELINE_MODELS = ["ElasticNet", "ExtraTrees", "KAN", "MLP", "RandomForest", "XGBoost"]
 
 # load_fn per input_type -- mirrors the _LOAD_FN dicts in
 # test_baselines_pysr_lipids_to8.py / test_deeppysr_lipids_to8.py (PGS, to8,
 # PGSto8) and test_baselines_pysr_lipids_recent.py / test_deeppysr_lipids_recent.py
-# (recent, nblood).
+# (recent, nblood). The _male/_female entries bind sex=0/1 (data_utils.py's
+# `sex` parameter is still the raw RAINE 0/1 coding) into the same base loader.
 INPUT_TYPE_LOADERS = {
-    'PGS':    load_data_PGS_only,
-    'PGSto8': load_data_PGSto8,
-    'to8':    load_data_keepto8,
-    'recent': load_data_recent,
-    'nblood': load_data_nblood,
+    'PGS':           load_data_PGS_only,
+    'PGS_male':      lambda target, age: load_data_PGS_only(target, age, sex=0),
+    'PGS_female':    lambda target, age: load_data_PGS_only(target, age, sex=1),
+    'PGSto8':        load_data_PGSto8,
+    'PGSto8_male':   lambda target, age: load_data_PGSto8(target, age, sex=0),
+    'PGSto8_female': lambda target, age: load_data_PGSto8(target, age, sex=1),
+    'to8':           load_data_keepto8,
+    'to8_male':      lambda target, age: load_data_keepto8(target, age, sex=0),
+    'to8_female':    lambda target, age: load_data_keepto8(target, age, sex=1),
+    'recent':        load_data_recent,
+    'recent_male':   lambda target, age: load_data_recent(target, age, sex=0),
+    'recent_female': lambda target, age: load_data_recent(target, age, sex=1),
+    'nblood':        load_data_nblood,
+    'nblood_male':   lambda target, age: load_data_nblood(target, age, sex=0),
+    'nblood_female': lambda target, age: load_data_nblood(target, age, sex=1),
 }
 
 N_SPLITS = 5
@@ -159,13 +196,25 @@ def _variant_dir(input_type):
     return os.path.join(RESULTS_BASE_DIR, f"results_lipids_{input_type}")
 
 
+def _base_input_type(input_type):
+    """Strip a trailing sex suffix ('_male'/'_female') to get the base variant
+    name, e.g. 'recent_female' -> 'recent'. Base (unsuffixed) input types pass
+    through unchanged. Used wherever behavior is keyed off which training
+    script produced a variant, not the sex-filtering itself."""
+    for suffix in ('_male', '_female'):
+        if input_type.endswith(suffix):
+            return input_type[:-len(suffix)]
+    return input_type
+
+
 def _deeppysr_uses_scaler(input_type):
     """test_deeppysr_lipids_recent.py passes scaler=False explicitly for
-    both recent and nblood; the to8/PGS/PGSto8 script
+    both recent and nblood (and their sex-specific variants, which are
+    trained by that same script); the to8/PGS/PGSto8 script
     test_deeppysr_lipids_to8.py omits scaler=..., so eval_utils.run_cv's
     default (True) applies there. PySR always runs with scaler=False
     regardless of input_type."""
-    return input_type not in ('recent', 'nblood')
+    return _base_input_type(input_type) not in ('recent', 'nblood')
 
 
 def _process_baselines(age_path, target, age, input_type, rows):
@@ -429,6 +478,11 @@ def _plot_metric_vs_age(df, keep_col, legend_title, out_path, suptitle, palette_
         return
 
     series = sorted(plot_df[keep_col].unique())
+    if len(series) > 10 and palette_name == "tab10":
+        # tab10 only has 10 distinguishable hues -- input_type now has 15
+        # entries (5 base + 2 sexes x 5), so auto-upgrade rather than have
+        # colors repeat and become ambiguous in the legend.
+        palette_name = "tab20"
     palette = sns.color_palette(palette_name, n_colors=len(series))
     colors = dict(zip(series, palette))
 
