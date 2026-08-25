@@ -1,3 +1,3 @@
-type,model,formula,r2,complexity
-red,fullsr_vps75_vpr50_aps1.0_nit500_pop100_sz200_grid_r2w1.0_L0.01,-1.0*volatile acidity + 1.91*(alcohol - 1.0*sin(pH/sulphates**1.0 - 5.63))**0.5,0.3631258673356481,23.0
-white,fullsr_vps75_vpr150_aps1.0_nit500_pop100_sz200_grid_r2w1.5_L0.001,-1.17*fixed acidity/(residual sugar + free sulfur dioxide)**1.0 + volatile acidity*(alcohol - 12.4) - 1.0*chlorides + 6.7,0.30090728734985994,23.0
+wine type,model,formula,r2,complexity
+red,fullsr_vps50_vpr150_aps1.0_nit500_pop100_sz200_grid__interp25,-1.0*volatile acidity - 1.0*chlorides + (alcohol*(4.8 - 0.65/sulphates**1.0))**0.5,0.3674966461822423,22.0
+white,fullsr_vps50_vpr50_aps10.0_nit500_pop100_sz200_grid__interp25,sin(1.63*sin(volatile acidity*(alcohol - 12.25)) - 1.0*sin(volatile acidity + log(fixed acidity/free sulfur dioxide**1.0))) + 5.76,0.3335236253439373,24.0

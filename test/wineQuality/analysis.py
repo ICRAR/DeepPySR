@@ -5,8 +5,8 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.patches import Patch
 
-# Add test/ and test/bmi to path to import load_bmi_agg_data
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if not current_dir:
     current_dir = "."
@@ -14,157 +14,99 @@ sys.path.append(os.path.join(current_dir, ".."))
 sys.path.append(current_dir)
 
 from wine_utils import load_wine_data
-from analysis_utils import (calculate_metrics, get_best_formula_from_raw,
-                             collect_model_fold_data, se_from_fold_data,
-                             run_wilcoxon_analysis, compute_se)
+from analysis_v1_utils import (calculate_metrics, leak_free_process_and_select,
+                                get_best_formula_from_raw, collect_model_fold_data,
+                                get_formula_fold_metrics, compute_fold_metrics_from_predictions,
+                                se_from_fold_data, run_wilcoxon_analysis, compute_se)
+
+TASK = 'regression'
+WINE_TYPES = ['red', 'white']
+INTERP_MAX_COMPLEXITY = 25
+R2W_LIST = [1, 1.5, 2]
+LAMBDA_LIST = [0.001, 0.005, 0.01]
+
+
+def _load_xy(wine_type):
+    df = load_wine_data(wine_type)
+    X = df.drop(columns=['quality'])
+    y = df['quality']
+    return X, y
+
 
 def process_results():
-    wine_types = ['red', 'white']
-    all_data = []
-    for wine_type in wine_types:
-        base_dir = os.path.join(current_dir, f"results_{wine_type}_all")
+    """Aggregate every model's genuine held-out metrics for both wine types.
 
-        df = load_wine_data(wine_type)
-        X = df.drop(columns=['quality'])
-        y = df['quality']
-        # Baselines (including KAN/KANSym)
-        baselines_dir = os.path.join(base_dir, "baselines")
-        if os.path.exists(baselines_dir):
-            for model_name in os.listdir(baselines_dir):
-                model_path = os.path.join(baselines_dir, model_name)
-                if not os.path.isdir(model_path):
-                    continue
+    DeepPySR/PySR/KAN/KANSym metrics come from predictions.csv (each fold's
+    model.predict on its own held-out split, pooled) -- never from
+    re-evaluating a formula against data it was fit on. Interpretable
+    DeepPySR is scored by evaluating each fold's own low-complexity candidate
+    only on that fold's own held-out rows (analysis_v1_utils.get_best_formula_from_raw).
+    Training used stratify_by=y (StratifiedKFold on the discrete quality
+    score) for both baselines/PySR and DeepPySR -- reconstructed folds here
+    must use the same stratify=y or they won't match.
+    """
+    all_rows, best_rows = [], []
+    for wine_type in WINE_TYPES:
+        X, y = _load_xy(wine_type)
+        source_dir = os.path.join(current_dir, f"results_{wine_type}_all")
+        all_df, best_df = leak_free_process_and_select(
+            source_dir, X, y, task=TASK, interp_max_complexity=INTERP_MAX_COMPLEXITY,
+            stratify=y)
+        all_df.insert(0, 'wine type', wine_type)
+        best_df.insert(0, 'wine type', wine_type)
+        all_rows.append(all_df)
+        best_rows.append(best_df)
 
-                pred_file = os.path.join(model_path, "predictions.csv")
-                if os.path.exists(pred_file):
-                    df_pred = pd.read_csv(pred_file)
-                    if model_name.lower() == 'kan':
-                        # KAN
-                        r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                        all_data.append(['KAN', wine_type, r2, rmse, mae, np.nan, ""])
-
-                        # KANSym
-                        if 'y_pred_kansym' in df_pred.columns:
-                            # For KANSym, we need formula and complexity
-                            # The user wants us to check all formulas and pick the best one
-                            formula, complexity, metrics = get_best_formula_from_raw(model_path, X, y, prefix='formulas_fold',model_type='kan')
-                            r2, rmse, mae = metrics
-
-                            if not formula:
-                                r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred_kansym'])
-
-                            all_data.append(['KANSym', wine_type, r2, rmse, mae, complexity, formula])
-                    else:
-                        # Other baselines
-                        r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                        all_data.append([model_name, wine_type, r2, rmse, mae, np.nan, ""])
-
-        # DeepPySR
-        deeppysr_dir = os.path.join(base_dir, "deeppysr")
-        if os.path.exists(deeppysr_dir):
-            for variant in os.listdir(deeppysr_dir):
-                v_path = os.path.join(deeppysr_dir, variant)
-                if not os.path.isdir(v_path): continue
-
-                res = get_best_formula_from_raw(v_path, X, y,model_type='deeppysr')
-
-                if isinstance(res, dict):
-                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                        r2, rmse, mae = metrics
-                        model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                        all_data.append([model_name, wine_type, r2, rmse, mae, complexity, formula])
-                else:
-                    formula, complexity, metrics = res
-                    r2, rmse, mae = metrics
-                    if not formula:
-                        pred_file = os.path.join(v_path, "predictions.csv")
-                        if os.path.exists(pred_file):
-                            df_pred = pd.read_csv(pred_file)
-                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                    all_data.append([variant, wine_type, r2, rmse, mae, complexity, formula])
-
-        # PySR
-        pysr_dir = os.path.join(base_dir, "pysr")
-        if os.path.exists(pysr_dir):
-            for variant in os.listdir(pysr_dir):
-                v_path = os.path.join(pysr_dir, variant)
-                if not os.path.isdir(v_path): continue
-
-                res = get_best_formula_from_raw(v_path, X, y,model_type='pysr')
-
-                if isinstance(res, dict):
-                    for (r2w, lamb), (formula, complexity, metrics) in res.items():
-                        r2, rmse, mae = metrics
-                        model_name = f"{variant}_r2w{r2w}_L{lamb}"
-                        all_data.append([model_name, wine_type, r2, rmse, mae, complexity, formula])
-                else:
-                    formula, complexity, metrics = res
-                    r2, rmse, mae = metrics
-                    if not formula:
-                        pred_file = os.path.join(v_path, "predictions.csv")
-                        if os.path.exists(pred_file):
-                            df_pred = pd.read_csv(pred_file)
-                            r2, rmse, mae = calculate_metrics(df_pred['y_true'], df_pred['y_pred'])
-                    all_data.append([variant, wine_type, r2, rmse, mae, complexity, formula])
-
-
-
-    # Create DataFrame and save
-    result_df = pd.DataFrame(all_data, columns=['model', 'wine type', 'r2', 'rmse', 'mae', 'complexity', 'formula'])
-    # Clip r2 to 0
-    result_df['r2'] = result_df['r2'].clip(lower=0)
-    result_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
+    all_df = pd.concat(all_rows, ignore_index=True)
+    best_df = pd.concat(best_rows, ignore_index=True)
+    all_df.to_csv(os.path.join(current_dir, "aggregated_results.csv"), index=False)
     print(f"Results saved to {os.path.join(current_dir, 'aggregated_results.csv')}")
-    return result_df
+    return all_df, best_df
 
 
-def compute_se_and_wilcoxon(result_df):
-    """Compute per-fold SE and run Wilcoxon vs DeepPySR (best R²) for each wine type."""
-    task = 'regression'
+def save_results(best_df):
+    plot_csv_path = os.path.join(current_dir, 'wine_best_models_metrics.csv')
+    best_df.to_csv(plot_csv_path, index=False)
+    print(f"Best models plot data saved to {plot_csv_path}")
 
-    display_to_fold = {
-        'Best DeepPySR': 'DeepPySR_best',
-        'Interpretable DeepPySR': 'DeepPySR_best',
-        'Best PySR': 'PySR',
-    }
+    interp_rows = best_df[best_df['display_model'] == 'Interpretable DeepPySR']
+    print(f"\n--- Interpretable DeepPySR Formulas (Complexity < {INTERP_MAX_COMPLEXITY}) ---")
+    cols = ['wine type', 'model', 'formula', 'r2', 'complexity']
+    print(interp_rows[cols].to_string(index=False))
+    interp_rows[cols].to_csv(os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv'), index=False)
 
-    all_se_maps = {}  # wine_type -> se_map
 
-    for wine_type in ['red', 'white']:
-        df_wine = load_wine_data(wine_type)
-        y = df_wine['quality']
-        X = df_wine.drop(columns=['quality'])
-        base_dir = os.path.join(current_dir, f"results_{wine_type}_all")
-        sub_df = result_df[result_df['wine type'] == wine_type]
+def _fold_data_for_row(row, X, y, stratify):
+    source_path = row.get('source_path', '')
+    if not source_path or not os.path.isdir(str(source_path)):
+        return None
+    family = row['family']
+    max_c = row.get('max_complexity', np.nan)
+    is_interp = pd.notna(max_c)
+
+    if family == 'kansym':
+        return compute_fold_metrics_from_predictions(
+            source_path, X, y, task=TASK, stratify=stratify, pred_col='y_pred_kansym')
+    if family in ('deeppysr', 'pysr') and is_interp:
+        return get_formula_fold_metrics(
+            source_path, X, y, task=TASK, model_type=family, stratify=stratify,
+            max_complexity=int(max_c))
+    return collect_model_fold_data(source_path, "", X, y, TASK, model_type=family, stratify=stratify)
+
+
+def compute_se_and_wilcoxon(best_df):
+    """Compute per-fold SE for each best-model row and run Wilcoxon vs DeepPySR (best), per wine type."""
+    all_se_maps = {}
+
+    for wine_type in WINE_TYPES:
+        X, y = _load_xy(wine_type)
+        sub = best_df[best_df['wine type'] == wine_type]
 
         fold_data = {}
-
-        baselines_dir = os.path.join(base_dir, "baselines")
-        if os.path.exists(baselines_dir):
-            for model_name in os.listdir(baselines_dir):
-                model_path = os.path.join(baselines_dir, model_name)
-                if not os.path.isdir(model_path):
-                    continue
-                row = sub_df[sub_df['model'] == model_name]
-                formula = row['formula'].iloc[0] if not row.empty else ""
-                fold_data[model_name] = collect_model_fold_data(
-                    model_path, formula, X, y, task,
-                    model_type='kan' if model_name.lower() == 'kansym' else 'pysr')
-
-        deeppysr_sub = sub_df[sub_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
-        if not deeppysr_sub.empty:
-            best_row = deeppysr_sub.loc[deeppysr_sub['r2'].idxmax()]
-            base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_row['model'])
-            model_dir = os.path.join(base_dir, 'deeppysr', base_model)
-            fold_data['DeepPySR_best'] = collect_model_fold_data(
-                model_dir, best_row['formula'], X, y, task, model_type='deeppysr')
-
-        pysr_sub = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)]
-        if not pysr_sub.empty:
-            best_pysr = pysr_sub.loc[pysr_sub['r2'].idxmax()]
-            pysr_model_dir = os.path.join(base_dir, 'pysr', best_pysr['model'])
-            fold_data['PySR'] = collect_model_fold_data(
-                pysr_model_dir, best_pysr['formula'], X, y, task, model_type='pysr')
+        for _, row in sub.iterrows():
+            fd = _fold_data_for_row(row, X, y, y)
+            if fd is not None:
+                fold_data[row['display_model']] = fd
 
         se_map = {}
         for model_name, fd in fold_data.items():
@@ -174,10 +116,10 @@ def compute_se_and_wilcoxon(result_df):
                 se_map[model_name] = ses
         all_se_maps[wine_type] = se_map
 
-        run_wilcoxon_analysis(fold_data, 'DeepPySR_best', task,
-                              output_file=os.path.join(current_dir, f"wilcoxon_results_{wine_type}.csv"))
+        if 'Best DeepPySR' in fold_data:
+            run_wilcoxon_analysis(fold_data, 'Best DeepPySR', TASK,
+                                  output_file=os.path.join(current_dir, f"wilcoxon_results_{wine_type}.csv"))
 
-    # Merge SE into wine_best_models_metrics.csv
     metrics_csv_path = os.path.join(current_dir, 'wine_best_models_metrics.csv')
     if all_se_maps and os.path.exists(metrics_csv_path):
         metrics_df = pd.read_csv(metrics_csv_path)
@@ -186,192 +128,77 @@ def compute_se_and_wilcoxon(result_df):
         for col in se_cols + ['n_folds']:
             metrics_df[col] = np.nan
         for i, row in metrics_df.iterrows():
-            wt = row['wine type']
-            sm = all_se_maps.get(wt, {})
-            fold_key = display_to_fold.get(row['display_model'], row['display_model'])
-            if fold_key in sm:
+            sm = all_se_maps.get(row['wine type'], {})
+            if row['display_model'] in sm:
                 for col in se_cols + ['n_folds']:
-                    metrics_df.at[i, col] = sm[fold_key].get(col, np.nan)
+                    metrics_df.at[i, col] = sm[row['display_model']].get(col, np.nan)
         metrics_df.to_csv(metrics_csv_path, index=False)
         print(f"SE merged into {metrics_csv_path}")
 
-def save_results(df):
-    """
-    1. Plot r2, rmse, mae for the models, along the age.
-    """
-    # Clip r2 to 0 for plotting
-    df = df.copy()
-    df['r2'] = df['r2'].clip(lower=0)
-
-    metrics = ['r2', 'rmse', 'mae']
-    types = ['red', 'white']
-
-    selected_data = []
-    interpretable_formulas = []
-
-    for t in types:
-        type_df = df[df['wine type'] == t]
-        if type_df.empty:
-            continue
-
-        # DeepPySR variants
-        deeppysr_df = type_df[type_df['model'].str.contains('fullsr|stdsr|srprn|srpsm', na=False)]
-        if not deeppysr_df.empty:
-            best_deeppysr = deeppysr_df.loc[deeppysr_df['r2'].idxmax()].copy()
-            best_deeppysr['display_model'] = 'Best DeepPySR'
-            selected_data.append(best_deeppysr)
-
-            interp_deeppysr_df = deeppysr_df[deeppysr_df['complexity'] < 25]
-            if not interp_deeppysr_df.empty:
-                interp_deeppysr = interp_deeppysr_df.loc[interp_deeppysr_df['r2'].idxmax()].copy()
-                interp_deeppysr['display_model'] = 'Interpretable DeepPySR'
-                selected_data.append(interp_deeppysr)
-                interpretable_formulas.append({
-                    'type': t, 'model': interp_deeppysr['model'],
-                    'formula': interp_deeppysr['formula'], 'r2': interp_deeppysr['r2'], 'complexity': interp_deeppysr['complexity']
-                })
-
-        # PySR variants
-        pysr_df = type_df[type_df['model'].str.contains('pysr', na=False)]
-        if not pysr_df.empty:
-            best_pysr = pysr_df.loc[pysr_df['r2'].idxmax()].copy()
-            best_pysr['display_model'] = 'Best PySR'
-            selected_data.append(best_pysr)
-
-        # KAN and KANSym
-        for m in ['KAN', 'KANSym']:
-            m_df = type_df[type_df['model'] == m]
-            if not m_df.empty:
-                m_row = m_df.iloc[0].copy()
-                m_row['display_model'] = m
-                selected_data.append(m_row)
-
-        # Other baselines (ElasticNet, ExtraTrees, MLP, RandomForest, XGBoost)
-        baselines = ['ElasticNet', 'ExtraTrees', 'MLP', 'RandomForest', 'XGBoost']
-        for b in baselines:
-            b_df = type_df[type_df['model'] == b]
-            if not b_df.empty:
-                b_row = b_df.iloc[0].copy()
-                b_row['display_model'] = b
-                selected_data.append(b_row)
-
-    plot_df = pd.DataFrame(selected_data)
-
-    # Save the plot data for the best models to CSV
-    plot_csv_path = os.path.join(current_dir, 'wine_best_models_metrics.csv')
-    plot_df.to_csv(plot_csv_path, index=False)
-    print(f"Best models plot data saved to {plot_csv_path}")
-
-    # Print interpretable DeepPySR formulas
-    print("\n--- Interpretable DeepPySR Formulas (Complexity < 25) ---")
-    interp_df = pd.DataFrame(interpretable_formulas)
-    print(interp_df.to_string(index=False))
-    interp_csv_path = os.path.join(current_dir, 'interpretable_deeppysr_formulas.csv')
-    interp_df.to_csv(interp_csv_path, index=False)
-
 
 def aggregate_feature_importance():
-    """
-    Aggregate feature importance for ElasticNet, ExtraTrees, RandomForest, XGBoost, KAN.
-    Exclude DeepPySR, PySR, MLP.
-    Average across folds, percentage it.
-    """
-    types = ['red', 'white']
-    importance_data = []
-    for type in types:
-        base_dir = os.path.join(current_dir, f"results_{type}_all")
+    """Aggregate feature importance for ElasticNet, ExtraTrees, RandomForest, XGBoost, KAN
+    per wine type. (Unrelated to the formula-selection leak.)"""
+    for wine_type in WINE_TYPES:
+        base_dir = os.path.join(current_dir, f"results_{wine_type}_all")
+        importance_data = []
 
-
-        # Helper to process importance file
-        def process_importance(path, model_name, type):
+        def process_importance(path, model_name):
             if os.path.exists(path):
                 df_imp = pd.read_csv(path)
-                # Ensure it has 'feature' and 'importance' columns
                 if 'feature' in df_imp.columns and 'importance' in df_imp.columns:
-                    # Percentage it
                     total = df_imp['importance'].sum()
-                    if total > 0:
-                        df_imp['importance_pct'] = (df_imp['importance'] / total) * 100
-                    else:
-                        df_imp['importance_pct'] = 0
-
+                    df_imp['importance_pct'] = (df_imp['importance'] / total * 100) if total > 0 else 0
                     for _, row in df_imp.iterrows():
-                        importance_data.append({
-                            'model': model_name,
-                            'type': type,
-                            'variable': row['feature'],
-                            'weight': row['importance_pct']
-                        })
+                        importance_data.append({'model': model_name, 'variable': row['feature'],
+                                                 'weight': row['importance_pct']})
 
-        if os.path.exists(base_dir):
-            baselines_dir = os.path.join(base_dir, "baselines")
-            if os.path.exists(baselines_dir):
-                for m in os.listdir(baselines_dir):
-                    if m in ['ElasticNet', 'ExtraTrees', 'RandomForest', 'XGBoost', 'KAN']:
-                        imp_file = os.path.join(baselines_dir, m, "feature_importance.csv")
-                        process_importance(imp_file, m, type)
+        baselines_dir = os.path.join(base_dir, "baselines")
+        if os.path.exists(baselines_dir):
+            for m in os.listdir(baselines_dir):
+                if m in ['ElasticNet', 'ExtraTrees', 'RandomForest', 'XGBoost', 'KAN']:
+                    process_importance(os.path.join(baselines_dir, m, "feature_importance.csv"), m)
 
         imp_df = pd.DataFrame(importance_data)
-        imp_df.to_csv(os.path.join(base_dir,"feature_importance_aggregated.csv"), index=False)
-        print("Feature importance aggregated to feature_importance_aggregated.csv")
+        imp_df.to_csv(os.path.join(base_dir, "feature_importance_aggregated.csv"), index=False)
+        print(f"Feature importance ({wine_type}) aggregated to feature_importance_aggregated.csv")
 
-        # Grouped bar plot for all models comparison
         if not imp_df.empty:
-            # Average importance across ages and types per model/variable
             agg_imp = imp_df.groupby(['model', 'variable'])['weight'].mean().reset_index()
-
-            # Find top 15 features based on average across all models
             top_features = agg_imp.groupby('variable')['weight'].mean().sort_values(ascending=False).head(15).index
-
             plot_df = agg_imp[agg_imp['variable'].isin(top_features)].copy()
             plot_df['variable'] = pd.Categorical(plot_df['variable'], categories=top_features, ordered=True)
 
             plt.figure(figsize=(14, 10))
             sns.barplot(data=plot_df, x='weight', y='variable', hue='model', palette="bright")
-
-            plt.title('Feature Importance Comparison across Models', fontsize=22, fontweight='bold', pad=20)
+            plt.title(f'Feature Importance Comparison across Models ({wine_type})', fontsize=22, fontweight='bold', pad=20)
             plt.xlabel('Average Percentage Importance (%)', fontsize=18)
             plt.ylabel('Feature', fontsize=18)
             plt.legend(title='Model', bbox_to_anchor=(1.02, 1), loc='upper left', fontsize=12)
             plt.tick_params(labelsize=14)
-
             plt.tight_layout()
             plot_path = os.path.join(base_dir, "feature_importance_by_model.png")
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
             plt.close()
             print(f"Combined feature importance plot saved to {plot_path}")
 
+
 def plot_best_models():
-    """
-    Create a plot with 2 rows (red and white wine) and 4 columns (r2, rmse, mae, complexity).
-    Each subplot shows metric values for the models, with R2/RMSE/MAE showing all models.
-    """
+    """2 rows (red/white) x 4 cols (r2, rmse, mae, complexity)."""
     df = pd.read_csv(os.path.join(current_dir, 'wine_best_models_metrics.csv'))
 
-    wine_types = ['red', 'white']
     metrics = ['r2', 'rmse', 'mae', 'complexity']
-    models_to_include_for_complexity = ['Best DeepPySR', 'Interpretable DeepPySR', 'Best PySR', 'KANSym']
-    label_map = {
-        'Best DeepPySR': 'DeepPySR',
-        'Interpretable DeepPySR': 'InterpDeepPySR'
-    }
-    
+    models_to_include_for_complexity = ['Best DeepPySR', 'Interpretable DeepPySR', 'PySR', 'KANSym']
+    label_map = {'Best DeepPySR': 'DeepPySR', 'Interpretable DeepPySR': 'InterpDeepPySR'}
+
     fig, axes = plt.subplots(2, 4, figsize=(15, 7))
-
-    for i, wine in enumerate(wine_types):
-        wine_df_all = df[df['wine type'] == wine].copy()
-        wine_df_all = wine_df_all.sort_values('display_model')
-
+    for i, wine in enumerate(WINE_TYPES):
+        wine_df_all = df[df['wine type'] == wine].sort_values('display_model').copy()
         wine_df_complexity = wine_df_all[wine_df_all['display_model'].isin(models_to_include_for_complexity)].copy()
 
         for j, metric in enumerate(metrics):
             ax = axes[i, j]
-
-            if metric == 'complexity':
-                plot_df = wine_df_complexity.copy()
-            else:
-                plot_df = wine_df_all.copy()
-
+            plot_df = wine_df_complexity.copy() if metric == 'complexity' else wine_df_all.copy()
             if plot_df.empty:
                 ax.text(0.5, 0.5, 'No data', ha='center', va='center', fontsize=12)
                 ax.set_title(f'{wine.capitalize()} Wine - {metric.upper()}')
@@ -379,7 +206,6 @@ def plot_best_models():
                 ax.set_ylabel(metric.upper())
                 ax.set_xticks([])
                 continue
-
             plot_df['plot_label'] = plot_df['display_model'].replace(label_map)
             ax.bar(plot_df['plot_label'], plot_df[metric])
             ax.set_title(f'{wine.capitalize()} Wine - {metric.upper()}')
@@ -393,28 +219,26 @@ def plot_best_models():
     plt.close()
     print(f"Plot saved to {plot_path}")
 
-def plot_vps_vpr_ablation(df):
-    """Ablation: VPS/VPR effect with fixed APS=10.0, r2w=1.0, λ=0.01. Averaged over wine types."""
-    import re
-    from matplotlib.patches import Patch
 
+def plot_vps_vpr_ablation(all_df):
+    """Ablation: VPS/VPR effect -- best R² across all aps per config at the
+    model's own default (r2w=1, lambda=0.001) operating point, genuinely
+    held-out per fold, averaged over wine types."""
     metrics = ['r2', 'rmse', 'mae', 'complexity']
     metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
 
-    deep_mask = df['model'].str.contains('fullsr', regex=False, na=False)
-    deep_df = df[deep_mask].copy()
+    deep_df = all_df[(all_df['family'] == 'deeppysr') & all_df['max_complexity'].isna()].copy()
 
     def vps_vpr_label(m):
         match = re.search(r'vps(\d+)_vpr(\d+)', m)
         return f"vps{match.group(1)}/vpr{match.group(2)}" if match else m
     deep_df['label'] = deep_df['model'].apply(vps_vpr_label)
-    # Best R² per (wine type, vps/vpr config) across all aps/r2w/λ
     deep_df = deep_df.loc[deep_df.groupby(['wine type', 'label'])['r2'].idxmax()].reset_index(drop=True)
     deep_agg = deep_df.groupby('label')[metrics].mean().reset_index()
 
-    pysr_mask = df['model'].str.contains(r'^pysr', regex=True, na=False)
-    pysr_sub = df[pysr_mask].copy()
-    pysr_sub = pysr_sub.loc[pysr_sub.groupby('wine type')['r2'].idxmax()].reset_index(drop=True)
+    pysr_sub = all_df[all_df['family'] == 'pysr'].copy()
+    if not pysr_sub.empty:
+        pysr_sub = pysr_sub.loc[pysr_sub.groupby('wine type')['r2'].idxmax()].reset_index(drop=True)
     pysr_sub['label'] = 'PySR (no VPS/VPR)'
 
     csv_df = pd.concat([deep_df[['label'] + metrics], pysr_sub[['label'] + metrics]], ignore_index=True)
@@ -451,7 +275,7 @@ def plot_vps_vpr_ablation(df):
     fig.legend(handles=[Patch(facecolor='#4878CF', label='DeepPySR'),
                         Patch(facecolor='#E87722', label='PySR (reference)')],
                loc='upper right', fontsize=11, frameon=True)
-    plt.suptitle('Ablation: VPS/VPR Effect (APS=10.0, r2w=1.0, λ=0.01)', fontsize=14, fontweight='bold', y=1.04)
+    plt.suptitle('Ablation: VPS/VPR Effect (best APS per config, default r2w/λ)', fontsize=14, fontweight='bold', y=1.04)
     plt.tight_layout()
     out = os.path.join(current_dir, 'ablation_vps_vpr.png')
     plt.savefig(out, dpi=300, bbox_inches='tight')
@@ -459,35 +283,44 @@ def plot_vps_vpr_ablation(df):
     print(f"VPS/VPR ablation saved to {out}")
 
 
-def plot_pareto_ablation(df):
-    """Ablation: pareto r2w/λ effect with fixed VPS=25, VPR=100, APS=10.0. Averaged over wine types."""
-    import re
-    from matplotlib.patches import Patch
-
+def plot_pareto_ablation(all_df):
+    """Ablation: pareto r2w/λ effect with fixed VPS=25, VPR=100, APS=10.0,
+    averaged over wine types. Each r2w/λ grid point is scored genuinely:
+    per fold, restrict candidates to that exact pareto_r2_weight/pareto_lambda,
+    pick by in-fold fitness, evaluate only on that fold's held-out rows."""
     metrics = ['r2', 'rmse', 'mae', 'complexity']
     metric_labels = ['R²', 'RMSE', 'MAE', 'Complexity']
 
-    deep_mask = (df['model'].str.contains('fullsr', regex=False, na=False) &
-                 df['model'].str.contains('_vps25_', regex=False, na=False) &
-                 df['model'].str.contains('_vpr100_', regex=False, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
-    deep_df = df[deep_mask].copy()
+    rows = []
+    for wine_type in WINE_TYPES:
+        X, y = _load_xy(wine_type)
+        deep_dir = os.path.join(current_dir, f"results_{wine_type}_all", 'deeppysr')
+        target_variant = None
+        if os.path.isdir(deep_dir):
+            for variant in os.listdir(deep_dir):
+                if '_vps25_' in variant and '_vpr100_' in variant and 'aps10.0' in variant:
+                    target_variant = variant
+                    break
+        if target_variant is None:
+            continue
+        v_path = os.path.join(deep_dir, target_variant)
+        for r2w in R2W_LIST:
+            for lam in LAMBDA_LIST:
+                formula, complexity, m = get_best_formula_from_raw(
+                    v_path, X, y, task=TASK, model_type='deeppysr', stratify=y,
+                    pareto_point=(r2w, lam))
+                if not formula:
+                    continue
+                rows.append({'wine type': wine_type, 'label': f"r2w={r2w}, λ={lam}",
+                             'r2': m[0], 'rmse': m[1], 'mae': m[2], 'complexity': complexity})
+    deep_df = pd.DataFrame(rows)
+    deep_agg = deep_df.groupby('label')[metrics].mean().reset_index() if not deep_df.empty else pd.DataFrame()
 
-    def pareto_label(m):
-        r2w_m = re.search(r'_r2w([\d.]+)_L', m)
-        l_m = re.search(r'_L([\d.]+)$', m)
-        if r2w_m and l_m:
-            return f"r2w={r2w_m.group(1)}, λ={l_m.group(1)}"
-        return m
-    deep_df['label'] = deep_df['model'].apply(pareto_label)
-    deep_agg = deep_df.groupby('label')[metrics].mean().reset_index()
-
-    pysr_mask = (df['model'].str.contains(r'^pysr', regex=True, na=False) &
-                 df['model'].str.contains('aps10.0', regex=False, na=False))
-    pysr_sub = df[pysr_mask].copy()
+    pysr_sub = all_df[(all_df['family'] == 'pysr') & all_df['model'].str.contains('aps10.0', na=False)].copy()
     pysr_sub['label'] = 'PySR (reference)'
 
-    csv_df = pd.concat([deep_df[['label'] + metrics], pysr_sub[['label'] + metrics]], ignore_index=True)
+    csv_df = pd.concat([deep_df, pysr_sub[['wine type', 'label'] + metrics] if not pysr_sub.empty else pd.DataFrame()],
+                        ignore_index=True)
     csv_df.to_csv(os.path.join(current_dir, 'ablation_pareto.csv'), index=False)
     print(f"Pareto ablation data saved to {os.path.join(current_dir, 'ablation_pareto.csv')}")
 
@@ -495,9 +328,10 @@ def plot_pareto_ablation(df):
         print("No data for pareto ablation")
         return
 
-    pysr_row = pysr_sub[metrics].mean().to_frame().T
-    pysr_row['label'] = 'PySR\n(reference)'
-    plot_df = pd.concat([deep_agg, pysr_row[['label'] + metrics]], ignore_index=True)
+    pysr_row = pysr_sub[metrics].mean().to_frame().T if not pysr_sub.empty else pd.DataFrame()
+    if not pysr_row.empty:
+        pysr_row['label'] = 'PySR\n(reference)'
+    plot_df = pd.concat([deep_agg, pysr_row], ignore_index=True) if not deep_agg.empty else pysr_row
 
     def sort_key(lbl):
         r2w_m = re.search(r'r2w=([\d.]+)', lbl)
@@ -511,7 +345,8 @@ def plot_pareto_ablation(df):
 
     r2w_vals = sorted(set(float(re.search(r'r2w=([\d.]+)', l).group(1))
                           for l in labels if re.search(r'r2w=([\d.]+)', l)))
-    r2w_palette = dict(zip(r2w_vals, ['#2166ac', '#4dac26', '#d6604d']))
+    palette_colors = ['#2166ac', '#4dac26', '#d6604d']
+    r2w_palette = dict(zip(r2w_vals, palette_colors * (len(r2w_vals) // len(palette_colors) + 1)))
     colors = []
     for lbl in order:
         m = re.search(r'r2w=([\d.]+)', lbl)
@@ -540,7 +375,6 @@ def plot_pareto_ablation(df):
 
 
 def _pareto_front_steps(complexity, error):
-    """Return Pareto-optimal (complexity, error) pairs sorted by complexity (both minimize)."""
     points = sorted(zip(complexity, error), key=lambda p: (p[0], p[1]))
     pareto = []
     min_error = float('inf')
@@ -552,8 +386,9 @@ def _pareto_front_steps(complexity, error):
 
 
 def _load_hof_data(model_dir):
-    """Load hall_of_fame CSVs from pysr_outputs/y/ sorted by timestamp (fold order).
-    Returns DataFrame with (complexity, rmse) where rmse = mean sqrt(Loss) across folds."""
+    """Load hall_of_fame CSVs from pysr_outputs/y/ (the SR search's own
+    training-time complexity/loss log -- optimizer dynamics, not a held-out
+    generalization claim, so unaffected by the formula-selection leak)."""
     pysr_out = os.path.join(model_dir, 'pysr_outputs', 'y')
     if not os.path.exists(pysr_out):
         return pd.DataFrame()
@@ -575,36 +410,25 @@ def _load_hof_data(model_dir):
     return agg[['complexity', 'rmse']]
 
 
-def plot_pareto_front_rmse(df):
+def plot_pareto_front_rmse(all_df):
     """Pareto front per wine type: DeepPySR from hall_of_fame, PySR from aggregated variants."""
-    import re
-    wine_types = df['wine type'].unique() if 'wine type' in df.columns else [None]
-    n_types = len(wine_types)
+    n_types = len(WINE_TYPES)
     fig, axes = plt.subplots(1, n_types, figsize=(8 * n_types, 7), squeeze=False)
 
-    wtype_to_results_dir = {'red': 'results_red_all', 'white': 'results_white_all'}
-
-    for ax, wtype in zip(axes[0], wine_types):
-        sub_df = df[df['wine type'] == wtype] if wtype is not None else df
-        deep_df = sub_df[sub_df['model'].str.contains('fullsr', regex=False, na=False)].copy()
-        pysr_df = sub_df[sub_df['model'].str.contains(r'^pysr', regex=True, na=False)].copy()
+    for ax, wtype in zip(axes[0], WINE_TYPES):
+        sub_df = all_df[all_df['wine type'] == wtype]
+        deep_df = sub_df[(sub_df['family'] == 'deeppysr') & sub_df['max_complexity'].isna()].copy()
+        pysr_df = sub_df[sub_df['family'] == 'pysr'].copy()
         pysr_df = pysr_df[pysr_df['rmse'].notna() & pysr_df['complexity'].notna()]
 
-        # Load full Pareto hall_of_fame for the best DeepPySR model
         hof_data = pd.DataFrame()
         if not deep_df.empty:
-            best_name = deep_df.loc[deep_df['r2'].idxmax(), 'model']
-            base_model = re.sub(r'_r2w[\d.]+_L[\d.]+$', '', best_name)
-            res_dir = wtype_to_results_dir.get(wtype, f'results_{wtype}_all') if wtype else 'results_all'
-            model_dir = os.path.join(current_dir, res_dir, 'deeppysr', base_model)
+            model_dir = deep_df.loc[deep_df['r2'].idxmax(), 'source_path']
             hof_data = _load_hof_data(model_dir)
 
-        # Load hall_of_fame for best PySR model (only plotted once saved by save_pysr_hof.py)
         hof_pysr = pd.DataFrame()
         if not pysr_df.empty:
-            best_pysr_name = re.sub(r'_r2w[\d.]+_L[\d.]+$', '',
-                                    pysr_df.loc[pysr_df['r2'].idxmax(), 'model'])
-            pysr_model_dir = os.path.join(current_dir, res_dir, 'pysr', best_pysr_name)
+            pysr_model_dir = pysr_df.loc[pysr_df['r2'].idxmax(), 'source_path']
             hof_pysr = _load_hof_data(pysr_model_dir)
 
         if not hof_data.empty:
@@ -621,10 +445,9 @@ def plot_pareto_front_rmse(df):
                 ax.step(px, py, where='post', color='#cc4400', linewidth=2, zorder=4)
                 ax.scatter(px, py, c='#cc4400', s=100, zorder=5, marker='D', label='PySR')
 
-        title = f'Wine Quality ({wtype}) – Pareto Front: Complexity vs RMSE' if wtype else 'Wine Quality – Pareto Front: Complexity vs RMSE'
         ax.set_xlabel('Complexity', fontsize=13)
         ax.set_ylabel('RMSE', fontsize=13)
-        ax.set_title(title, fontsize=13, fontweight='bold')
+        ax.set_title(f'Wine Quality ({wtype}) – Pareto Front: Complexity vs RMSE', fontsize=13, fontweight='bold')
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
 
@@ -636,15 +459,16 @@ def plot_pareto_front_rmse(df):
 
 
 if __name__ == "__main__":
-    # process_results: aggregate all the results from the 5 fold cv, select one formula among the 5 which achieves the highest r2.
-    # The r2 is calculated by applying this formula on the entire dataset, not the fold.
+    # process_results: every model's metrics come from genuine held-out CV
+    # (predictions.csv for Best DeepPySR/PySR/KAN/KANSym, matching how
+    # baselines are already scored; per-fold held-out formula evaluation only
+    # for Interpretable DeepPySR, which has no predictions.csv of its own).
+    all_df, best_df = process_results()
 
-    df = process_results()
-
-    save_results(df)
-    compute_se_and_wilcoxon(df)
+    save_results(best_df)
+    compute_se_and_wilcoxon(best_df)
     aggregate_feature_importance()
     plot_best_models()
-    plot_vps_vpr_ablation(df)
-    plot_pareto_ablation(df)
-    plot_pareto_front_rmse(df)
+    plot_vps_vpr_ablation(all_df)
+    plot_pareto_ablation(all_df)
+    plot_pareto_front_rmse(all_df)

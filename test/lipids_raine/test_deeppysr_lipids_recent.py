@@ -11,8 +11,6 @@ from data_utils import load_data_recent, load_data_nblood, _LIPIDS_AGES, _LIPID_
 
 import argparse
 
-_N_TOP = 100
-
 _LOAD_FN = {
     'recent': (load_data_recent, 'results_lipids/results_lipids_recent'),
     'nblood': (load_data_nblood, 'results_lipids/results_lipids_nblood'),
@@ -68,7 +66,7 @@ def main():
         'extra_data': X[['age']] if 'age' in X.columns else None,
     }
 
-    # DeepPySR models — two runs per config: all features and top-100
+    # DeepPySR models — trained on the full feature set.
     print("\nEvaluating DeepPySR Models...")
     for cfg_name, cfg_overrides in deeppysr_configs.items():
         parts = cfg_name.split('_', 1)
@@ -76,28 +74,24 @@ def main():
         params_part = parts[1] if len(parts) > 1 else ""
         full_name = f"{setting_prefix}_{param_suffix}_{params_part}_grid"
 
-        for subfolder, fs_kwargs in [
-            ("all_features", {}),
-            (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
-        ]:
-            deeppysr_out = os.path.join(run_out, "deeppysr", full_name, subfolder)
-            if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
-                print(f"  Skipping {full_name}/{subfolder} (results exist)")
-                continue
-            print(f"  {full_name}/{subfolder}...")
+        deeppysr_out = os.path.join(run_out, "deeppysr", full_name, "all_features")
+        if os.path.exists(os.path.join(deeppysr_out, "overall_metrics.csv")):
+            print(f"  Skipping {full_name} (results exist)")
+            continue
+        print(f"  {full_name}...")
 
-            def deeppysr_factory(co=cfg_overrides, out=deeppysr_out):
-                kwargs = pysr_base_kwargs.copy()
-                kwargs.update(co)
-                return DeepPySR(
-                    max_layers=1,
-                    output_dir=out,
-                    pareto_r2_weight=r2w_list,
-                    pareto_lambda=lambda_list,
-                    **kwargs,
-                )
+        def deeppysr_factory(co=cfg_overrides, out=deeppysr_out):
+            kwargs = pysr_base_kwargs.copy()
+            kwargs.update(co)
+            return DeepPySR(
+                max_layers=1,
+                output_dir=out,
+                pareto_r2_weight=r2w_list,
+                pareto_lambda=lambda_list,
+                **kwargs,
+            )
 
-            run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs, **fs_kwargs)
+        run_cv(deeppysr_factory, X, y, outdir=deeppysr_out, scaler=False, **cv_kwargs)
 
     print(f"\nAggregating results for {run_name}...")
     aggregate_results(run_out, task='regression')

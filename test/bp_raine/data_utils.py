@@ -463,7 +463,47 @@ def _build_merged() -> pd.DataFrame:
     pgs_cols = _get_pgs_cols()
     merged = merged.dropna(subset=pgs_cols)
     merged = _preprocess(merged)
+    merged = _consolidate_sex_columns(merged)
     return merged
+
+
+_SEX_COL_RE = re.compile(r"^(g[12]_)?sex(01|_x)?$", re.IGNORECASE)
+
+
+def _consolidate_sex_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse every sex-encoding column (raw + dictionary-derived, whatever
+    coding they use) into a single canonical 'sex' feature so downstream
+    duplicate/correlation-based dropping doesn't have to be relied on.
+
+    Without this, the raw RAINE 'sex_x'/'sex01' columns and G2's 'g2_sex'
+    column (same underlying data.Health/bmi source as lipids_raine -- see
+    lipids_raine/data_utils.py's identical fix) survive independently, and
+    _clean_and_impute's duplicate-column drop only removes them from a given
+    (target, age) cache when their values happen to agree on that particular
+    row subset -- silently leaving 2 or 3 sex columns depending on which age
+    was cached."""
+    candidates = [c for c in df.columns if _SEX_COL_RE.match(c)]
+    if len(candidates) <= 1:
+        return df
+
+    canonical = "g2_sex" if "g2_sex" in candidates else sorted(candidates)[0]
+    combined = df[canonical].copy()
+    for c in candidates:
+        if c == canonical:
+            continue
+        other = df[c]
+        both = pd.concat([combined.rename("canon"), other.rename("other")], axis=1).dropna()
+        if len(both) and (both["canon"] == both["other"]).mean() < 0.5:
+            # differently-coded (e.g. 1/2 vs 0/1): remap to canonical's scale
+            mapping = both.groupby("other")["canon"].agg(lambda s: s.mode().iloc[0])
+            other = other.map(mapping)
+        combined = combined.fillna(other)
+
+    print(f"\n[sex columns] consolidated {candidates} -> '{canonical}' "
+          f"({int(combined.notna().sum())} non-null)")
+    df = df.drop(columns=[c for c in candidates if c != canonical])
+    df[canonical] = combined
+    return df
 
 
 _YR_COL_RE = re.compile(r"^(.+)_yr(\d+)$")

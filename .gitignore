@@ -3,8 +3,6 @@
 /archive/
 /**/pysr_outputs/
 /**/*kan*/
-!/**/kan/
-!/**/kansym/
 /**/outputs/
 /**/model/
 /**/predictions.csv
@@ -12,8 +10,6 @@
 /test_data/
 /test/*/*results*/
 /scripts/*.log
-/**/analysis_v1/
-/**/analysis_v1*
 /.vscode/
 /*/__pycache__/
 */**/__pycache__/
@@ -22,6 +18,4 @@
 /*paper/
 /Manifest.toml
 /Project.toml
-/test/diab_raine/
-!/test/lipids_raine/**/*.png
 /mynote.md

@@ -1,2 +1,2 @@
 model,formula,f1,complexity
-fullsr_vps25_vpr150_aps50.0_nit500_pop100_sz200_grid_r2w1.0_L0.01,"sin((cond(ca + exang, log(slope + cond(sex + fbs, ca))) + log(log(thal)))*sin(0.96*exp(cp)))",0.8692579505300353,23.0
+fullsr_vps25_vpr100_aps1.0_nit500_pop100_sz200_grid__interp30,"sin(0.06*(sex + thal + cond(sin(cp), -2.23) - 1.0*sin(chol))*exp((ca + cond(oldpeak, exang))**0.25))",0.896551724137931,27.0

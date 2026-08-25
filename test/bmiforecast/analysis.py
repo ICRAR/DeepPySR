@@ -25,6 +25,7 @@ try:
 except ImportError:
     pass
 from analysis_utils import evaluate_formula, map_variable_names
+from analysis_v1_utils import get_best_formula_from_raw as _leak_free_get_best_formula
 
 FORECAST_RESULTS_DIR = os.path.join(current_dir, 'results_bmiforecast')
 BMI_BEST_MODELS_CSV = os.path.join(
@@ -202,7 +203,9 @@ def extract_bmiforecast_formulas():
             sub = base_sub[['child_id'] + avail + [bmi_col]].copy()
             return sub[avail], sub[bmi_col].values, avail
 
-        # DeepPySR — collect once, pick best and best-interpretable from same candidate pool
+        # DeepPySR formula for display only (load_bmiforecast_results uses
+        # genuine cv_metrics_summary.csv for the reported r2/rmse/mae of this
+        # row, not dsr_candidates' full-dataset-evaluated score).
         dsr_files = glob.glob(os.path.join(age_dir, 'deeppysr', '**', 'relationships_fold*.csv'),
                                recursive=True)
         if not dsr_files:
@@ -215,9 +218,37 @@ def extract_bmiforecast_formulas():
             res = _pick_best(dsr_candidates)
             if res:
                 results[(age, 'DeepPySR')] = res
-            res_i = _pick_best(dsr_candidates, max_complexity=INTERP_COMPLEXITY_THRESHOLD)
-            if res_i:
-                results[(age, 'DeepPySR (Interpretable)')] = res_i
+
+            # DeepPySR (Interpretable): no genuine held-out r2 exists anywhere
+            # for this complexity-constrained operating point (unlike the
+            # unconstrained row above, which load_bmiforecast_results scores
+            # from cv_metrics_summary.csv instead of this function's r2), so
+            # it has to be computed leak-free here: per deeppysr grid variant,
+            # each fold's own low-complexity candidate evaluated only on that
+            # fold's own held-out rows (analysis_v1_utils, same CV as
+            # training: plain KFold, n_splits=5, random_state=42, no
+            # stratify/groups -- see test_bmiforecast.py's cv_kwargs), then
+            # keep whichever variant generalizes best.
+            deeppysr_dir = os.path.join(age_dir, 'deeppysr')
+            best_interp = None
+            if os.path.isdir(deeppysr_dir):
+                for variant in os.listdir(deeppysr_dir):
+                    v_path = os.path.join(deeppysr_dir, variant)
+                    if not os.path.isdir(v_path):
+                        continue
+                    formula_i, complexity_i, metrics_i = _leak_free_get_best_formula(
+                        v_path, X_dsr, y_dsr, task='regression', model_type='deeppysr',
+                        max_complexity=INTERP_COMPLEXITY_THRESHOLD, n_splits=5, random_state=42)
+                    if not formula_i:
+                        continue
+                    r2_i = metrics_i[0]
+                    if best_interp is None or (not np.isnan(r2_i) and r2_i > best_interp['r2']):
+                        # formula_i is already mapped to real feature names by
+                        # get_best_formula_from_raw (via X_dsr's own columns).
+                        best_interp = {'formula': formula_i, 'complexity': complexity_i, 'r2': r2_i,
+                                        'rmse': metrics_i[1], 'mae': metrics_i[2]}
+            if best_interp:
+                results[(age, 'DeepPySR (Interpretable)')] = best_interp
 
         # PySR — uses pysr_pred columns, not deeppysr_pred
         psr_files = glob.glob(os.path.join(age_dir, 'pysr', '**', 'formulas_fold*.csv'),
@@ -265,15 +296,19 @@ def load_bmiforecast_results(forecast_formulas=None):
             key = (str(row['family']), str(row['model']))
             display = FAMILY_MODEL_TO_DISPLAY.get(key, f"{row['family']}_{row['model']}")
             entry = forecast_formulas.get((age, display), {}) if forecast_formulas else {}
-            # For formula-based models use formula-evaluated metrics so DeepPySR and
-            # DeepPySR (Interpretable) are compared on the same evaluation basis.
-            use_formula_metrics = bool(entry.get('formula')) and display in FORMULA_MODELS.values()
+            # r2/rmse/mae always come from cv_metrics_summary.csv -- genuine
+            # held-out CV, computed by the training pipeline itself. entry's
+            # formula/complexity (from extract_bmiforecast_formulas) is used
+            # only for display; entry's own r2/rmse/mae (which, for the
+            # unconstrained DeepPySR/PySR/KANSym pick, come from evaluating a
+            # formula against the *entire* dataset it was partly fit on) are
+            # never used as the reported metric here.
             rec = {
                 'age': age,
                 'display_model': display,
-                'r2': entry.get('r2', row['cv_r2']) if use_formula_metrics else row['cv_r2'],
-                'rmse': entry.get('rmse', row['cv_rmse']) if use_formula_metrics else row['cv_rmse'],
-                'mae': entry.get('mae', row['cv_mae']) if use_formula_metrics else row['cv_mae'],
+                'r2': row['cv_r2'],
+                'rmse': row['cv_rmse'],
+                'mae': row['cv_mae'],
                 'source': 'BMI Forecast',
                 'formula': entry.get('formula', ''),
                 'complexity': entry.get('complexity', np.nan),
@@ -282,7 +317,12 @@ def load_bmiforecast_results(forecast_formulas=None):
             if display == 'DeepPySR':
                 deeppysr_row = rec
 
-        # Add interpretable DeepPySR row — use formula-evaluated metrics, not CV summary
+        # Add interpretable DeepPySR row. Unlike the unconstrained row above,
+        # there is no genuine held-out r2 for this complexity-constrained
+        # operating point anywhere in cv_metrics_summary.csv, so
+        # extract_bmiforecast_formulas computes it itself via leak-free
+        # per-fold held-out evaluation (see analysis_v1_utils.get_best_formula_from_raw
+        # there) -- this is the one legitimate use of entry-sourced metrics.
         if forecast_formulas is not None:
             interp_entry = forecast_formulas.get((age, 'DeepPySR (Interpretable)'), {})
             if interp_entry.get('formula'):

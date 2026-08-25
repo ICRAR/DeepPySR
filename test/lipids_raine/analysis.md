@@ -8,7 +8,7 @@ Links to the plots produced by `analysis_lipids.py`. Run it to regenerate everyt
 - **Input types** (5): `PGS`, `PGSto8`, `to8`, `recent`, `nblood`.
 - **Ages**: 14, 17, 20, 22, 28 (27 excluded — pre-merge/outlier-fix data).
 - **Models**: DeepPySR, PySR, KAN, ElasticNet, ExtraTrees, RandomForest, XGBoost, MLP.
-- **"Best" row selection**: max F1 (macro) on the clinical bins below, per (target, age, input_type, model), collapsed across ftsl/config.
+- **"Best" row selection**: max F1 (macro) on the clinical bins below, per (target, age, input_type, model), collapsed across config.
 
 **Clinical bin definitions** (mmol/L, adapted from NCEP ATP III adult cutoffs — see `LIPID_BIN_EDGES` in `analysis_lipids.py`):
 
@@ -21,25 +21,15 @@ Links to the plots produced by `analysis_lipids.py`. Run it to regenerate everyt
 
 ## Key findings
 
-Scoped to `PGS`, `PGSto8`, `to8`, `nblood` — `recent` excluded (focus on earlier-life data).
+*F1 = how reliably a model sorts a person into the right lipid category (normal/borderline/high), not just how close its number is. Data sources compared: `PGS` (genetics only), `to8` (data to age 8), `PGSto8` (both), `nblood` (a recent non-lipid blood panel). `recent` (prior lipid measurements) is excluded to keep the focus on earlier-life screening.*
 
-- **DeepPySR wins most often**: max-F1_macro model in 54/80 combos (XGBoost
-  13, KAN 6, PySR 4, MLP 3; ElasticNet/ExtraTrees/RandomForest 0). Mean F1
-  0.400, best of any model, despite RandomForest/ExtraTrees having higher
-  mean R2 (~0.16 vs 0.09).
-- **`nblood` is the strongest of the four** (mean F1 0.436), then `PGSto8`
-  (0.423), `PGS` (0.402), then `to8` clearly last (0.364).
-- **Age trend is much flatter here** than with `recent` included (F1 ranges
-  ~0.42–0.47 across ages 14→28, vs. a steep climb to 0.81 at 28 when
-  `recent` is included)
-- **HDL is the easiest target** (mean F1 0.449); triglyceride is hardest
-  (0.382). By input type: `nblood` is best for HDL (0.50) and triglyceride
-  (0.42); `PGSto8` is best for cholesterol (0.42) tied with `nblood`.
-- **Recurring DeepPySR sensitivity drivers** (from `lipids_sensitivity.csv`,
-  same 4 input types): **PGS003819** (16/80 winning formulas, mean 40%),
-  **g2_sex** (13, mean 21%), and a small recurring set of other PGS scores
-  (PGS002695, PGS002669, PGS000892, PGS003768, PGS002654) — polygenic score
-  and sex dominate over raw clinical variables once `recent` is excluded.
+- **DeepPySR predicts best overall** — top model in 57/80 age×target×source combinations (best average F1, 0.390), even though tree models (RandomForest/ExtraTrees) explain slightly more raw variance. DeepPySR also outputs an actual formula, not a black box.
+- **`nblood` is the strongest data source** (F1 0.42), followed by genetics+early-life (`PGSto8`, 0.41) and genetics alone (0.40); early-childhood-only data (`to8`) is clearly weakest (0.36).
+- **Accuracy is fairly flat with age** (F1 ~0.40–0.45, ages 14–28) once recent lipid history is excluded — it only jumps (to ~0.64) if very recent lipid measurements are allowed in, a different and easier task than early-life screening.
+- **HDL is the easiest lipid to predict; triglycerides the hardest** (F1 0.44 vs. 0.37).
+- **Sex and genetic risk scores are the biggest drivers**, and each recurring score matches the trait it's predicting — a total-cholesterol genetic score drives cholesterol predictions, an HDL score drives HDL, an LDL score drives LDL.
+
+[**→ What drives DeepPySR's own formulas, by data source**](results_lipids/lipids_deeppysr_sensitivity_overview.png) ([data](results_lipids/lipids_deeppysr_sensitivity_overview.csv)) — for the fuller picture across all models, see the per-combination heatmaps linked below.
 
 ## Overview plots
 
@@ -50,35 +40,7 @@ Scoped to `PGS`, `PGSto8`, `to8`, `nblood` — `recent` excluded (focus on earli
 - [Models vs age — to8](results_lipids/lipids_models_vs_age_to8.png)
 - [Models vs age — recent](results_lipids/lipids_models_vs_age_recent.png)
 - [Models vs age — nblood](results_lipids/lipids_models_vs_age_nblood.png)
-
-[//]: # (By feature-set &#40;ftsl&#41;, best row confined to that variant instead of collapsed across both:)
-
-[//]: # ()
-[//]: # (- [Best model vs age — all_feature]&#40;results_lipids/lipids_models_vs_age_all_feature.png&#41;)
-
-[//]: # (- [Best input type vs age — all_feature]&#40;results_lipids/lipids_input_types_vs_age_all_feature.png&#41;)
-
-[//]: # (- [Best model vs age — top100]&#40;results_lipids/lipids_models_vs_age_top100.png&#41;)
-
-[//]: # (- [Best input type vs age — top100]&#40;results_lipids/lipids_input_types_vs_age_top100.png&#41;)
-
-## Per input-type plots
-
-- [Model x feature-set vs age — PGS](results_lipids/results_lipids_PGS/lipids_model_ftsl_vs_age.png)
-- [Model x feature-set vs age — PGSto8](results_lipids/results_lipids_PGSto8/lipids_model_ftsl_vs_age.png)
-- [Model x feature-set vs age — to8](results_lipids/results_lipids_to8/lipids_model_ftsl_vs_age.png)
-- [Model x feature-set vs age — recent](results_lipids/results_lipids_recent/lipids_model_ftsl_vs_age.png)
-- [Model x feature-set vs age — nblood](results_lipids/results_lipids_nblood/lipids_model_ftsl_vs_age.png)
-
-Models vs age, by input type and feature-set (ftsl):
-
-| Input type | all_feature | top100 |
-|---|---|---|
-| PGS | [plot](results_lipids/lipids_models_vs_age_PGS_all_feature.png) | [plot](results_lipids/lipids_models_vs_age_PGS_top100.png) |
-| PGSto8 | [plot](results_lipids/lipids_models_vs_age_PGSto8_all_feature.png) | [plot](results_lipids/lipids_models_vs_age_PGSto8_top100.png) |
-| to8 | [plot](results_lipids/lipids_models_vs_age_to8_all_feature.png) | [plot](results_lipids/lipids_models_vs_age_to8_top100.png) |
-| recent | [plot](results_lipids/lipids_models_vs_age_recent_all_feature.png) | [plot](results_lipids/lipids_models_vs_age_recent_top100.png) |
-| nblood | [plot](results_lipids/lipids_models_vs_age_nblood_all_feature.png) | [plot](results_lipids/lipids_models_vs_age_nblood_top100.png) |
+- [**Permutation sensitivity overview** — what drives DeepPySR's interpretable formulas, by data source](results_lipids/lipids_deeppysr_sensitivity_overview.png)
 
 ## Per (target, age) plots
 

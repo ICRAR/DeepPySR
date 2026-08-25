@@ -1,0 +1,1422 @@
+Formula Demonstration — 5 Observed BMI Participants (highest BMI first)
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+Participant 1  (ID: 46940)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.4804  -0.9536 ± 0.3530                          7.3%    0.1355
+      ga_us                    continuous   274.0000  276.1033 ± 13.2648                       38.8%     0.874
+      m_wt1                    continuous    70.6500  65.5056 ± 12.2932                        73.3%    0.6756
+      y8bmi_deeppysr_pred      continuous    17.5033  16.8988 ± 2.4679                         71.8%    0.8065
+      Predicted BMI : 19.0268
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.4804  -0.9536 ± 0.3530                          7.3%    0.1355
+      ga_us                    continuous   274.0000  276.1033 ± 13.2648                       38.8%     0.874
+      m_wt1                    continuous    70.6500  65.5056 ± 12.2932                        73.3%    0.6756
+      y8bmi_deeppysr_pred      continuous    17.5033  16.8988 ± 2.4679                         71.8%    0.8065
+      Predicted BMI : 19.0268
+
+  Age 14   |   True BMI: 32.19
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0122  0.0177 ± 0.0650                          31.6%    0.6453
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    19.2065  18.7732 ± 3.3642                         65.3%    0.8975
+      Predicted BMI : 21.9840
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0122  0.0177 ± 0.0650                          31.6%    0.6453
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    19.2065  18.7732 ± 3.3642                         65.3%    0.8975
+      Predicted BMI : 21.9840
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    73.4500  74.3402 ± 12.4961                        52.5%    0.9432
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.1920  21.4884 ± 4.0988                         97.4%  0.009018
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 33.0501
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    73.4500  74.3402 ± 12.4961                        52.5%    0.9432
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.1920  21.4884 ± 4.0988                         97.4%  0.009018
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 33.0501
+
+  Age 20   |   True BMI: 43.26
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    32.1634  23.2012 ± 4.2964                         95.1%   0.03698
+      y5_a5                    continuous    57.0000  58.3537 ± 3.7892                         37.9%    0.7209
+      Predicted BMI : 34.4777
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    32.1634  23.2012 ± 4.2964                         95.1%   0.03698
+      y5_a5                    continuous    57.0000  58.3537 ± 3.7892                         37.9%    0.7209
+      Predicted BMI : 34.4777
+
+  Age 22   |   True BMI: 44.82
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous    -0.0593  0.2376 ± 0.3082                          16.4%    0.3353
+      SUM_PGS003884            continuous     0.6588  0.6233 ± 0.3551                          53.6%    0.9203
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    43.2623  24.6825 ± 4.9280                         99.2% 0.0001631
+      Predicted BMI : 44.2240
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous    -0.0593  0.2376 ± 0.3082                          16.4%    0.3353
+      SUM_PGS003884            continuous     0.6588  0.6233 ± 0.3551                          53.6%    0.9203
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    43.2623  24.6825 ± 4.9280                         99.2% 0.0001631
+      Predicted BMI : 44.2240
+
+  Age 27   |   True BMI: 52.71
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.4804  -0.9536 ± 0.3530                          7.3%    0.1355
+      b_parasc                 continuous     5.5000  4.5302 ± 1.1057                          85.4%    0.3805
+      cats_quant_2             continuous     0.0980  0.4382 ± 0.8579                          61.1%    0.6917
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.5800  2.7899 ± 0.4294                          26.5%     0.625
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    44.8163  25.5282 ± 5.0495                         99.6% 0.0001336
+      Predicted BMI : 45.0916
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0122  0.0177 ± 0.0650                          31.6%    0.6453
+      cats_quant_2             continuous     0.0980  0.4382 ± 0.8579                          61.1%    0.6917
+      mht_wt                   continuous     2.5800  2.7899 ± 0.4294                          26.5%     0.625
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    44.8163  25.5282 ± 5.0495                         99.6% 0.0001336
+      Predicted BMI : 44.8560
+
+──────────────────────────────────────────────────────────────────────
+Participant 2  (ID: 24210)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 29.97
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.5252  -0.9536 ± 0.3530                         88.9%    0.2249
+      ga_us                    continuous   298.0000  276.1033 ± 13.2648                       99.6%   0.09879
+      m_wt1                    continuous    77.4000  65.5056 ± 12.2932                        86.4%    0.3333
+      y8bmi_deeppysr_pred      continuous    28.2215  16.8988 ± 2.4679                         99.6% 4.476e-06
+      Predicted BMI : 32.9720
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.5252  -0.9536 ± 0.3530                         88.9%    0.2249
+      ga_us                    continuous   298.0000  276.1033 ± 13.2648                       99.6%   0.09879
+      m_wt1                    continuous    77.4000  65.5056 ± 12.2932                        86.4%    0.3333
+      y8bmi_deeppysr_pred      continuous    28.2215  16.8988 ± 2.4679                         99.6% 4.476e-06
+      Predicted BMI : 32.9720
+
+  Age 14   |   True BMI: 35.38
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0768  0.0177 ± 0.0650                          82.3%     0.364
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    1.0000  level=1  n=583/1113 (52.4%)                N/A    0.5238
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    29.9705  18.7732 ± 3.3642                         98.9% 0.0008735
+      Predicted BMI : 33.7053
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0768  0.0177 ± 0.0650                          82.3%     0.364
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    1.0000  level=1  n=583/1113 (52.4%)                N/A    0.5238
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    29.9705  18.7732 ± 3.3642                         98.9% 0.0008735
+      Predicted BMI : 33.7053
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    94.1000  74.3402 ± 12.4961                        93.8%    0.1138
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    35.3796  21.4884 ± 4.0988                         98.9% 0.0007014
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 36.6022
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    94.1000  74.3402 ± 12.4961                        93.8%    0.1138
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    35.3796  21.4884 ± 4.0988                         98.9% 0.0007014
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 36.6022
+
+  Age 20   |   True BMI: 44.66
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    20.0000  31.0685 ± 6.6820                          4.0%   0.09763
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    1.0000  level=1  n=583/1113 (52.4%)                N/A    0.5238
+      y16bmi_deeppysr_pred     continuous    35.3792  23.2012 ± 4.2964                         98.0%   0.00459
+      y5_a5                    continuous    78.9000  58.3537 ± 3.7892                        100.0% 5.885e-08
+      Predicted BMI : 39.1242
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    20.0000  31.0685 ± 6.6820                          4.0%   0.09763
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    1.0000  level=1  n=583/1113 (52.4%)                N/A    0.5238
+      y16bmi_deeppysr_pred     continuous    35.3792  23.2012 ± 4.2964                         98.0%   0.00459
+      y5_a5                    continuous    78.9000  58.3537 ± 3.7892                        100.0% 5.885e-08
+      Predicted BMI : 39.1242
+
+  Age 22   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3351  0.2376 ± 0.3082                          61.9%    0.7516
+      SUM_PGS003884            continuous     0.7510  0.6233 ± 0.3551                          62.8%    0.7191
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    44.6615  24.6825 ± 4.9280                         99.6% 5.031e-05
+      Predicted BMI : 45.9477
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3351  0.2376 ± 0.3082                          61.9%    0.7516
+      SUM_PGS003884            continuous     0.7510  0.6233 ± 0.3551                          62.8%    0.7191
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    44.6615  24.6825 ± 4.9280                         99.6% 5.031e-05
+      Predicted BMI : 45.9477
+
+  Age 27   |   True BMI: 37.92
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.5252  -0.9536 ± 0.3530                         88.9%    0.2249
+      b_parasc                 continuous     5.1022  4.5302 ± 1.1057                          76.9%    0.6049
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.4000  2.7899 ± 0.4294                          16.9%    0.3639
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    44.1652  25.5282 ± 5.0495                         99.2% 0.0002235
+      Predicted BMI : 45.1085
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0768  0.0177 ± 0.0650                          82.3%     0.364
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.4000  2.7899 ± 0.4294                          16.9%    0.3639
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.1128  2.0156 ± 0.3417                          89.5%    0.7759
+      y23bmi_deeppysr_pred     continuous    44.1652  25.5282 ± 5.0495                         99.2% 0.0002235
+      Predicted BMI : 45.4387
+
+──────────────────────────────────────────────────────────────────────
+Participant 3  (ID: 18630)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 33.17
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8604  -0.9536 ± 0.3530                         60.3%    0.7918
+      ga_us                    continuous   273.0000  276.1033 ± 13.2648                       35.8%     0.815
+      m_wt1                    continuous    60.5000  65.5056 ± 12.2932                        40.0%    0.6839
+      y8bmi_deeppysr_pred      continuous    30.3321  16.8988 ± 2.4679                         99.9% 5.235e-08
+      Predicted BMI : 34.8614
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8604  -0.9536 ± 0.3530                         60.3%    0.7918
+      ga_us                    continuous   273.0000  276.1033 ± 13.2648                       35.8%     0.815
+      m_wt1                    continuous    60.5000  65.5056 ± 12.2932                        40.0%    0.6839
+      y8bmi_deeppysr_pred      continuous    30.3321  16.8988 ± 2.4679                         99.9% 5.235e-08
+      Predicted BMI : 34.8614
+
+  Age 14   |   True BMI: not observed
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0465  0.0177 ± 0.0650                          67.1%    0.6588
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    33.1722  18.7732 ± 3.3642                         99.8% 1.868e-05
+      Predicted BMI : 37.1304
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0465  0.0177 ± 0.0650                          67.1%    0.6588
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    33.1722  18.7732 ± 3.3642                         99.8% 1.868e-05
+      Predicted BMI : 37.1304
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    67.6000  74.3402 ± 12.4961                        32.1%    0.5896
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    35.9555  21.4884 ± 4.0988                         99.3% 0.0004163
+      y1_sm4                   continuous     2.0000  0.7776 ± 1.4763                          83.9%    0.4076
+      Predicted BMI : 36.3370
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    67.6000  74.3402 ± 12.4961                        32.1%    0.5896
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    35.9555  21.4884 ± 4.0988                         99.3% 0.0004163
+      y1_sm4                   continuous     2.0000  0.7776 ± 1.4763                          83.9%    0.4076
+      Predicted BMI : 36.3370
+
+  Age 20   |   True BMI: 35.57
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    24.0000  31.0685 ± 6.6820                         14.9%    0.2901
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    35.9959  23.2012 ± 4.2964                         98.6%  0.002901
+      y5_a5                    continuous    74.2000  58.3537 ± 3.7892                         99.2% 2.891e-05
+      Predicted BMI : 38.4209
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    24.0000  31.0685 ± 6.6820                         14.9%    0.2901
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    35.9959  23.2012 ± 4.2964                         98.6%  0.002901
+      y5_a5                    continuous    74.2000  58.3537 ± 3.7892                         99.2% 2.891e-05
+      Predicted BMI : 38.4209
+
+  Age 22   |   True BMI: 36.77
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.4085  0.2376 ± 0.3082                          71.3%     0.579
+      SUM_PGS003884            continuous     0.5923  0.6233 ± 0.3551                          46.3%    0.9306
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    35.5696  24.6825 ± 4.9280                         95.7%   0.02716
+      Predicted BMI : 36.8434
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.4085  0.2376 ± 0.3082                          71.3%     0.579
+      SUM_PGS003884            continuous     0.5923  0.6233 ± 0.3551                          46.3%    0.9306
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    35.5696  24.6825 ± 4.9280                         95.7%   0.02716
+      Predicted BMI : 36.8434
+
+  Age 27   |   True BMI: 36.34
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8604  -0.9536 ± 0.3530                         60.3%    0.7918
+      b_parasc                 continuous     5.5000  4.5302 ± 1.1057                          85.4%    0.3805
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.9600  2.7899 ± 0.4294                          65.9%     0.692
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    1.0000  level=1  n=290/1113 (26.1%)                N/A    0.2606
+      y23bmi_deeppysr_pred     continuous    36.7703  25.5282 ± 5.0495                         96.0%   0.02599
+      Predicted BMI : 37.9312
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0465  0.0177 ± 0.0650                          67.1%    0.6588
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.9600  2.7899 ± 0.4294                          65.9%     0.692
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    36.7703  25.5282 ± 5.0495                         96.0%   0.02599
+      Predicted BMI : 37.5831
+
+──────────────────────────────────────────────────────────────────────
+Participant 4  (ID: 50810)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.3285  -0.9536 ± 0.3530                         96.1%   0.07656
+      ga_us                    continuous   273.0000  276.1033 ± 13.2648                       35.8%     0.815
+      m_wt1                    continuous    72.0000  65.5056 ± 12.2932                        76.7%    0.5973
+      y8bmi_deeppysr_pred      continuous    21.8975  16.8988 ± 2.4679                         95.7%   0.04282
+      Predicted BMI : 25.5623
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.3285  -0.9536 ± 0.3530                         96.1%   0.07656
+      ga_us                    continuous   273.0000  276.1033 ± 13.2648                       35.8%     0.815
+      m_wt1                    continuous    72.0000  65.5056 ± 12.2932                        76.7%    0.5973
+      y8bmi_deeppysr_pred      continuous    21.8975  16.8988 ± 2.4679                         95.7%   0.04282
+      Predicted BMI : 25.5623
+
+  Age 14   |   True BMI: 32.67
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0945  0.0177 ± 0.0650                          88.1%    0.2378
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    25.6279  18.7732 ± 3.3642                         95.8%   0.04159
+      Predicted BMI : 29.6202
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0945  0.0177 ± 0.0650                          88.1%    0.2378
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    25.6279  18.7732 ± 3.3642                         95.8%   0.04159
+      Predicted BMI : 29.6202
+
+  Age 17   |   True BMI: 33.63
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    79.0000  74.3402 ± 12.4961                        71.2%    0.7092
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.6663  21.4884 ± 4.0988                         97.9%   0.00639
+      y1_sm4                   continuous     4.0000  0.7776 ± 1.4763                          95.5%   0.02905
+      Predicted BMI : 33.6530
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    79.0000  74.3402 ± 12.4961                        71.2%    0.7092
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.6663  21.4884 ± 4.0988                         97.9%   0.00639
+      y1_sm4                   continuous     4.0000  0.7776 ± 1.4763                          95.5%   0.02905
+      Predicted BMI : 33.6530
+
+  Age 20   |   True BMI: 41.13
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.6346  23.2012 ± 4.2964                         96.6%   0.01517
+      y5_a5                    continuous    62.3000  58.3537 ± 3.7892                         89.2%    0.2977
+      Predicted BMI : 36.2013
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.6346  23.2012 ± 4.2964                         96.6%   0.01517
+      y5_a5                    continuous    62.3000  58.3537 ± 3.7892                         89.2%    0.2977
+      Predicted BMI : 36.2013
+
+  Age 22   |   True BMI: 40.70
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3506  0.2376 ± 0.3082                          64.7%    0.7137
+      SUM_PGS003884            continuous     0.6136  0.6233 ± 0.3551                          48.5%    0.9783
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    41.1321  24.6825 ± 4.9280                         98.7% 0.0008438
+      Predicted BMI : 42.3722
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3506  0.2376 ± 0.3082                          64.7%    0.7137
+      SUM_PGS003884            continuous     0.6136  0.6233 ± 0.3551                          48.5%    0.9783
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    41.1321  24.6825 ± 4.9280                         98.7% 0.0008438
+      Predicted BMI : 42.3722
+
+  Age 27   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.3285  -0.9536 ± 0.3530                         96.1%   0.07656
+      b_parasc                 continuous     4.3000  4.5302 ± 1.1057                          48.0%    0.8351
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.6300  2.7899 ± 0.4294                          30.9%    0.7096
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    40.7031  25.5282 ± 5.0495                         98.3%  0.002654
+      Predicted BMI : 41.7060
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0945  0.0177 ± 0.0650                          88.1%    0.2378
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.6300  2.7899 ± 0.4294                          30.9%    0.7096
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    40.7031  25.5282 ± 5.0495                         98.3%  0.002654
+      Predicted BMI : 41.6503
+
+──────────────────────────────────────────────────────────────────────
+Participant 5  (ID: 23960)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8765  -0.9536 ± 0.3530                         58.3%    0.8273
+      ga_us                    continuous   285.0000  276.1033 ± 13.2648                       76.3%    0.5024
+      m_wt1                    continuous    58.2000  65.5056 ± 12.2932                        30.5%    0.5523
+      y8bmi_deeppysr_pred      continuous    18.3460  16.8988 ± 2.4679                         80.9%    0.5576
+      Predicted BMI : 20.3391
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8765  -0.9536 ± 0.3530                         58.3%    0.8273
+      ga_us                    continuous   285.0000  276.1033 ± 13.2648                       76.3%    0.5024
+      m_wt1                    continuous    58.2000  65.5056 ± 12.2932                        30.5%    0.5523
+      y8bmi_deeppysr_pred      continuous    18.3460  16.8988 ± 2.4679                         80.9%    0.5576
+      Predicted BMI : 20.3391
+
+  Age 14   |   True BMI: not observed
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0349  0.0177 ± 0.0650                          60.7%    0.7917
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    20.8113  18.7732 ± 3.3642                         78.3%    0.5446
+      Predicted BMI : 23.7681
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0349  0.0177 ± 0.0650                          60.7%    0.7917
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    20.8113  18.7732 ± 3.3642                         78.3%    0.5446
+      Predicted BMI : 23.7681
+
+  Age 17   |   True BMI: 36.26
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         1.0000  level=1  n=28/1113 (2.5%)                  N/A   0.02516
+      fam_splitup2             binary         1.0000  level=1  n=56/1113 (5.0%)                  N/A   0.05031
+      latepreg_weight          continuous    61.6500  74.3402 ± 12.4961                        11.7%    0.3099
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    23.2668  21.4884 ± 4.0988                         75.0%    0.6644
+      y1_sm4                   continuous     4.0000  0.7776 ± 1.4763                          95.5%   0.02905
+      Predicted BMI : 29.4850
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         1.0000  level=1  n=28/1113 (2.5%)                  N/A   0.02516
+      fam_splitup2             binary         1.0000  level=1  n=56/1113 (5.0%)                  N/A   0.05031
+      latepreg_weight          continuous    61.6500  74.3402 ± 12.4961                        11.7%    0.3099
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    23.2668  21.4884 ± 4.0988                         75.0%    0.6644
+      y1_sm4                   continuous     4.0000  0.7776 ± 1.4763                          95.5%   0.02905
+      Predicted BMI : 29.4850
+
+  Age 20   |   True BMI: 44.18
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    28.0000  31.0685 ± 6.6820                         36.6%    0.6461
+      miggen_child             categorical    4.0000  level=4  n=194/1113 (17.4%)                N/A    0.1743
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    36.2562  23.2012 ± 4.2964                         98.7%  0.002377
+      y5_a5                    continuous    61.0000  58.3537 ± 3.7892                         83.1%    0.4849
+      Predicted BMI : 37.9348
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    28.0000  31.0685 ± 6.6820                         36.6%    0.6461
+      miggen_child             categorical    4.0000  level=4  n=194/1113 (17.4%)                N/A    0.1743
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    36.2562  23.2012 ± 4.2964                         98.7%  0.002377
+      y5_a5                    continuous    61.0000  58.3537 ± 3.7892                         83.1%    0.4849
+      Predicted BMI : 37.9348
+
+  Age 22   |   True BMI: 34.16
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.1674  0.2376 ± 0.3082                          41.2%    0.8199
+      SUM_PGS003884            continuous     0.4136  0.6233 ± 0.3551                          28.0%    0.5549
+      alc_t3                   binary         1.0000  level=1  n=448/1113 (40.3%)                N/A    0.4025
+      y20bmi_deeppysr_pred     continuous    44.1751  24.6825 ± 4.9280                         99.5% 7.638e-05
+      Predicted BMI : 44.8838
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.1674  0.2376 ± 0.3082                          41.2%    0.8199
+      SUM_PGS003884            continuous     0.4136  0.6233 ± 0.3551                          28.0%    0.5549
+      alc_t3                   binary         1.0000  level=1  n=448/1113 (40.3%)                N/A    0.4025
+      y20bmi_deeppysr_pred     continuous    44.1751  24.6825 ± 4.9280                         99.5% 7.638e-05
+      Predicted BMI : 44.8838
+
+  Age 27   |   True BMI: 34.46
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.8765  -0.9536 ± 0.3530                         58.3%    0.8273
+      b_parasc                 continuous     3.7000  4.5302 ± 1.1057                          24.5%    0.4528
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         1.0000  level=1  n=56/1113 (5.0%)                  N/A   0.05031
+      mht_wt                   continuous     2.8400  2.7899 ± 0.4294                          52.3%    0.9071
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    34.1583  25.5282 ± 5.0495                         92.3%   0.08743
+      Predicted BMI : 35.4835
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0349  0.0177 ± 0.0650                          60.7%    0.7917
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.8400  2.7899 ± 0.4294                          52.3%    0.9071
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     1.0000  2.0156 ± 0.3417                           4.0%  0.002958
+      y23bmi_deeppysr_pred     continuous    34.1583  25.5282 ± 5.0495                         92.3%   0.08743
+      Predicted BMI : 33.8854
+
+──────────────────────────────────────────────────────────────────────
+Participant 6  (ID: 44750)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 28.78
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.1450  -0.9536 ± 0.3530                         29.0%    0.5875
+      ga_us                    continuous   263.0000  276.1033 ± 13.2648                       12.3%    0.3232
+      m_wt1                    continuous    73.0000  65.5056 ± 12.2932                        78.9%    0.5421
+      y8bmi_deeppysr_pred      continuous    27.8271  16.8988 ± 2.4679                         99.5% 9.505e-06
+      Predicted BMI : 32.0808
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.1450  -0.9536 ± 0.3530                         29.0%    0.5875
+      ga_us                    continuous   263.0000  276.1033 ± 13.2648                       12.3%    0.3232
+      m_wt1                    continuous    73.0000  65.5056 ± 12.2932                        78.9%    0.5421
+      y8bmi_deeppysr_pred      continuous    27.8271  16.8988 ± 2.4679                         99.5% 9.505e-06
+      Predicted BMI : 32.0808
+
+  Age 14   |   True BMI: not observed
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0598  0.0177 ± 0.0650                          11.9%    0.2333
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    28.7753  18.7732 ± 3.3642                         98.3%  0.002948
+      Predicted BMI : 32.2669
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0598  0.0177 ± 0.0650                          11.9%    0.2333
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    28.7753  18.7732 ± 3.3642                         98.3%  0.002948
+      Predicted BMI : 32.2669
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    75.0000  74.3402 ± 12.4961                        59.7%    0.9579
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.1122  21.4884 ± 4.0988                         97.3%  0.009545
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 33.0232
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    75.0000  74.3402 ± 12.4961                        59.7%    0.9579
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.1122  21.4884 ± 4.0988                         97.3%  0.009545
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 33.0232
+
+  Age 20   |   True BMI: 37.53
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    40.0000  31.0685 ± 6.6820                         91.6%    0.1813
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    31.6523  23.2012 ± 4.2964                         94.2%   0.04918
+      y5_a5                    continuous    76.5000  58.3537 ± 3.7892                         99.7% 1.677e-06
+      Predicted BMI : 32.8982
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    40.0000  31.0685 ± 6.6820                         91.6%    0.1813
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    31.6523  23.2012 ± 4.2964                         94.2%   0.04918
+      y5_a5                    continuous    76.5000  58.3537 ± 3.7892                         99.7% 1.677e-06
+      Predicted BMI : 32.8982
+
+  Age 22   |   True BMI: 37.31
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.2567  0.2376 ± 0.3082                          52.5%    0.9504
+      SUM_PGS003884            continuous     0.2575  0.6233 ± 0.3551                          16.4%    0.3029
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    37.5324  24.6825 ± 4.9280                         97.6%   0.00912
+      Predicted BMI : 38.6007
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.2567  0.2376 ± 0.3082                          52.5%    0.9504
+      SUM_PGS003884            continuous     0.2575  0.6233 ± 0.3551                          16.4%    0.3029
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    37.5324  24.6825 ± 4.9280                         97.6%   0.00912
+      Predicted BMI : 38.6007
+
+  Age 27   |   True BMI: 35.61
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -1.1450  -0.9536 ± 0.3530                         29.0%    0.5875
+      b_parasc                 continuous     5.0000  4.5302 ± 1.1057                          74.8%    0.6709
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.9200  2.7899 ± 0.4294                          60.9%    0.7619
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    1.0000  level=1  n=290/1113 (26.1%)                N/A    0.2606
+      y23bmi_deeppysr_pred     continuous    37.3057  25.5282 ± 5.0495                         96.9%   0.01968
+      Predicted BMI : 38.0958
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous    -0.0598  0.0177 ± 0.0650                          11.9%    0.2333
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.9200  2.7899 ± 0.4294                          60.9%    0.7619
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    37.3057  25.5282 ± 5.0495                         96.9%   0.01968
+      Predicted BMI : 37.3085
+
+──────────────────────────────────────────────────────────────────────
+Participant 7  (ID: 14970)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 21.99
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.2234  -0.9536 ± 0.3530                         98.4%   0.03858
+      ga_us                    continuous   277.0000  276.1033 ± 13.2648                       48.4%    0.9461
+      m_wt1                    continuous    60.0000  65.5056 ± 12.2932                        39.2%    0.6543
+      y8bmi_deeppysr_pred      continuous    20.5517  16.8988 ± 2.4679                         91.8%    0.1388
+      Predicted BMI : 23.6487
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.2234  -0.9536 ± 0.3530                         98.4%   0.03858
+      ga_us                    continuous   277.0000  276.1033 ± 13.2648                       48.4%    0.9461
+      m_wt1                    continuous    60.0000  65.5056 ± 12.2932                        39.2%    0.6543
+      y8bmi_deeppysr_pred      continuous    20.5517  16.8988 ± 2.4679                         91.8%    0.1388
+      Predicted BMI : 23.6487
+
+  Age 14   |   True BMI: not observed
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1711  0.0177 ± 0.0650                          99.2%    0.0184
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    21.9939  18.7732 ± 3.3642                         83.6%    0.3384
+      Predicted BMI : 25.1924
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1711  0.0177 ± 0.0650                          99.2%    0.0184
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    21.9939  18.7732 ± 3.3642                         83.6%    0.3384
+      Predicted BMI : 25.1924
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    75.0000  74.3402 ± 12.4961                        59.7%    0.9579
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    25.0250  21.4884 ± 4.0988                         84.3%    0.3882
+      y1_sm4                   continuous     3.0000  0.7776 ± 1.4763                          90.3%    0.1322
+      Predicted BMI : 26.5030
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    75.0000  74.3402 ± 12.4961                        59.7%    0.9579
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    25.0250  21.4884 ± 4.0988                         84.3%    0.3882
+      y1_sm4                   continuous     3.0000  0.7776 ± 1.4763                          90.3%    0.1322
+      Predicted BMI : 26.5030
+
+  Age 20   |   True BMI: 36.27
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    19.0000  31.0685 ± 6.6820                          2.6%    0.0709
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    26.3746  23.2012 ± 4.2964                         82.8%    0.4601
+      y5_a5                    continuous    58.1000  58.3537 ± 3.7892                         53.0%    0.9466
+      Predicted BMI : 29.0325
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    19.0000  31.0685 ± 6.6820                          2.6%    0.0709
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    26.3746  23.2012 ± 4.2964                         82.8%    0.4601
+      y5_a5                    continuous    58.1000  58.3537 ± 3.7892                         53.0%    0.9466
+      Predicted BMI : 29.0325
+
+  Age 22   |   True BMI: 40.68
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.6922  0.2376 ± 0.3082                          92.2%    0.1402
+      SUM_PGS003884            continuous     1.2743  0.6233 ± 0.3551                          97.9%   0.06676
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    36.2691  24.6825 ± 4.9280                         96.5%   0.01871
+      Predicted BMI : 38.6849
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.6922  0.2376 ± 0.3082                          92.2%    0.1402
+      SUM_PGS003884            continuous     1.2743  0.6233 ± 0.3551                          97.9%   0.06676
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    36.2691  24.6825 ± 4.9280                         96.5%   0.01871
+      Predicted BMI : 38.6849
+
+  Age 27   |   True BMI: 43.91
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.2234  -0.9536 ± 0.3530                         98.4%   0.03858
+      b_parasc                 continuous     4.8000  4.5302 ± 1.1057                          66.7%    0.8072
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.7700  2.7899 ± 0.4294                          44.0%    0.9631
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    40.6790  25.5282 ± 5.0495                         98.2%  0.002696
+      Predicted BMI : 41.9115
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1711  0.0177 ± 0.0650                          99.2%    0.0184
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.7700  2.7899 ± 0.4294                          44.0%    0.9631
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    40.6790  25.5282 ± 5.0495                         98.2%  0.002696
+      Predicted BMI : 42.0315
+
+──────────────────────────────────────────────────────────────────────
+Participant 8  (ID: 10510)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 25.47
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.0403  -0.9536 ± 0.3530                         99.6%  0.009669
+      ga_us                    continuous   270.0000  276.1033 ± 13.2648                       27.1%    0.6454
+      m_wt1                    continuous    85.7000  65.5056 ± 12.2932                        93.7%    0.1004
+      y8bmi_deeppysr_pred      continuous    21.0490  16.8988 ± 2.4679                         93.4%   0.09263
+      Predicted BMI : 25.4201
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.0403  -0.9536 ± 0.3530                         99.6%  0.009669
+      ga_us                    continuous   270.0000  276.1033 ± 13.2648                       27.1%    0.6454
+      m_wt1                    continuous    85.7000  65.5056 ± 12.2932                        93.7%    0.1004
+      y8bmi_deeppysr_pred      continuous    21.0490  16.8988 ± 2.4679                         93.4%   0.09263
+      Predicted BMI : 25.4201
+
+  Age 14   |   True BMI: 32.67
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1984  0.0177 ± 0.0650                          99.8%  0.005468
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    25.4709  18.7732 ± 3.3642                         95.4%    0.0465
+      Predicted BMI : 28.9770
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1984  0.0177 ± 0.0650                          99.8%  0.005468
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    25.4709  18.7732 ± 3.3642                         95.4%    0.0465
+      Predicted BMI : 28.9770
+
+  Age 17   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    94.1000  74.3402 ± 12.4961                        93.8%    0.1138
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.6728  21.4884 ± 4.0988                         98.0%  0.006359
+      y1_sm4                   continuous     3.0000  0.7776 ± 1.4763                          90.3%    0.1322
+      Predicted BMI : 34.1119
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    94.1000  74.3402 ± 12.4961                        93.8%    0.1138
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    32.6728  21.4884 ± 4.0988                         98.0%  0.006359
+      y1_sm4                   continuous     3.0000  0.7776 ± 1.4763                          90.3%    0.1322
+      Predicted BMI : 34.1119
+
+  Age 20   |   True BMI: 39.12
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.8301  23.2012 ± 4.2964                         96.9%   0.01336
+      y5_a5                    continuous    57.3000  58.3537 ± 3.7892                         41.5%    0.7809
+      Predicted BMI : 35.8920
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    21.0000  31.0685 ± 6.6820                          6.7%    0.1319
+      miggen_child             categorical    3.0000  level=3  n=188/1113 (16.9%)                N/A    0.1689
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.8301  23.2012 ± 4.2964                         96.9%   0.01336
+      y5_a5                    continuous    57.3000  58.3537 ± 3.7892                         41.5%    0.7809
+      Predicted BMI : 35.8920
+
+  Age 22   |   True BMI: 41.02
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.7911  0.2376 ± 0.3082                          96.0%   0.07245
+      SUM_PGS003884            continuous     1.1129  0.6233 ± 0.3551                          91.5%    0.1679
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    39.1203  24.6825 ± 4.9280                         98.3%  0.003392
+      Predicted BMI : 41.5324
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.7911  0.2376 ± 0.3082                          96.0%   0.07245
+      SUM_PGS003884            continuous     1.1129  0.6233 ± 0.3551                          91.5%    0.1679
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    39.1203  24.6825 ± 4.9280                         98.3%  0.003392
+      Predicted BMI : 41.5324
+
+  Age 27   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.0403  -0.9536 ± 0.3530                         99.6%  0.009669
+      b_parasc                 continuous     5.0000  4.5302 ± 1.1057                          74.8%    0.6709
+      cats_quant_2             continuous     0.5373  0.4382 ± 0.8579                          70.2%     0.908
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.8800  2.7899 ± 0.4294                          56.6%    0.8338
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    4.0000  level=4  n=84/1113 (7.5%)                  N/A   0.07547
+      y23bmi_deeppysr_pred     continuous    41.0156  25.5282 ± 5.0495                         98.6%  0.002161
+      Predicted BMI : 43.0135
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.1984  0.0177 ± 0.0650                          99.8%  0.005468
+      cats_quant_2             continuous     0.5373  0.4382 ± 0.8579                          70.2%     0.908
+      mht_wt                   continuous     2.8800  2.7899 ± 0.4294                          56.6%    0.8338
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    41.0156  25.5282 ± 5.0495                         98.6%  0.002161
+      Predicted BMI : 41.9600
+
+──────────────────────────────────────────────────────────────────────
+Participant 9  (ID: 50920)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.9929  -0.9536 ± 0.3530                         45.6%    0.9112
+      ga_us                    continuous   267.0000  276.1033 ± 13.2648                       19.7%    0.4925
+      m_wt1                    continuous    88.5500  65.5056 ± 12.2932                        94.9%   0.06085
+      y8bmi_deeppysr_pred      continuous    19.9198  16.8988 ± 2.4679                         89.4%    0.2209
+      Predicted BMI : 23.2361
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.9929  -0.9536 ± 0.3530                         45.6%    0.9112
+      ga_us                    continuous   267.0000  276.1033 ± 13.2648                       19.7%    0.4925
+      m_wt1                    continuous    88.5500  65.5056 ± 12.2932                        94.9%   0.06085
+      y8bmi_deeppysr_pred      continuous    19.9198  16.8988 ± 2.4679                         89.4%    0.2209
+      Predicted BMI : 23.2361
+
+  Age 14   |   True BMI: 27.17
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0444  0.0177 ± 0.0650                          65.8%    0.6817
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    23.1883  18.7732 ± 3.3642                         89.5%    0.1894
+      Predicted BMI : 26.3456
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0444  0.0177 ± 0.0650                          65.8%    0.6817
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         0.0000  level=0  n=878/1113 (78.9%)                N/A    0.7889
+      y10bmi_deeppysr_pred     continuous    23.1883  18.7732 ± 3.3642                         89.5%    0.1894
+      Predicted BMI : 26.3456
+
+  Age 17   |   True BMI: 30.96
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    93.1500  74.3402 ± 12.4961                        93.0%    0.1323
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    27.1745  21.4884 ± 4.0988                         90.9%    0.1654
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 29.0251
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous    93.1500  74.3402 ± 12.4961                        93.0%    0.1323
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    27.1745  21.4884 ± 4.0988                         90.9%    0.1654
+      y1_sm4                   continuous     0.0000  0.7776 ± 1.4763                          73.9%    0.5984
+      Predicted BMI : 29.0251
+
+  Age 20   |   True BMI: 36.62
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    30.0000  31.0685 ± 6.6820                         50.3%     0.873
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    30.9608  23.2012 ± 4.2964                         93.4%   0.07091
+      y5_a5                    continuous    60.1000  58.3537 ± 3.7892                         77.0%    0.6449
+      Predicted BMI : 32.5641
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    30.0000  31.0685 ± 6.6820                         50.3%     0.873
+      miggen_child             categorical    5.0000  level=5  n=475/1113 (42.7%)                N/A    0.4268
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    30.9608  23.2012 ± 4.2964                         93.4%   0.07091
+      y5_a5                    continuous    60.1000  58.3537 ± 3.7892                         77.0%    0.6449
+      Predicted BMI : 32.5641
+
+  Age 22   |   True BMI: 39.17
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3460  0.2376 ± 0.3082                          64.2%     0.725
+      SUM_PGS003884            continuous     0.3537  0.6233 ± 0.3551                          22.8%    0.4477
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    36.6208  24.6825 ± 4.9280                         96.9%   0.01541
+      Predicted BMI : 37.7509
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.3460  0.2376 ± 0.3082                          64.2%     0.725
+      SUM_PGS003884            continuous     0.3537  0.6233 ± 0.3551                          22.8%    0.4477
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    36.6208  24.6825 ± 4.9280                         96.9%   0.01541
+      Predicted BMI : 37.7509
+
+  Age 27   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.9929  -0.9536 ± 0.3530                         45.6%    0.9112
+      b_parasc                 continuous     6.8000  4.5302 ± 1.1057                          95.9%    0.0401
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     2.5100  2.7899 ± 0.4294                          21.4%    0.5145
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    0.0000  level=0  n=670/1113 (60.2%)                N/A     0.602
+      y23bmi_deeppysr_pred     continuous    39.1679  25.5282 ± 5.0495                         97.8%  0.006909
+      Predicted BMI : 39.9490
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0444  0.0177 ± 0.0650                          65.8%    0.6817
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     2.5100  2.7899 ± 0.4294                          21.4%    0.5145
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    39.1679  25.5282 ± 5.0495                         97.8%  0.006909
+      Predicted BMI : 39.8925
+
+──────────────────────────────────────────────────────────────────────
+Participant 10  (ID: 17120)
+──────────────────────────────────────────────────────────────────────
+
+  Age 10   |   True BMI: 26.34
+    [DeepPySR]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.7352  -0.9536 ± 0.3530                         73.0%    0.5361
+      ga_us                    continuous   274.0000  276.1033 ± 13.2648                       38.8%     0.874
+      m_wt1                    continuous    98.3500  65.5056 ± 12.2932                        97.8%  0.007545
+      y8bmi_deeppysr_pred      continuous    20.7560  16.8988 ± 2.4679                         92.5%    0.1181
+      Predicted BMI : 24.7278
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002313 + 1.21*y8bmi_deeppysr_pred + sin(ga_us/m_wt1**1.0)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.7352  -0.9536 ± 0.3530                         73.0%    0.5361
+      ga_us                    continuous   274.0000  276.1033 ± 13.2648                       38.8%     0.874
+      m_wt1                    continuous    98.3500  65.5056 ± 12.2932                        97.8%  0.007545
+      y8bmi_deeppysr_pred      continuous    20.7560  16.8988 ± 2.4679                         92.5%    0.1181
+      Predicted BMI : 24.7278
+
+  Age 14   |   True BMI: 33.41
+    [DeepPySR]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0887  0.0177 ± 0.0650                          86.5%    0.2756
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    26.3370  18.7732 ± 3.3642                         96.6%   0.02455
+      Predicted BMI : 30.3797
+    [DeepPySR (Interpretable)]
+      Formula : 1.08*SUM_PGS002161 + 1.08*y10bmi_deeppysr_pred + (sex*(occup_f1_2 + smk_exp2))**0.5 - 0.16
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0887  0.0177 ± 0.0650                          86.5%    0.2756
+      occup_f1_2               categorical    1.0000  level=1  n=1044/1113 (93.8%)               N/A     0.938
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      smk_exp2                 binary         1.0000  level=1  n=235/1113 (21.1%)                N/A    0.2111
+      y10bmi_deeppysr_pred     continuous    26.3370  18.7732 ± 3.3642                         96.6%   0.02455
+      Predicted BMI : 30.3797
+
+  Age 17   |   True BMI: 33.58
+    [DeepPySR]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous   104.8000  74.3402 ± 12.4961                        97.5%   0.01479
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    33.4060  21.4884 ± 4.0988                         98.4%  0.003643
+      y1_sm4                   continuous     2.0000  0.7776 ± 1.4763                          83.9%    0.4076
+      Predicted BMI : 35.1075
+    [DeepPySR (Interpretable)]
+      Formula : y1_sm4*fam_splitup0 + preg_thyroid + 0.92*y13bmi_deeppysr_pred + fam_splitup2 + 0.03*latepreg_weight + 1.23
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      fam_splitup0             binary         0.0000  level=0  n=1085/1113 (97.5%)               N/A    0.9748
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      latepreg_weight          continuous   104.8000  74.3402 ± 12.4961                        97.5%   0.01479
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      y13bmi_deeppysr_pred     continuous    33.4060  21.4884 ± 4.0988                         98.4%  0.003643
+      y1_sm4                   continuous     2.0000  0.7776 ± 1.4763                          83.9%    0.4076
+      Predicted BMI : 35.1075
+
+  Age 20   |   True BMI: 38.78
+    [DeepPySR]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    26.0000  31.0685 ± 6.6820                         23.5%    0.4481
+      miggen_child             categorical    2.0000  level=2  n=256/1113 (23.0%)                N/A      0.23
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.5768  23.2012 ± 4.2964                         96.5%   0.01574
+      y5_a5                    continuous    60.3000  58.3537 ± 3.7892                         78.5%    0.6075
+      Predicted BMI : 34.8961
+    [DeepPySR (Interpretable)]
+      Formula : y5_a5/agebirth_p_y**1.0 + preg_thyroid + y16bmi_deeppysr_pred - 1.0*sex/miggen_child**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      agebirth_p_y             continuous    26.0000  31.0685 ± 6.6820                         23.5%    0.4481
+      miggen_child             categorical    2.0000  level=2  n=256/1113 (23.0%)                N/A      0.23
+      preg_thyroid             binary         0.0000  level=0  n=1096/1113 (98.5%)               N/A    0.9847
+      sex                      categorical    2.0000  level=2  n=530/1113 (47.6%)                N/A    0.4762
+      y16bmi_deeppysr_pred     continuous    33.5768  23.2012 ± 4.2964                         96.5%   0.01574
+      y5_a5                    continuous    60.3000  58.3537 ± 3.7892                         78.5%    0.6075
+      Predicted BMI : 34.8961
+
+  Age 22   |   True BMI: not observed
+    [DeepPySR]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.4774  0.2376 ± 0.3082                          79.3%    0.4364
+      SUM_PGS003884            continuous     0.1661  0.6233 ± 0.3551                          10.8%     0.198
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    38.7812  24.6825 ± 4.9280                         97.9%  0.004224
+      Predicted BMI : 39.8637
+    [DeepPySR (Interpretable)]
+      Formula : y20bmi_deeppysr_pred + exp(SUM_PGS003884*(SUM_PGS002853 - 1.0*alc_t3))
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002853            continuous     0.4774  0.2376 ± 0.3082                          79.3%    0.4364
+      SUM_PGS003884            continuous     0.1661  0.6233 ± 0.3551                          10.8%     0.198
+      alc_t3                   binary         0.0000  level=0  n=665/1113 (59.7%)                N/A    0.5975
+      y20bmi_deeppysr_pred     continuous    38.7812  24.6825 ± 4.9280                         97.9%  0.004224
+      Predicted BMI : 39.8637
+
+  Age 27   |   True BMI: not observed
+    [DeepPySR]
+      Formula : SUM_PGS002313 + y23bmi_deeppysr_pred - 1.0*con_anomalies + fam_splitup2 - 1.0*childcareprof_2 + ((0.22 - 1.0*neo_unit)/(-1.0*cats_quant_2 - 1.0*region_mo - 0.29)**1.0 + 0.62)/(mht_wt - 1.54)**1.0 + log(b_parasc)
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002313            continuous    -0.7352  -0.9536 ± 0.3530                         73.0%    0.5361
+      b_parasc                 continuous     5.5000  4.5302 ± 1.1057                          85.4%    0.3805
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      childcareprof_2          binary         0.0000  level=0  n=1073/1113 (96.4%)               N/A    0.9641
+      con_anomalies            binary         0.0000  level=0  n=1053/1113 (94.6%)               N/A    0.9461
+      fam_splitup2             binary         0.0000  level=0  n=1057/1113 (95.0%)               N/A    0.9497
+      mht_wt                   continuous     1.6500  2.7899 ± 0.4294                           1.0%  0.007944
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      region_mo                categorical    2.0000  level=2  n=22/1113 (2.0%)                  N/A   0.01977
+      y23bmi_deeppysr_pred     continuous    38.8299  25.5282 ± 5.0495                         97.5%  0.008432
+      Predicted BMI : 44.5625
+    [DeepPySR (Interpretable)]
+      Formula : SUM_PGS002161/(cats_quant_2 + 0.31)**1.0 + y23bmi_deeppysr_pred + (neo_unit + log(weight_who_ga - 1.0*sin(32.57*y23bmi_deeppysr_pred)))/(mht_wt - 1.51)**1.0
+      Variable                 Type            Value  Summary (mean±SD or level freq)         Pctile   p-value
+      ──────────────────────── ─────────── ─────────  ────────────────────────────────────── ─────── ─────────
+      SUM_PGS002161            continuous     0.0887  0.0177 ± 0.0650                          86.5%    0.2756
+      cats_quant_2             continuous     0.0000  0.4382 ± 0.8579                          59.7%    0.6095
+      mht_wt                   continuous     1.6500  2.7899 ± 0.4294                           1.0%  0.007944
+      neo_unit                 binary         0.0000  level=0  n=1070/1113 (96.1%)               N/A    0.9614
+      weight_who_ga            continuous     2.0000  2.0156 ± 0.3417                          85.1%    0.9636
+      y23bmi_deeppysr_pred     continuous    38.8299  25.5282 ± 5.0495                         97.5%  0.008432
+      Predicted BMI : 39.2538

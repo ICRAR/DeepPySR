@@ -12,8 +12,6 @@ from data_utils import load_data_recent, _INSULIN_AGES
 
 import argparse
 
-_N_TOP = 100
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -51,53 +49,43 @@ def main():
         'extra_data': X[['age']] if 'age' in X.columns else None,
     }
 
-    # Baseline models — two runs per model: all features and top-50
+    # Baseline models — trained on the full feature set.
     print("\nEvaluating Baseline Models...")
     baseline_models = get_baseline_models(task='regression', input_dim=X.shape[1])
     for name, model_instance in baseline_models.items():
-        for subfolder, fs_kwargs in [
-            ("all_features", {}),
-            (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
-        ]:
-            model_out = os.path.join(run_out, "baselines", name, subfolder)
-            if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
-                print(f"  Skipping {name}/{subfolder} (results exist)")
-                continue
-            print(f"  {name}/{subfolder}...")
+        model_out = os.path.join(run_out, "baselines", name, "all_features")
+        if os.path.exists(os.path.join(model_out, "overall_metrics.csv")):
+            print(f"  Skipping {name} (results exist)")
+            continue
+        print(f"  {name}...")
 
-            n_feat = min(_N_TOP, X.shape[1]) if fs_kwargs else X.shape[1]
+        def baseline_factory(m=model_instance, n=name, nf=X.shape[1]):
+            if n == 'KAN':
+                return KANWrapper(input_dim=nf, output_dim=1,
+                                  hidden_dim=5, steps=200, update_grid=False,
+                                  task='regression')
+            return clone(m)
 
-            def baseline_factory(m=model_instance, n=name, nf=n_feat):
-                if n == 'KAN':
-                    return KANWrapper(input_dim=nf, output_dim=1,
-                                      hidden_dim=5, steps=200, update_grid=False,
-                                      task='regression')
-                return clone(m)
+        run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs)
 
-            run_cv(baseline_factory, X, y, outdir=model_out, **cv_kwargs, **fs_kwargs)
-
-    # PySR models — two runs per config: all features and top-100
+    # PySR models — trained on the full feature set.
     print("\nEvaluating PySR Models...")
     for cfg_name, cfg_overrides in pysr_configs.items():
         aps = cfg_overrides.get("adaptive_parsimony_scaling", 50.0)
         full_name = f"pysr_{param_suffix}_aps{aps}_grid"
 
-        for subfolder, fs_kwargs in [
-            ("all_features", {}),
-            (f"top{_N_TOP}", {"feature_selection": True, "n_features_to_select": _N_TOP}),
-        ]:
-            pysr_out = os.path.join(run_out, "pysr", full_name, subfolder)
-            if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
-                print(f"  Skipping {full_name}/{subfolder} (results exist)")
-                continue
-            print(f"  {full_name}/{subfolder}...")
+        pysr_out = os.path.join(run_out, "pysr", full_name, "all_features")
+        if os.path.exists(os.path.join(pysr_out, "overall_metrics.csv")):
+            print(f"  Skipping {full_name} (results exist)")
+            continue
+        print(f"  {full_name}...")
 
-            def pysr_factory(co=cfg_overrides):
-                kwargs = pysr_base_kwargs.copy()
-                kwargs.update(co)
-                return PySRRegressor(**kwargs)
+        def pysr_factory(co=cfg_overrides):
+            kwargs = pysr_base_kwargs.copy()
+            kwargs.update(co)
+            return PySRRegressor(**kwargs)
 
-            run_cv(pysr_factory, X, y, outdir=pysr_out, scaler=False, **cv_kwargs, **fs_kwargs)
+        run_cv(pysr_factory, X, y, outdir=pysr_out, scaler=False, **cv_kwargs)
 
     print(f"\nAggregating results for {run_name}...")
     aggregate_results(run_out, task='regression')

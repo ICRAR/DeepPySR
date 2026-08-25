@@ -1,2 +1,2 @@
 model,formula,f1,complexity
-fullsr_vps25_vpr150_aps50.0_nit100_pop100_sz200_grid_r2w1.0_L0.01,"cond(work_type, sin((sin(3.14*hypertension) + sin(3.14*Residence_type))**0.25 + sin(0.02*age - 1.0*sin(31.44*age))))",0.25727069351230425,27.0
+fullsr_vps75_vpr100_aps50.0_nit100_pop100_sz200_grid__interp30,"0.00221687747558228*exp((0.0441241259926867*age + sin(0.901234532821653*age*heart_disease*(work_type + 0.0135319368039302)))*exp(cond(smoking_status, 0.000452601312417545*avg_glucose_level)**0.5))",0.13043478260869565,27.0

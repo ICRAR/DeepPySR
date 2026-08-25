@@ -5,7 +5,7 @@ Unlike analysis_insulin_variant.py, the r2/rmse/mae/pearson_r columns are NOT
 leak-free CV -- they're read straight off each leaf's predictions.csv
 (y_true/y_pred columns), matching how the baseline models are already
 scored. For deeppysr/pysr, "complexity" is a single representative number
-per (variant config, feature-set) leaf:
+per (variant config) leaf:
   - deeppysr: complexity of the highest-r2 row in relationships.csv (the
     pareto candidate the SR search itself ranked best).
   - pysr: mean calculate_complexity(formula) across formulas_fold*.csv,
@@ -17,36 +17,35 @@ relationships_fold*.csv / formulas_fold*.csv in that leaf:
   - best_formula: highest full-dataset r2 among all candidates.
   - interp_formula: highest full-dataset r2 among candidates with
     calculate_complexity() < INTERP_MAX_COMPLEXITY (empty if none qualify).
-Each fold's formulas were fit on that fold's own (scaler/feature-selection)
-view of the data, so before evaluating we reconstruct that exact view --
-same KFold(5, shuffle=True, random_state=42) split as eval_utils.run_cv, the
+Each fold's formulas were fit on that fold's own (scaler) view of the data,
+so before evaluating we reconstruct that exact view -- same
+KFold(5, shuffle=True, random_state=42) split as eval_utils.run_cv, and the
 StandardScaler fit on that fold's train rows (deeppysr only, and only for
 variants whose test_deeppysr_bp_*.py call omits scaler=False -- see
-_deeppysr_uses_scaler), and the SelectKBest(f_regression, k=100) top-100
-subset fit on that fold's train rows (only for ftsl='top100') -- then apply
-that same transform to the full dataset before plugging into the formula.
+_deeppysr_uses_scaler) -- then apply that same transform to the full dataset
+before plugging into the formula.
 
 Produces, under this script's directory:
   bp_aggregated_results.csv   -- every (target, age, input_type, model,
-                                  ftsl, config) row found on disk.
+                                  config) row found on disk.
   bp_best_models.csv          -- best (max f1_macro, clinical-bin
                                   classification) row per
                                   (target, age, input_type, model),
-                                  collapsing across ftsl/config.
+                                  collapsing across config.
   bp_models_vs_age.png        -- 2 subplots (targets) x 3 metric rows
                                   (r2, pearson_r, f1_macro), lines=model,
                                   x=age, best f1_macro collapsed across
-                                  input_type and ftsl.
+                                  input_type.
   bp_input_types_vs_age.png   -- 2 subplots (targets) x 3 metric rows,
                                   lines=input_type, x=age, best f1_macro
-                                  collapsed across model and ftsl.
+                                  collapsed across model.
 
 Also computes a per-model feature-importance/sensitivity comparison at every
 (target, input_type, age) combo, mirroring
 deeppysr_paper/codes/feature_importance_comparison.py's build_importance_table
 but scoped to that single combo instead of a whole dataset:
   - ElasticNet/ExtraTrees/RandomForest/XGBoost: that combo's own winning
-    feature_importance.csv (the ftsl leaf best_df already selected).
+    feature_importance.csv (the best_df-selected config).
   - MLP: SHAP importance from a fresh refit of the paper's MLP architecture
     (common.mlp_shap_importance).
   - PySR: permutation sensitivity (common.formula_sensitivity) of the
@@ -71,7 +70,6 @@ from matplotlib.lines import Line2D
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 from sklearn.model_selection import KFold
-from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.preprocessing import StandardScaler
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -88,8 +86,8 @@ RESULTS_BASE_DIR = os.path.join(current_dir, "results_bp")
 
 TARGETS = ["sys_bp", "dia_bp"]
 AGES = [10, 14, 17, 20, 22]
-FS_SUBFOLDERS = ["all_features", "top100"]
-FTSL_LABELS = {"all_features": "all_feature", "top100": "top100"}
+FS_SUBFOLDERS = ["all_features"]
+FTSL_LABELS = {"all_features": "all_feature"}
 
 INPUT_TYPES = ["PGS", "to5", "PGSto5", "recent"]
 BASELINE_MODELS = ["ElasticNet", "ExtraTrees", "KAN", "MLP", "RandomForest", "XGBoost"]
@@ -106,7 +104,6 @@ INPUT_TYPE_LOADERS = {
 
 N_SPLITS = 5
 RANDOM_STATE = 42
-N_TOP = 100
 INTERP_MAX_COMPLEXITY = 25
 
 # ── Clinical binning for classification-style metrics ────────────────────────
@@ -227,38 +224,28 @@ def _pysr_complexity(config_fs_dir):
     return float(np.mean(complexities)) if complexities else np.nan
 
 
-def _fold_transform(X_all_raw, y_values, train_idx, use_scaler, use_topk, cols):
+def _fold_transform(X_all_raw, train_idx, use_scaler, cols):
     """X_all_raw (n_rows, n_cols) transformed exactly as that fold's model
-    would have seen its inputs (see eval_utils.run_cv: scaler applied before
-    feature_selection), applied to every row (not just that fold's own
-    train/test rows) so the resulting formula can be evaluated in-sample on
-    the whole dataset."""
-    X_train = X_all_raw[train_idx]
+    would have seen its inputs (see eval_utils.run_cv), applied to every row
+    (not just that fold's own train/test rows) so the resulting formula can
+    be evaluated in-sample on the whole dataset."""
     X_all = X_all_raw
     if use_scaler:
-        sc = StandardScaler().fit(X_train)
-        X_train = sc.transform(X_train)
+        sc = StandardScaler().fit(X_all_raw[train_idx])
         X_all = sc.transform(X_all)
-    if use_topk:
-        k = min(N_TOP, X_train.shape[1])
-        selector = SelectKBest(f_regression, k=k).fit(X_train, y_values[train_idx])
-        support = selector.get_support()
-        sel_cols = [c for c, s in zip(cols, support) if s]
-        return pd.DataFrame(X_all[:, support], columns=sel_cols)
     return pd.DataFrame(X_all, columns=cols)
 
 
-def _build_fold_transforms(X_full, y_full, use_scaler, use_topk):
+def _build_fold_transforms(X_full, use_scaler):
     """5 DataFrames (one per CV fold), each holding X_full's rows exactly as
-    that fold's model would have seen them post scaler/feature-selection --
-    reconstructed with the same KFold(5, shuffle=True, random_state=42) used
-    by eval_utils.run_cv (see cv_kwargs in test_*_bp_*.py; no groups or
+    that fold's model would have seen them post scaler -- reconstructed with
+    the same KFold(5, shuffle=True, random_state=42) used by
+    eval_utils.run_cv (see cv_kwargs in test_*_bp_*.py; no groups or
     stratify_by are passed, so plain KFold applies)."""
-    y_values = y_full.values if hasattr(y_full, 'values') else np.array(y_full)
     cols = list(X_full.columns)
     X_all_raw = X_full.values.astype(float)
     splits = list(KFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE).split(X_full))
-    return [_fold_transform(X_all_raw, y_values, train_idx, use_scaler, use_topk, cols)
+    return [_fold_transform(X_all_raw, train_idx, use_scaler, cols)
             for train_idx, _ in splits]
 
 
@@ -340,8 +327,7 @@ def _process_sr_family(age_path, target, age, input_type, family, complexity_fn,
 
             cache_key = (family, fs)
             if cache_key not in transforms_cache:
-                transforms_cache[cache_key] = _build_fold_transforms(
-                    X_full, y_full, use_scaler, use_topk=(fs == 'top100'))
+                transforms_cache[cache_key] = _build_fold_transforms(X_full, use_scaler)
             (best_formula, best_formula_r2, best_formula_complexity,
              interp_formula, interp_formula_r2, interp_formula_complexity) = _best_and_interp_formula(
                 fs_dir, family, transforms_cache[cache_key], y_values, formula_r2_cache, cache_key)
@@ -395,7 +381,7 @@ def process_results():
 
 def select_best_models(df):
     """One row per (target, age, input_type, model): max f1_macro (clinical-
-    bin classification performance) across ftsl/config."""
+    bin classification performance) across config."""
     if df.empty:
         return df
     idx = df.groupby(['target', 'age', 'input_type', 'model'])['f1_macro'].idxmax()
@@ -404,7 +390,7 @@ def select_best_models(df):
 
 def _collapse_best(df, keep_col):
     """Best (max f1_macro) row per (target, age, keep_col), collapsing every
-    other grouping dimension (model/input_type/ftsl/config)."""
+    other grouping dimension (model/input_type/config)."""
     idx = df.groupby(['target', 'age', keep_col])['f1_macro'].idxmax()
     return df.loc[idx].reset_index(drop=True)
 
@@ -421,8 +407,7 @@ def _plot_metric_vs_age(df, keep_col, legend_title, out_path, suptitle, palette_
     best-(max f1_macro) row from _collapse_best, so r2/pearson_r are read off
     the exact row f1_macro was maximized on, not maximized independently per
     metric. palette_name switches to e.g. "tab20" when keep_col has more
-    series than tab10's 10 distinguishable hues (e.g. the 16 model x ftsl
-    combinations in _plot_model_ftsl_per_input_type)."""
+    series than tab10's 10 distinguishable hues."""
     plot_df = _collapse_best(df, keep_col)
     if plot_df.empty:
         print(f"No data to plot for {out_path}.")
@@ -470,9 +455,9 @@ def _plot_metric_vs_age(df, keep_col, legend_title, out_path, suptitle, palette_
 
 def _plot_models_per_input_type(df, out_dir):
     """One models-vs-age grid plot per input_type actually present in df
-    (best f1_macro collapsed across ftsl/config only -- not across
-    input_type), so each plot shows how the models compare within that
-    specific feature-set variant."""
+    (best f1_macro collapsed across config only -- not across input_type),
+    so each plot shows how the models compare within that specific input
+    type."""
     for input_type in INPUT_TYPES:
         sub = df[df['input_type'] == input_type]
         if sub.empty:
@@ -481,76 +466,6 @@ def _plot_models_per_input_type(df, out_dir):
             sub, keep_col='model', legend_title='Model',
             out_path=os.path.join(out_dir, f"bp_models_vs_age_{input_type}.png"),
             suptitle=f'Blood Pressure Prediction ({input_type}): Best Model vs Age')
-
-
-def _plot_overview_by_ftsl(df, out_dir):
-    """Same overview + per-input-type plots as bp_models_vs_age.png /
-    bp_input_types_vs_age.png / bp_models_vs_age_<input_type>.png, but as two
-    full separate sets -- one built only from ftsl='all_feature' rows, one
-    only from ftsl='top100' -- so each set's best-row selection is confined
-    to that feature-set variant instead of picking whichever of the two
-    scored higher (as the unsuffixed files do). Saves, under out_dir:
-      bp_models_vs_age_<ftsl>.png
-      bp_input_types_vs_age_<ftsl>.png
-      bp_models_vs_age_<input_type>_<ftsl>.png
-    for ftsl in ('all_feature', 'top100')."""
-    for ftsl in ['all_feature', 'top100']:
-        sub = df[df['ftsl'] == ftsl]
-        if sub.empty:
-            continue
-        _plot_metric_vs_age(
-            sub, keep_col='model', legend_title='Model',
-            out_path=os.path.join(out_dir, f"bp_models_vs_age_{ftsl}.png"),
-            suptitle=f'Blood Pressure Prediction ({ftsl}): Best Model vs Age')
-        _plot_metric_vs_age(
-            sub, keep_col='input_type', legend_title='Input type',
-            out_path=os.path.join(out_dir, f"bp_input_types_vs_age_{ftsl}.png"),
-            suptitle=f'Blood Pressure Prediction ({ftsl}): Best Input Type vs Age')
-        for input_type in INPUT_TYPES:
-            sub_it = sub[sub['input_type'] == input_type]
-            if sub_it.empty:
-                continue
-            _plot_metric_vs_age(
-                sub_it, keep_col='model', legend_title='Model',
-                out_path=os.path.join(out_dir, f"bp_models_vs_age_{input_type}_{ftsl}.png"),
-                suptitle=f'Blood Pressure Prediction ({input_type}, {ftsl}): Best Model vs Age')
-
-
-def _collapse_best_by_ftsl(df):
-    """Best (max f1_macro) row per (target, age, model, ftsl): collapses only
-    across config (the SR hyperparameter grid point), NOT across ftsl --
-    unlike select_best_models/_collapse_best, which fold all_feature and
-    top100 into one family line. Adds a 'model_ftsl' column (e.g.
-    'XGBoost (top100)', 'deeppysr (all_feature)') so both feature-set
-    variants of every model/family show up as distinct series."""
-    idx = df.groupby(['target', 'age', 'model', 'ftsl'])['f1_macro'].idxmax()
-    out = df.loc[idx].copy()
-    out['model_ftsl'] = out['model'] + ' (' + out['ftsl'] + ')'
-    return out
-
-
-def _plot_model_ftsl_per_input_type(df, out_dir=None):
-    """Per input_type: same R2/Pearson-r-vs-age grid as
-    bp_models_vs_age_<input_type>.png, but all_feature and top100 are kept as
-    separate series per model/family instead of collapsed into one best-of-
-    family line -- e.g. 'XGBoost (all_feature)' vs 'XGBoost (top100)',
-    'deeppysr (all_feature)' vs 'deeppysr (top100)'. Saved under each
-    input_type's own results folder (out_dir override is for testing;
-    production calls always save alongside that variant)."""
-    for input_type in INPUT_TYPES:
-        variant_dir = _variant_dir(input_type)
-        if not os.path.exists(variant_dir):
-            continue
-        sub = df[df['input_type'] == input_type]
-        if sub.empty:
-            continue
-        plot_df = _collapse_best_by_ftsl(sub)
-        save_dir = out_dir or variant_dir
-        _plot_metric_vs_age(
-            plot_df, keep_col='model_ftsl', legend_title='Model (feature set)',
-            out_path=os.path.join(save_dir, "bp_model_ftsl_vs_age.png"),
-            suptitle=f'Blood Pressure Prediction ({input_type}): R2 by Model x Feature-set vs Age',
-            palette_name="tab20")
 
 
 # The only 4 models that actually emit feature_importance.csv for bp (KAN's
@@ -565,8 +480,8 @@ MODEL_COLORS = dict(zip(MODEL_DISPLAY_ORDER, sns.color_palette("tab10", n_colors
 def _collect_feature_importance(variant_dir, target):
     """Long-format feature importance for one (input_type, target) across
     every age found under variant_dir: columns age, model (base name, e.g.
-    'ElasticNet'), ftsl ('all_feature'/'top100'), variable, weight. Each
-    (model, ftsl, age) leaf's feature_importance.csv is normalized to
+    'ElasticNet'), ftsl (always 'all_feature'), variable, weight. Each
+    (model, age) leaf's feature_importance.csv is normalized to
     percent-of-that-leaf's-total first (mirrors
     analysis_insulin_variant.py's aggregate_feature_importance)."""
     importance_data = []
@@ -595,20 +510,18 @@ def _collect_feature_importance(variant_dir, target):
 
 
 def _plot_feature_importance_by_model(imp_df, variant_dir, target, top_n=15):
-    """8 subplots: the 4 FEATURE_IMPORTANCE_MODELS x 2 ftsl (all_feature,
-    top100) -- the only combinations that actually have feature_importance
-    data. Each subplot shows that (model, ftsl)'s own top-N features (by
-    mean weight across ages) on the x-axis, with one grouped bar per age."""
+    """4 subplots, one per FEATURE_IMPORTANCE_MODELS entry. Each subplot
+    shows that model's own top-N features (by mean weight across ages) on
+    the x-axis, with one grouped bar per age."""
     ages_present = sorted(imp_df['age'].unique()) if not imp_df.empty else []
     age_palette = sns.color_palette("viridis", n_colors=max(len(ages_present), 1))
     age_colors = dict(zip(ages_present, age_palette))
 
-    panels = [(m, fs) for m in FEATURE_IMPORTANCE_MODELS for fs in ['all_feature', 'top100']]
-    fig, axes = plt.subplots(2, 4, figsize=(30, 14), squeeze=False)
+    fig, axes = plt.subplots(1, len(FEATURE_IMPORTANCE_MODELS), figsize=(30, 7), squeeze=False)
     axes = axes.reshape(-1)
-    for i, (model, fs) in enumerate(panels):
+    for i, model in enumerate(FEATURE_IMPORTANCE_MODELS):
         ax = axes[i]
-        panel_df = imp_df[(imp_df['model'] == model) & (imp_df['ftsl'] == fs)]
+        panel_df = imp_df[imp_df['model'] == model]
         if panel_df.empty:
             ax.set_visible(False)
             continue
@@ -617,7 +530,7 @@ def _plot_feature_importance_by_model(imp_df, variant_dir, target, top_n=15):
         plot_df['variable'] = pd.Categorical(plot_df['variable'], categories=top_features, ordered=True)
         sns.barplot(data=plot_df, x='variable', y='weight', hue='age', palette=age_colors,
                     hue_order=ages_present, ax=ax)
-        ax.set_title(f'{model} ({fs})', fontsize=16, fontweight='bold')
+        ax.set_title(model, fontsize=16, fontweight='bold')
         ax.set_xlabel('')
         ax.set_ylabel('Importance (%)', fontsize=12)
         ax.tick_params(axis='x', rotation=90, labelsize=9)
@@ -628,7 +541,7 @@ def _plot_feature_importance_by_model(imp_df, variant_dir, target, top_n=15):
     fig.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 1.08),
                ncol=len(ages_present), fontsize=12, frameon=True, title='Age')
     variant_name = os.path.basename(variant_dir)
-    plt.suptitle(f'Top {top_n} Feature Importance by Model x Feature-set ({variant_name}, {target})',
+    plt.suptitle(f'Top {top_n} Feature Importance by Model ({variant_name}, {target})',
                  fontsize=22, fontweight='bold', y=1.14)
     plt.tight_layout()
     plot_path = os.path.join(variant_dir, f"feature_importance_by_model_{target}.png")
@@ -662,17 +575,14 @@ def _feature_importance_per_input_type():
             _aggregate_feature_importance(variant_dir, target)
 
 
-def _plot_predictions_scatter(best_df, out_subdir="scatter_predictions"):
+def _plot_predictions_scatter(best_df):
     """One true-vs-predicted scatter grid per (input_type, target, age), one
     subplot per model present in best_df at that combo (already the best,
     max-f1_macro row per model from select_best_models). y_true/y_pred are read
     straight from that row's winning predictions.csv (best_df's
     source_path) -- the exact predictions the row's r2/rmse/mae/pearson_r
     were computed from, not a re-evaluation. Saved under each input_type's
-    own results folder as <out_subdir>/age_<age>_<target>_scatter.png
-    (out_subdir defaults to scatter_predictions; the all-features-only pass
-    in main() uses scatter_predictions_all_feature so it doesn't clobber the
-    ftsl-collapsed version)."""
+    own results folder as scatter_predictions/age_<age>_<target>_scatter.png."""
     for input_type in INPUT_TYPES:
         variant_dir = _variant_dir(input_type)
         if not os.path.exists(variant_dir):
@@ -680,7 +590,7 @@ def _plot_predictions_scatter(best_df, out_subdir="scatter_predictions"):
         sub_it = best_df[best_df['input_type'] == input_type]
         if sub_it.empty:
             continue
-        out_dir = os.path.join(variant_dir, out_subdir)
+        out_dir = os.path.join(variant_dir, "scatter_predictions")
         os.makedirs(out_dir, exist_ok=True)
         n_saved = 0
 
@@ -743,7 +653,7 @@ def _plot_predictions_scatter(best_df, out_subdir="scatter_predictions"):
             print(f"{n_saved} scatter plot(s) saved under {out_dir}")
 
 
-def _plot_confusion_matrices(best_df, out_subdir="conf_matrix"):
+def _plot_confusion_matrices(best_df):
     """One confusion-matrix grid per (input_type, target, age), one subplot
     per model present in best_df at that combo -- same selection and
     predictions.csv source as _plot_predictions_scatter, but y_true/y_pred
@@ -751,8 +661,7 @@ def _plot_confusion_matrices(best_df, out_subdir="conf_matrix"):
     confusion matrix is computed, so this reads directly as "how often does
     each model's continuous prediction land in the right clinical category."
     Saved under each input_type's own results folder as
-    <out_subdir>/age_<age>_<target>_confmat.png (see _plot_predictions_scatter
-    for the out_subdir convention)."""
+    conf_matrix/age_<age>_<target>_confmat.png."""
     from sklearn.metrics import confusion_matrix
 
     for input_type in INPUT_TYPES:
@@ -762,7 +671,7 @@ def _plot_confusion_matrices(best_df, out_subdir="conf_matrix"):
         sub_it = best_df[best_df['input_type'] == input_type]
         if sub_it.empty:
             continue
-        out_dir = os.path.join(variant_dir, out_subdir)
+        out_dir = os.path.join(variant_dir, "conf_matrix")
         os.makedirs(out_dir, exist_ok=True)
         n_saved = 0
 
@@ -940,10 +849,12 @@ def _bp_conventional_importance(row):
     return dict(zip(df_imp['feature'], 100.0 * df_imp['importance'] / total))
 
 
-def _plot_sensitivity_heatmap(table, out_path, title, top_n=10):
+def _plot_sensitivity_heatmap(table, out_path, title, top_n=10,
+                               cbar_label="% importance (within model)"):
     """Heatmap of top_n features (by max importance across models) x models,
     styled after deeppysr_paper/codes/feature_importance_comparison.py's
-    plot_heatmap."""
+    plot_heatmap. `table`'s columns don't have to be models -- reused by
+    aggregate_permutation_sensitivity with input_type columns instead."""
     top_features = table.max(axis=1).sort_values(ascending=False).head(top_n).index
     plot_df = table.loc[top_features]
     arr = plot_df.values.astype(float)
@@ -974,7 +885,7 @@ def _plot_sensitivity_heatmap(table, out_path, title, top_n=10):
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
     cbar.outline.set_visible(False)
-    cbar.set_label("% importance (within model)", fontsize=11)
+    cbar.set_label(cbar_label, fontsize=11)
 
     ax.set_title(title, fontsize=13, fontweight='bold', loc="left", pad=10)
     fig.tight_layout()
@@ -986,7 +897,7 @@ DEEPPYSR_VARIANT_COLORS = {'Best': '#3987e5', 'Interpretable': '#e58939'}
 
 
 def _plot_deeppysr_sensitivity(row, X_full, y_full, out_dir, target, age, input_type,
-                                n_repeats=15, random_state=42, suffix=""):
+                                n_repeats=15, random_state=42):
     """Combined best-vs-interpretable DeepPySR sensitivity plot for one
     (target, age, input_type) combo: grouped horizontal bars over the union
     of every variable either formula references (no top-N truncation),
@@ -998,11 +909,9 @@ def _plot_deeppysr_sensitivity(row, X_full, y_full, out_dir, target, age, input_
     (in-sample r2 only, no pearson_r/f1_macro stored per-formula).
 
     Saves under out_dir (the same age_<age>_<target> directory as
-    bp_sensitivity<suffix>.csv/.png):
-      bp_deeppysr_sensitivity<suffix>.csv
-      bp_deeppysr_sensitivity<suffix>.png
-    (suffix defaults to "" -- the all-features-only pass in main() uses
-    "_all_feature" so it doesn't clobber the ftsl-collapsed version.)
+    bp_sensitivity.csv/.png):
+      bp_deeppysr_sensitivity.csv
+      bp_deeppysr_sensitivity.png
     """
     variants = []
     for label, formula_col, complexity_col in [
@@ -1065,7 +974,7 @@ def _plot_deeppysr_sensitivity(row, X_full, y_full, out_dir, target, age, input_
     ax.legend(handles, legend_labels, loc='lower right', fontsize=10, frameon=True)
 
     plt.tight_layout()
-    png_path = os.path.join(out_dir, f'bp_deeppysr_sensitivity{suffix}.png')
+    png_path = os.path.join(out_dir, 'bp_deeppysr_sensitivity.png')
     plt.savefig(png_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
 
@@ -1075,12 +984,12 @@ def _plot_deeppysr_sensitivity(row, X_full, y_full, out_dir, target, age, input_
          'r2': v['r2'], 'pearson_r': v['pearson_r'], 'f1_macro': v['f1_macro']}
         for v in variants for var, pct in v['sens'].items()
     ]
-    pd.DataFrame(csv_rows).to_csv(os.path.join(out_dir, f'bp_deeppysr_sensitivity{suffix}.csv'), index=False)
+    pd.DataFrame(csv_rows).to_csv(os.path.join(out_dir, 'bp_deeppysr_sensitivity.csv'), index=False)
 
     return png_path
 
 
-def compute_bp_sensitivity(best_df, n_repeats=15, random_state=42, top_n=10, suffix=""):
+def compute_bp_sensitivity(best_df, n_repeats=15, random_state=42, top_n=10):
     """Per-(target, input_type, age) feature-importance comparison across the
     conventional model families present in best_df (HEATMAP_MODEL_ORDER):
       - ElasticNet/ExtraTrees/RandomForest/XGBoost: that combo's own winning
@@ -1099,12 +1008,10 @@ def compute_bp_sensitivity(best_df, n_repeats=15, random_state=42, top_n=10, suf
 
     Saves, under that combo's own results_bp_<input_type>/
     age_<age>_<target>/ directory:
-      bp_sensitivity<suffix>.csv             -- long format: variable, model, pct
-      bp_sensitivity<suffix>.png             -- heatmap, top_n features x models present
-      bp_deeppysr_sensitivity<suffix>.csv    -- DeepPySR best vs interpretable, all variables
-      bp_deeppysr_sensitivity<suffix>.png    -- grouped bar chart, best vs interpretable
-    (suffix defaults to "" -- the all-features-only pass in main() uses
-    "_all_feature" so it doesn't clobber the ftsl-collapsed version.)
+      bp_sensitivity.csv             -- long format: variable, model, pct
+      bp_sensitivity.png             -- heatmap, top_n features x models present
+      bp_deeppysr_sensitivity.csv    -- DeepPySR best vs interpretable, all variables
+      bp_deeppysr_sensitivity.png    -- grouped bar chart, best vs interpretable
     """
     combos = best_df[['target', 'age', 'input_type']].drop_duplicates()
     if combos.empty:
@@ -1155,7 +1062,7 @@ def compute_bp_sensitivity(best_df, n_repeats=15, random_state=42, top_n=10, suf
 
         if not deeppysr_row.empty and X_full is not None:
             _plot_deeppysr_sensitivity(deeppysr_row.iloc[0], X_full, y_full, age_dir, target, age, input_type,
-                                        n_repeats=n_repeats, random_state=random_state, suffix=suffix)
+                                        n_repeats=n_repeats, random_state=random_state)
 
         if not importances:
             continue
@@ -1170,17 +1077,95 @@ def compute_bp_sensitivity(best_df, n_repeats=15, random_state=42, top_n=10, suf
         long_df.insert(0, 'input_type', input_type)
         long_df.insert(0, 'age', age)
         long_df.insert(0, 'target', target)
-        csv_path = os.path.join(age_dir, f"bp_sensitivity{suffix}.csv")
+        csv_path = os.path.join(age_dir, "bp_sensitivity.csv")
         long_df.to_csv(csv_path, index=False)
 
         title = f'{target} ({input_type}, age {age}): feature importance across models'
-        png_path = os.path.join(age_dir, f"bp_sensitivity{suffix}.png")
+        png_path = os.path.join(age_dir, "bp_sensitivity.png")
         _plot_sensitivity_heatmap(table, png_path, title, top_n=top_n)
 
         all_rows.append(long_df)
         print(f"  Sensitivity saved to {age_dir}")
 
     return pd.concat(all_rows, ignore_index=True) if all_rows else pd.DataFrame()
+
+
+def aggregate_permutation_sensitivity(top_n=15, min_pct=1.0):
+    """Combine every per-combo DeepPySR permutation-sensitivity CSV
+    (bp_deeppysr_sensitivity.csv, written by _plot_deeppysr_sensitivity) into
+    one overview: which variables drive DeepPySR's formulas, and does that
+    change depending on which data source (input_type) the model was given?
+    Only the 'Interpretable' formula_type is kept -- the complexity-capped
+    formula a clinician could actually read, not the unconstrained 'Best'
+    one.
+
+    Ranking is by *how often* a variable is a driver, not its mean
+    sensitivity_pct share -- a plain mean is dominated by combos whose
+    formula happens to have very few terms (a variable alone in a 2-term
+    formula gets ~90%+ of that formula's normalised share by construction,
+    regardless of how rarely it shows up anywhere else). Instead, for each
+    input_type, each variable's cell is "in what % of the (target, age)
+    combos evaluated for that input_type does this variable appear as a
+    driver (sensitivity_pct > min_pct)" -- top_n variables are chosen by
+    total appearance count summed across every input_type.
+
+    Note this view only covers combos where DeepPySR was itself the
+    winning/best_df model with a positive-sensitivity Interpretable formula
+    -- a minority of all (target, age, input_type) combos (see
+    aggregated_results.csv row counts). For the fuller, non-DeepPySR-only
+    picture see the per-combo bp_sensitivity.png heatmaps linked below.
+
+    Saves, under RESULTS_BASE_DIR:
+      bp_deeppysr_sensitivity_overview.csv  -- every kept combo's rows,
+                                                concatenated (unaveraged)
+      bp_deeppysr_sensitivity_overview.png  -- heatmap, top_n variables x
+                                                input_type, % of that input
+                                                type's combos where the
+                                                variable is a driver
+    """
+    rows = []
+    for input_type in INPUT_TYPES:
+        variant_dir = _variant_dir(input_type)
+        if not os.path.exists(variant_dir):
+            continue
+        for target in TARGETS:
+            for age in AGES:
+                f = os.path.join(variant_dir, f"age_{age}_{target}", "bp_deeppysr_sensitivity.csv")
+                if not os.path.exists(f):
+                    continue
+                df = pd.read_csv(f)
+                df = df[df['formula_type'] == 'Interpretable']
+                if not df.empty:
+                    rows.append(df)
+    if not rows:
+        print("No DeepPySR sensitivity data to aggregate.")
+        return pd.DataFrame()
+
+    long_df = pd.concat(rows, ignore_index=True)
+    csv_path = os.path.join(RESULTS_BASE_DIR, "bp_deeppysr_sensitivity_overview.csv")
+    long_df.to_csv(csv_path, index=False)
+    print(f"DeepPySR sensitivity overview saved to {csv_path}")
+
+    combos = long_df[['input_type', 'target', 'age']].drop_duplicates()
+    n_combos = combos.groupby('input_type').size()
+    present = (long_df[long_df['sensitivity_pct'] > min_pct]
+               [['variable', 'input_type', 'target', 'age']].drop_duplicates())
+    counts = present.groupby(['variable', 'input_type']).size().unstack(fill_value=0)
+    it_order = [it for it in INPUT_TYPES if it in n_combos.index]
+    counts = counts.reindex(columns=it_order, fill_value=0)
+    pct_table = counts.div(n_combos.reindex(it_order), axis=1) * 100.0
+
+    top_vars = counts.sum(axis=1).sort_values(ascending=False).head(top_n).index
+    plot_table = pct_table.loc[top_vars]
+
+    png_path = os.path.join(RESULTS_BASE_DIR, "bp_deeppysr_sensitivity_overview.png")
+    _plot_sensitivity_heatmap(
+        plot_table, png_path,
+        title="Blood pressure: how often each variable drives DeepPySR's interpretable formula, by data source"
+              f" (n combos: {', '.join(f'{it}={n}' for it, n in n_combos.items())})",
+        top_n=top_n, cbar_label="% of that input type's combos where this variable is a driver")
+    print(f"DeepPySR sensitivity overview plot saved to {png_path}")
+    return long_df
 
 
 def main():
@@ -1207,8 +1192,6 @@ def main():
         out_path=os.path.join(RESULTS_BASE_DIR, "bp_input_types_vs_age.png"),
         suptitle='Blood Pressure Prediction: Best Input Type vs Age')
     _plot_models_per_input_type(df, RESULTS_BASE_DIR)
-    _plot_overview_by_ftsl(df, RESULTS_BASE_DIR)
-    _plot_model_ftsl_per_input_type(df)
     _feature_importance_per_input_type()
     _plot_predictions_scatter(best_df)
     _plot_confusion_matrices(best_df)
@@ -1216,25 +1199,8 @@ def main():
     print("=== Computing formula sensitivity ===")
     compute_bp_sensitivity(best_df)
 
-    # All-features-only pass: same best-row selection/plots/sensitivity as
-    # above, but restricted to ftsl=='all_feature' rows before picking the
-    # max-f1_macro row per (target, age, input_type, model) -- i.e. top100
-    # never competes for "best" here. Written to distinctly-suffixed/named
-    # outputs (bp_best_models_all_feature.csv, scatter_predictions_all_feature/,
-    # conf_matrix_all_feature/, bp_sensitivity_all_feature.*) so the combined
-    # (ftsl-collapsed) artifacts above are untouched.
-    print("=== All-features-only pass (ftsl == 'all_feature') ===")
-    df_af = df[df['ftsl'] == 'all_feature']
-    best_df_af = select_best_models(df_af)
-    best_csv_af = os.path.join(RESULTS_BASE_DIR, "bp_best_models_all_feature.csv")
-    best_df_af.to_csv(best_csv_af, index=False)
-    print(f"Best models (all_feature only) saved to {best_csv_af}")
-
-    _plot_predictions_scatter(best_df_af, out_subdir="scatter_predictions_all_feature")
-    _plot_confusion_matrices(best_df_af, out_subdir="conf_matrix_all_feature")
-
-    print("=== Computing formula sensitivity (all_feature only) ===")
-    compute_bp_sensitivity(best_df_af, suffix="_all_feature")
+    print("=== Aggregating DeepPySR permutation sensitivity overview ===")
+    aggregate_permutation_sensitivity()
 
 
 if __name__ == "__main__":

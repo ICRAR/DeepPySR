@@ -13,6 +13,7 @@ values -- mirroring bmiforecast_utils's y{year}bmi rolling design, generalized
 to a named target column instead of a fixed 'y{year}bmi' pattern.
 """
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -37,7 +38,8 @@ _lipid_target_series = _lipids_raine_du._lipid_target_series
 _get_target_col = _lipids_raine_du._get_target_col
 _high_age_suffixes = _lipids_raine_du._high_age_suffixes
 _recent_feature_cutoff = _lipids_raine_du._recent_feature_cutoff
-_clean_and_impute = _lipids_raine_du._clean_and_impute
+_prune_columns = _lipids_raine_du._prune_columns
+_impute_columns = _lipids_raine_du._impute_columns
 _dedup_by_child_id = _lipids_raine_du._dedup_by_child_id
 _LIPID_TARGETS = _lipids_raine_du._LIPID_TARGETS
 _LIPIDS_AGES = _lipids_raine_du._LIPIDS_AGES
@@ -107,6 +109,44 @@ def get_age_filtered_feature_cols(feature_cols: list, target_age: int) -> list:
             if not any(suf in c for suf in high_suffixes) and not c.startswith("SUM_PGS")]
 
 
+_WAVE_SUFFIX_RE = re.compile(r"_(?:yr|y)(\d+)$")
+
+
+def _wave_of(col: str) -> int:
+    """Wave number a feature column was measured at (e.g. 'sys_bp_yr14' -> 14),
+    0 for columns with no wave suffix (birth/PGS/demographic -- always available)."""
+    m = _WAVE_SUFFIX_RE.search(col)
+    return int(m.group(1)) if m else 0
+
+
+def _chronological_impute(X: pd.DataFrame) -> pd.DataFrame:
+    """Impute missing values wave-by-wave (ascending), so a column's imputed
+    values are only ever informed by columns measured at the same wave or
+    earlier -- never by a later wave, regardless of which downstream target
+    age eventually consumes that column as a feature.
+
+    Unlike a single joint IterativeImputer.fit_transform() over every column
+    at once (which lets a later-wave column act as a predictor for filling in
+    an earlier-wave column's missing values), this processes columns in
+    increasing wave order, growing the predictor pool with each already-
+    imputed (NaN-free) wave before imputing the next -- so no 'age14'-eligible
+    feature's value can ever have been informed by 'age20'+ data, even
+    indirectly through imputation."""
+    waves = sorted({_wave_of(c) for c in X.columns})
+    imputed_parts = []
+    pool = pd.DataFrame(index=X.index)
+
+    for wave in waves:
+        bucket_cols = [c for c in X.columns if _wave_of(c) == wave]
+        pool_with_bucket = pd.concat([pool, X[bucket_cols]], axis=1)
+        imputed_pool = _impute_columns(pool_with_bucket)
+        bucket_imputed = imputed_pool[bucket_cols]
+        imputed_parts.append(bucket_imputed)
+        pool = pd.concat([pool, bucket_imputed], axis=1)
+
+    return pd.concat(imputed_parts, axis=1)[list(X.columns)]
+
+
 def prepare_base_dataset():
     """Build the merged dataset with explicit rolling target columns for all 4
     lipid targets at all 5 ages, plus a shared, cleaned/imputed feature set.
@@ -145,8 +185,11 @@ def prepare_base_dataset():
     # waves (27, 28) that no step's cutoff ever admits as a feature.
     feature_cols = get_age_filtered_feature_cols(feature_cols, max(AGES))
 
-    print(f"\n=== Cleaning + imputing {len(feature_cols)} feature columns ===")
-    X = _clean_and_impute(merged[feature_cols].copy())
+    print(f"\n=== Cleaning {len(feature_cols)} feature columns ===")
+    X = _prune_columns(merged[feature_cols].copy())
+    print(f"\n=== Chronologically imputing {len(X.columns)} feature columns (wave-by-wave, "
+          f"no later-wave data informs an earlier-wave column's imputed values) ===")
+    X = _chronological_impute(X)
     feature_cols = list(X.columns)
 
     merged = pd.concat([

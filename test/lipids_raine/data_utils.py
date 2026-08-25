@@ -609,8 +609,8 @@ def _add_missing_bmi(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
-    """Drop high-NaN, duplicate, perfectly-correlated, and date columns; then impute."""
+def _prune_columns(X: pd.DataFrame) -> pd.DataFrame:
+    """Drop high-NaN, duplicate, perfectly-correlated, and date columns."""
     nan_props = X.isna().mean().sort_values(ascending=False)
     print("\n[NaN proportions per column]")
     for col, prop in nan_props.items():
@@ -650,7 +650,17 @@ def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
         print(f"\n[dropping date columns] {date_cols}")
     X = X.drop(columns=date_cols)
 
-    # impute: categorical cols → mode, continuous → IterativeImputer
+    return X
+
+
+def _impute_columns(X: pd.DataFrame) -> pd.DataFrame:
+    """Impute categorical cols → mode, continuous → IterativeImputer.
+
+    Every column in X is used as a mutual predictor for every other column
+    (IterativeImputer imputes jointly) -- callers that need to keep later
+    information from leaking into an earlier column's imputed values (e.g.
+    lipidsforecast's chronological, per-wave-bucket imputation) must restrict
+    X to the appropriate column subset before calling this."""
     numeric_cols = X.select_dtypes(include="number").columns.tolist()
     cat_cols = [c for c in numeric_cols
                 if _is_categorical_col(c) or X[c].nunique() < 13]
@@ -663,6 +673,11 @@ def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
         X[cont_cols] = IterativeImputer(max_iter=50, random_state=42).fit_transform(X[cont_cols])
 
     return X
+
+
+def _clean_and_impute(X: pd.DataFrame) -> pd.DataFrame:
+    """Drop high-NaN, duplicate, perfectly-correlated, and date columns; then impute."""
+    return _impute_columns(_prune_columns(X))
 
 
 def _high_age_suffixes(cutoff: int) -> set:
