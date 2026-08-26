@@ -1,6 +1,18 @@
 """Aggregate regression results for the blood-pressure RAINE tests (sys_bp,
 dia_bp) across all input-type variants under results_bp/.
 
+INPUT_TYPES has 12 entries: the 4 base variants (PGS, to5, PGSto5, recent)
+plus, for each, a male-only ('_male') and female-only ('_female') variant
+trained on the same features but restricted to one sex (RAINE's
+G2_data_dictionary SEXa coding: 0=male, 1=female -- see data_utils.py's
+`sex` loader parameter, which still takes the raw 0/1 value; only the
+results-folder/input_type naming uses the human-readable male/female tag).
+Sex-specific results live under results_bp_<base>_<male|female>/, produced
+by the same training scripts via a --sex {0,1} flag; every function in this
+file is generic over INPUT_TYPES and treats a sex-specific entry exactly
+like any other input_type once INPUT_TYPE_LOADERS/_deeppysr_uses_scaler
+know how to resolve it.
+
 Unlike analysis_insulin_variant.py, the r2/rmse/mae/pearson_r columns are NOT
 leak-free CV -- they're read straight off each leaf's predictions.csv
 (y_true/y_pred columns), matching how the baseline models are already
@@ -89,17 +101,42 @@ AGES = [10, 14, 17, 20, 22]
 FS_SUBFOLDERS = ["all_features"]
 FTSL_LABELS = {"all_features": "all_feature"}
 
-INPUT_TYPES = ["PGS", "to5", "PGSto5", "recent"]
+# 4 base input types, each immediately followed by its two sex-stratified
+# variants (_male/_female, i.e. sex=0/1 per RAINE's G2_data_dictionary SEXa
+# coding -- see data_utils.py's sex parameter, which still takes the raw 0/1
+# value; only this results-folder/input_type naming uses the human-readable
+# tag). Sex-specific runs are otherwise treated exactly like any other
+# input_type throughout this file: _variant_dir(), _deeppysr_uses_scaler(),
+# the sensitivity/plotting functions etc. are all generic over INPUT_TYPES
+# and need no per-entry special-casing beyond what's below -- results live
+# under results_bp_<base>_<male|female>/, matching _variant_dir's existing
+# f"results_bp_{input_type}" pattern unchanged.
+INPUT_TYPES = [
+    "PGS", "PGS_male", "PGS_female",
+    "to5", "to5_male", "to5_female",
+    "PGSto5", "PGSto5_male", "PGSto5_female",
+    "recent", "recent_male", "recent_female",
+]
 BASELINE_MODELS = ["ElasticNet", "ExtraTrees", "KAN", "MLP", "RandomForest", "XGBoost"]
 
 # load_fn per input_type -- mirrors the _LOAD_FN dicts in
 # test_baselines_pysr_bp_to5.py / test_deeppysr_bp_to5.py (PGS, to5, PGSto5)
 # and test_baselines_pysr_bp_recent.py / test_deeppysr_bp_recent.py (recent).
+# The _male/_female entries bind sex=0/1 (data_utils.py's `sex` parameter is
+# still the raw RAINE 0/1 coding) into the same base loader.
 INPUT_TYPE_LOADERS = {
-    'PGS':    load_data_PGS_only,
-    'to5':    load_data_keepto5,
-    'PGSto5': load_data_PGSto5,
-    'recent': load_data_recent,
+    'PGS':           load_data_PGS_only,
+    'PGS_male':      lambda target, age: load_data_PGS_only(target, age, sex=0),
+    'PGS_female':    lambda target, age: load_data_PGS_only(target, age, sex=1),
+    'to5':           load_data_keepto5,
+    'to5_male':      lambda target, age: load_data_keepto5(target, age, sex=0),
+    'to5_female':    lambda target, age: load_data_keepto5(target, age, sex=1),
+    'PGSto5':        load_data_PGSto5,
+    'PGSto5_male':   lambda target, age: load_data_PGSto5(target, age, sex=0),
+    'PGSto5_female': lambda target, age: load_data_PGSto5(target, age, sex=1),
+    'recent':        load_data_recent,
+    'recent_male':   lambda target, age: load_data_recent(target, age, sex=0),
+    'recent_female': lambda target, age: load_data_recent(target, age, sex=1),
 }
 
 N_SPLITS = 5
@@ -157,12 +194,24 @@ def _variant_dir(input_type):
     return os.path.join(RESULTS_BASE_DIR, f"results_bp_{input_type}")
 
 
+def _base_input_type(input_type):
+    """Strip a trailing sex suffix ('_male'/'_female') to get the base variant
+    name, e.g. 'recent_female' -> 'recent'. Base (unsuffixed) input types pass
+    through unchanged. Used wherever behavior is keyed off which training
+    script produced a variant, not the sex-filtering itself."""
+    for suffix in ('_male', '_female'):
+        if input_type.endswith(suffix):
+            return input_type[:-len(suffix)]
+    return input_type
+
+
 def _deeppysr_uses_scaler(input_type):
     """test_deeppysr_bp_recent.py passes scaler=False explicitly; the
     to5/PGS/PGSto5 script test_deeppysr_bp_to5.py omits scaler=..., so
     eval_utils.run_cv's default (True) applies there. PySR always runs with
-    scaler=False regardless of input_type."""
-    return input_type != 'recent'
+    scaler=False regardless of input_type. recent_male/recent_female (and
+    every other sex-suffixed tag) inherit their base variant's behavior."""
+    return _base_input_type(input_type) != 'recent'
 
 
 def _process_baselines(age_path, target, age, input_type, rows):
@@ -1190,7 +1239,8 @@ def main():
     _plot_metric_vs_age(
         df, keep_col='input_type', legend_title='Input type',
         out_path=os.path.join(RESULTS_BASE_DIR, "bp_input_types_vs_age.png"),
-        suptitle='Blood Pressure Prediction: Best Input Type vs Age')
+        suptitle='Blood Pressure Prediction: Best Input Type vs Age',
+        palette_name="tab20")
     _plot_models_per_input_type(df, RESULTS_BASE_DIR)
     _feature_importance_per_input_type()
     _plot_predictions_scatter(best_df)

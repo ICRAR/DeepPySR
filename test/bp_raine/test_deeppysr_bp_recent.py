@@ -21,9 +21,13 @@ def main():
     parser.add_argument('--vps', type=int, default=25)
     parser.add_argument('--save_hof', action='store_true',
                         help='Persist PySR hall-of-fame/checkpoint files (large; off by default).')
+    parser.add_argument('--sex', type=int, default=None, choices=[0, 1],
+                        help='Restrict to one sex (0=male, 1=female); omit for the unfiltered run.')
     args = parser.parse_args()
 
     results_dir = "results_bp/results_bp_recent"
+    if args.sex is not None:
+        results_dir = f"{results_dir}_{'male' if args.sex == 0 else 'female'}"
     out_root = os.path.join(current_dir, results_dir)
     os.makedirs(out_root, exist_ok=True)
 
@@ -41,8 +45,8 @@ def main():
     r2w_list = [1, 1.5, 2]
     lambda_list = [0.001, 0.005, 0.01]
 
-    print(f"\nLoading recent data for target={args.target}, age={args.age}...")
-    ids, X, y = load_data_recent(args.target, args.age)
+    print(f"\nLoading recent data for target={args.target}, age={args.age}, sex={args.sex}...")
+    ids, X, y = load_data_recent(args.target, args.age, sex=args.sex)
     y = y.rename(args.target)
 
     run_name = f"age_{args.age}_{args.target}"
