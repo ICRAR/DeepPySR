@@ -472,7 +472,7 @@ def get_pysr_base_kwargs(os_cpu_count=None, use_explicit_cond=False, save_hof=Fa
         # "warm_start": True,
         "unary_operators": ["exp", "log", "sin", "sqrt"],
         "parsimony": 0.001,
-        "populations": 100,
+        "populations": 150,
         "population_size": 200,
         "ncycles_per_iteration": 200,
         "verbosity": 0,
